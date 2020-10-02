@@ -102,15 +102,18 @@ mod tests {
     use super::*;
 
     fn test_basic_message() -> std::io::Result<()> {
-        let network = Network::run_daemon();
-        let raft = Arc::new(Raft {});
-        let name = "test-basic-message";
+        let client = {
+            let network = Network::run_daemon();
+            let raft = Arc::new(Raft {});
+            let name = "test-basic-message";
 
-        register_server(raft, name, network.clone())?;
-        let client = network
-            .lock()
-            .expect("Network lock should not be poisoned")
-            .make_client("test-basic-message", name);
+            register_server(raft, name, network.clone())?;
+            let client = network
+                .lock()
+                .expect("Network lock should not be poisoned")
+                .make_client("test-basic-message", name);
+            client
+        };
 
         let request = RequestVoteArgs { term: 2021 };
         let response =

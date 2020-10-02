@@ -46,6 +46,7 @@ impl Default for Peer {
     }
 }
 
+#[derive(Clone, Copy, Serialize, Deserialize)]
 struct LogEntry {
     term: Term,
     index: usize,
@@ -106,11 +107,17 @@ struct RequestVoteReply {
 #[derive(Serialize, Deserialize)]
 struct AppendEntriesArgs {
     term: Term,
+    leader_id: Peer,
+    prev_log_index: usize,
+    prev_log_term: Term,
+    entries: Vec<LogEntry>,
+    leader_commit: usize,
 }
 
 #[derive(Serialize, Deserialize)]
 struct AppendEntriesReply {
     term: Term,
+    success: bool,
 }
 
 impl Raft {
@@ -173,10 +180,59 @@ impl Raft {
 
     pub(crate) fn process_append_entries(
         &self,
-        request: AppendEntriesArgs,
+        args: AppendEntriesArgs,
     ) -> AppendEntriesReply {
+        let mut rf = self.inner_state.lock();
+        if rf.current_term > args.term {
+            return AppendEntriesReply {
+                term: rf.current_term,
+                success: false,
+            };
+        }
+
+        if rf.current_term < args.term {
+            rf.current_term = args.term;
+            rf.voted_for = None;
+        }
+
+        rf.state = State::Follower;
+        // TODO: reset election timer
+        // TODO: stop previous election
+        rf.leader_id = args.leader_id;
+
+        if rf.log.len() <= args.prev_log_index
+            || rf.log[args.prev_log_index].term != args.term
+        {
+            return AppendEntriesReply {
+                term: args.term,
+                success: false,
+            };
+        }
+
+        for (i, entry) in args.entries.iter().enumerate() {
+            let index = i + args.prev_log_index + 1;
+            if rf.log.len() > index {
+                if rf.log[index].term != entry.term {
+                    rf.log.truncate(index);
+                    rf.log.push(entry.clone());
+                }
+            } else {
+                rf.log.push(entry.clone());
+            }
+        }
+
+        if args.leader_commit > rf.commit_index {
+            rf.commit_index = if args.leader_commit < rf.log.len() {
+                args.leader_commit
+            } else {
+                rf.log.len() - 1
+            };
+            // TODO: apply commands.
+        }
+
         AppendEntriesReply {
-            term: Term(request.term.0 - 1),
+            term: args.term,
+            success: true,
         }
     }
 }

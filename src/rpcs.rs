@@ -145,11 +145,19 @@ mod tests {
         )?;
         assert_eq!(true, response.vote_granted);
 
-        let request = AppendEntriesArgs { term: Term(2021) };
+        let request = AppendEntriesArgs {
+            term: Term(2021),
+            leader_id: Default::default(),
+            prev_log_index: 0,
+            prev_log_term: Default::default(),
+            entries: vec![],
+            leader_commit: 0,
+        };
         let response = futures::executor::block_on(
             rpc_client.call_append_entries(0, request),
         )?;
-        assert_eq!(2020, response.term.0);
+        assert_eq!(2021, response.term.0);
+        assert_eq!(false, response.success);
 
         Ok(())
     }

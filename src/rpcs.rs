@@ -25,21 +25,6 @@ impl RpcHandler for RequestVoteRpcHandler {
     }
 }
 
-pub(crate) const REQUEST_VOTE_RPC: &'static str = "Raft.RequestVote";
-pub(crate) async fn call_request_vote(
-    client: &Client,
-    request: RequestVoteArgs,
-) -> std::io::Result<RequestVoteReply> {
-    let data = RequestMessage::from(
-        bincode::serialize(&request)
-            .expect("Serialization of requests should not fail"),
-    );
-    let reply = client.call_rpc(REQUEST_VOTE_RPC.to_owned(), data).await?;
-
-    Ok(bincode::deserialize(reply.as_ref())
-        .expect("Deserialization of reply should not fail"))
-}
-
 struct AppendEntriesRpcHandler(Arc<Raft>);
 
 impl RpcHandler for AppendEntriesRpcHandler {
@@ -55,20 +40,50 @@ impl RpcHandler for AppendEntriesRpcHandler {
     }
 }
 
+pub(crate) const REQUEST_VOTE_RPC: &'static str = "Raft.RequestVote";
 pub(crate) const APPEND_ENTRIES_RPC: &'static str = "Raft.AppendEntries";
-pub(crate) async fn call_append_entries(
-    client: &Client,
-    request: AppendEntriesArgs,
-) -> std::io::Result<AppendEntriesReply> {
-    let data = RequestMessage::from(
-        bincode::serialize(&request)
-            .expect("Serialization of requests should not fail"),
-    );
-    let reply = client.call_rpc(APPEND_ENTRIES_RPC.to_owned(), data).await?;
 
-    Ok(bincode::deserialize(reply.as_ref())
-        .expect("Deserialization of reply should not fail"))
+#[derive(Default)]
+pub(crate) struct RpcClient(Vec<Client>);
+
+impl RpcClient {
+    pub(crate) async fn call_request_vote(
+        &self,
+        client_index: usize,
+        request: RequestVoteArgs,
+    ) -> std::io::Result<RequestVoteReply> {
+        let data = RequestMessage::from(
+            bincode::serialize(&request)
+                .expect("Serialization of requests should not fail"),
+        );
+        let reply = self.0[client_index]
+            .call_rpc(REQUEST_VOTE_RPC.to_owned(), data)
+            .await?;
+
+        Ok(bincode::deserialize(reply.as_ref())
+            .expect("Deserialization of reply should not fail"))
+    }
+
+    pub(crate) async fn call_append_entries(
+        &self,
+        client_index: usize,
+        request: AppendEntriesArgs,
+    ) -> std::io::Result<AppendEntriesReply> {
+        let data = RequestMessage::from(
+            bincode::serialize(&request)
+                .expect("Serialization of requests should not fail"),
+        );
+        let reply = self.0[client_index]
+            .call_rpc(APPEND_ENTRIES_RPC.to_owned(), data)
+            .await?;
+
+        Ok(bincode::deserialize(reply.as_ref())
+            .expect("Deserialization of reply should not fail"))
+    }
 }
+
+unsafe impl Send for RpcClient {}
+unsafe impl Sync for RpcClient {}
 
 pub(crate) fn register_server<S: AsRef<str>>(
     raft: Arc<Raft>,
@@ -104,7 +119,9 @@ mod tests {
     fn test_basic_message() -> std::io::Result<()> {
         let client = {
             let network = Network::run_daemon();
-            let raft = Arc::new(Raft {});
+            let raft = Arc::new(Raft {
+                ..Default::default()
+            });
             let name = "test-basic-message";
 
             register_server(raft, name, network.clone())?;
@@ -115,14 +132,17 @@ mod tests {
             client
         };
 
+        let rpc_client = RpcClient(vec![client]);
         let request = RequestVoteArgs { term: 2021 };
-        let response =
-            futures::executor::block_on(call_request_vote(&client, request))?;
+        let response = futures::executor::block_on(
+            rpc_client.call_request_vote(0, request),
+        )?;
         assert_eq!(2022, response.term);
 
         let request = AppendEntriesArgs { term: 2021 };
-        let response =
-            futures::executor::block_on(call_append_entries(&client, request))?;
+        let response = futures::executor::block_on(
+            rpc_client.call_append_entries(0, request),
+        )?;
         assert_eq!(2020, response.term);
 
         Ok(())

@@ -7,12 +7,12 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+bincode = "1.3.1"
 labrpc = { path = "../labrpc" }
-tokio = "0.2.22"
 parking_lot = "0.11.0"
 serde = "1.0.116"
 serde_derive = "1.0.116"
-bincode = "1.3.1"
+tokio = { version = "0.2.22", features = ["rt-threaded", "time"] }
 
 [dev-dependencies]
 futures = { version = "0.3.5", features = ["thread-pool"] }

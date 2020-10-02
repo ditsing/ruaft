@@ -19,24 +19,44 @@ enum State {
     Leader,
 }
 
+#[derive(
+    Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize,
+)]
+struct Term(usize);
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
+struct Peer(usize);
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+struct Command(usize);
+
 // TODO: remove all of the defaults.
 impl Default for State {
     fn default() -> Self {
         Self::Leader
     }
 }
+impl Default for Term {
+    fn default() -> Self {
+        Self(0)
+    }
+}
+impl Default for Peer {
+    fn default() -> Self {
+        Self(0)
+    }
+}
 
 struct LogEntry {
-    term: usize,
+    term: Term,
     index: usize,
     // TODO: Allow sending of arbitrary information.
-    command: usize,
+    command: Command,
 }
 
 #[derive(Default)]
 struct RaftState {
-    current_term: usize,
-    voted_for: Option<usize>,
+    current_term: Term,
+    voted_for: Option<Peer>,
     log: Vec<LogEntry>,
 
     commit_index: usize,
@@ -48,7 +68,7 @@ struct RaftState {
 
     state: State,
 
-    leader_id: usize,
+    leader_id: Peer,
     // election_timer: timer,
 }
 
@@ -57,7 +77,7 @@ struct Raft {
     inner_state: Mutex<RaftState>,
     peers: RpcClient,
 
-    me: usize,
+    me: Peer,
 
     vote_mutex: Mutex<()>,
     vote_cond: Condvar,
@@ -71,29 +91,41 @@ struct Raft {
 
 #[derive(Serialize, Deserialize)]
 struct RequestVoteArgs {
-    term: usize,
-    candidate_id: usize,
+    term: Term,
+    candidate_id: Peer,
     last_log_index: usize,
-    last_log_term: usize,
+    last_log_term: Term,
 }
 
 #[derive(Serialize, Deserialize)]
 struct RequestVoteReply {
-    term: usize,
+    term: Term,
     vote_granted: bool,
 }
 
 #[derive(Serialize, Deserialize)]
 struct AppendEntriesArgs {
-    term: usize,
+    term: Term,
 }
 
 #[derive(Serialize, Deserialize)]
 struct AppendEntriesReply {
-    term: usize,
+    term: Term,
 }
 
 impl Raft {
+    pub fn new() -> Self {
+        let mut raft = Self {
+            ..Default::default()
+        };
+        raft.inner_state.lock().log.push(LogEntry {
+            term: Default::default(),
+            index: 0,
+            command: Command(0),
+        });
+        raft
+    }
+
     pub(crate) fn process_request_vote(
         &self,
         args: RequestVoteArgs,
@@ -144,7 +176,7 @@ impl Raft {
         request: AppendEntriesArgs,
     ) -> AppendEntriesReply {
         AppendEntriesReply {
-            term: request.term - 1,
+            term: Term(request.term.0 - 1),
         }
     }
 }

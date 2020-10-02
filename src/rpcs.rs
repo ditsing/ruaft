@@ -115,35 +115,41 @@ pub(crate) fn register_server<S: AsRef<str>>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Term;
 
+    #[test]
     fn test_basic_message() -> std::io::Result<()> {
         let client = {
             let network = Network::run_daemon();
-            let raft = Arc::new(Raft {
-                ..Default::default()
-            });
+            let raft = Arc::new(Raft::new());
             let name = "test-basic-message";
 
             register_server(raft, name, network.clone())?;
             let client = network
                 .lock()
                 .expect("Network lock should not be poisoned")
-                .make_client("test-basic-message", name);
+                .make_client("test-basic-message", name.to_owned() + "-server");
             client
         };
 
         let rpc_client = RpcClient(vec![client]);
-        let request = RequestVoteArgs { term: 2021 };
+        let request = RequestVoteArgs {
+            term: Term(2021),
+
+            candidate_id: Default::default(),
+            last_log_index: 0,
+            last_log_term: Default::default(),
+        };
         let response = futures::executor::block_on(
             rpc_client.call_request_vote(0, request),
         )?;
-        assert_eq!(2022, response.term);
+        assert_eq!(true, response.vote_granted);
 
-        let request = AppendEntriesArgs { term: 2021 };
+        let request = AppendEntriesArgs { term: Term(2021) };
         let response = futures::executor::block_on(
             rpc_client.call_append_entries(0, request),
         )?;
-        assert_eq!(2020, response.term);
+        assert_eq!(2020, response.term.0);
 
         Ok(())
     }

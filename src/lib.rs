@@ -276,11 +276,14 @@ impl Raft {
         let me = self.me;
 
         let mut votes = vec![];
-        for i in 0..self.peers.len() {
-            if i != self.me.0 {
+        for (index, rpc_client) in self.peers.iter().enumerate() {
+            if index != self.me.0 {
+                // RpcClient must be cloned to avoid sending its reference
+                // across threads.
+                let rpc_client = rpc_client.clone();
                 // RPCs are started right away.
                 let one_vote = tokio::spawn(Self::request_one_vote(
-                    self.peers[i].clone(),
+                    rpc_client,
                     term,
                     me,
                     last_log_index,

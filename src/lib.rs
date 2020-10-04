@@ -1,20 +1,28 @@
 #![allow(unused)]
 
 extern crate bincode;
+extern crate futures;
 extern crate labrpc;
 extern crate rand;
 #[macro_use]
 extern crate serde_derive;
 extern crate tokio;
 
-use crate::rpcs::RpcClient;
+use std::future::Future;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::Arc;
+use std::time::Duration;
+
+use futures::FutureExt;
 use parking_lot::{Condvar, Mutex};
 use rand::{thread_rng, Rng};
-use std::sync::atomic::AtomicBool;
-use tokio::time::Duration;
+
+use crate::rpcs::RpcClient;
+use std::cell::RefCell;
 
 pub mod rpcs;
 
+#[derive(Eq, PartialEq)]
 enum State {
     Follower,
     Candidate,
@@ -73,19 +81,19 @@ struct RaftState {
     state: State,
 
     leader_id: Peer,
-    // Timer will be removed upon shutdown.
+
+    // Current election cancel token, might be None if no election is running.
+    election_cancel_token: Option<tokio::sync::oneshot::Sender<Term>>,
+    // Timer will be removed upon shutdown or elected.
     election_timer: Option<tokio::time::Delay>,
 }
 
 #[derive(Default)]
 struct Raft {
-    inner_state: Mutex<RaftState>,
-    peers: RpcClient,
+    inner_state: Arc<Mutex<RaftState>>,
+    peers: Vec<RpcClient>,
 
     me: Peer,
-
-    vote_mutex: Mutex<()>,
-    vote_cond: Condvar,
 
     // new_log_entry: Sender<usize>,
     // new_log_entry: Receiver<usize>,
@@ -153,8 +161,8 @@ impl Raft {
             rf.current_term = args.term;
             rf.voted_for = None;
             rf.state = State::Follower;
-            // TODO: quit current election
             rf.reset_election_timer();
+            rf.stop_current_election();
             rf.persist();
         }
 
@@ -168,6 +176,7 @@ impl Raft {
         {
             rf.voted_for = Some(args.candidate_id);
             rf.reset_election_timer();
+            // No need to stop the election. We are not a candidate.
             rf.persist();
 
             RequestVoteReply {
@@ -201,7 +210,7 @@ impl Raft {
 
         rf.state = State::Follower;
         rf.reset_election_timer();
-        // TODO: stop previous election
+        rf.stop_current_election();
         rf.leader_id = args.leader_id;
 
         if rf.log.len() <= args.prev_log_index
@@ -239,6 +248,146 @@ impl Raft {
             success: true,
         }
     }
+
+    async fn retry_rpc<Func, Fut, T>(
+        max_retry: usize,
+        mut task_gen: Func,
+    ) -> std::io::Result<T>
+    where
+        Fut: Future<Output = std::io::Result<T>> + Send + 'static,
+        Func: FnMut(usize) -> Fut,
+    {
+        for i in 0..max_retry {
+            if let Ok(reply) = task_gen(i).await {
+                return Ok(reply);
+            }
+            tokio::time::delay_for(tokio::time::Duration::from_millis(
+                (1 << i) * 10,
+            ))
+            .await;
+        }
+        Err(std::io::Error::new(
+            std::io::ErrorKind::TimedOut,
+            format!("Timed out after {} retries", max_retry),
+        ))
+    }
+
+    fn run_election(&self) {
+        let (term, last_log_index, last_log_term, cancel_token) = {
+            let mut rf = self.inner_state.lock();
+
+            let (tx, rx) = tokio::sync::oneshot::channel();
+            rf.current_term.0 += 1;
+
+            rf.voted_for = Some(self.me);
+            rf.state = State::Candidate;
+            rf.reset_election_timer();
+            rf.stop_current_election();
+
+            rf.election_cancel_token.replace(tx);
+
+            rf.persist();
+
+            (
+                rf.current_term,
+                rf.log.len() - 1,
+                rf.log.last().unwrap().term,
+                rx,
+            )
+        };
+
+        let me = self.me;
+
+        let mut votes = vec![];
+        for i in 0..self.peers.len() {
+            if i != self.me.0 {
+                // Make a clone now so that self will not be passed across await
+                // boundary.
+                let rpc_client = self.peers[i].clone();
+                let one_vote = async move {
+                    let reply_future = Self::retry_rpc(4, move |_round| {
+                        rpc_client.clone().call_request_vote(RequestVoteArgs {
+                            term,
+                            candidate_id: me,
+                            last_log_index,
+                            last_log_term,
+                        })
+                    });
+                    if let Ok(reply) = reply_future.await {
+                        return Some(reply.vote_granted && reply.term == term);
+                    }
+                    return None;
+                };
+                // Futures must be pinned so that they have Unpin, as required
+                // by futures::future::select.
+                votes.push(Box::pin(one_vote));
+            }
+        }
+
+        tokio::spawn(Self::count_vote_util_cancelled(
+            term,
+            self.inner_state.clone(),
+            votes,
+            self.peers.len() / 2,
+            cancel_token,
+        ));
+    }
+
+    async fn count_vote_util_cancelled(
+        term: Term,
+        rf: Arc<Mutex<RaftState>>,
+        votes: Vec<impl Future<Output = Option<bool>> + Unpin>,
+        majority: usize,
+        cancel_token: tokio::sync::oneshot::Receiver<Term>,
+    ) {
+        let mut vote_count = 0;
+        let mut against_count = 0;
+        let mut cancel_token = cancel_token;
+        let mut futures_vec = votes;
+        while vote_count < majority && against_count <= majority {
+            // Mixing tokio futures with futures-rs ones. Fingers crossed.
+            let selected = futures::future::select(
+                cancel_token,
+                futures::future::select_all(futures_vec),
+            )
+            .await;
+            let ((one_vote, index, rest), new_token) = match selected {
+                futures::future::Either::Left(_) => break,
+                futures::future::Either::Right(tuple) => tuple,
+            };
+
+            futures_vec = rest;
+            cancel_token = new_token;
+
+            if let Some(vote) = one_vote {
+                if vote {
+                    vote_count += 1
+                } else {
+                    against_count += 1
+                }
+            }
+        }
+
+        if vote_count < majority {
+            return;
+        }
+        let mut rf = rf.lock();
+        if rf.current_term == term && rf.state == State::Candidate {
+            rf.state = State::Leader;
+        }
+        let log_len = rf.log.len();
+        for item in rf.next_index.iter_mut() {
+            *item = log_len;
+        }
+        for item in rf.match_index.iter_mut() {
+            *item = 0;
+        }
+        // TODO: send heartbeats.
+        // Drop the timer and cancel token.
+        rf.election_cancel_token.take();
+        rf.election_timer.take();
+        rf.persist();
+    }
 }
 
 const HEARTBEAT_INTERVAL_MILLIS: u64 = 150;
@@ -257,6 +406,12 @@ impl RaftState {
             ELECTION_TIMEOUT_BASE_MILLIS
                 + thread_rng().gen_range(0, ELECTION_TIMEOUT_VAR_MILLIS),
         )
+    }
+
+    fn stop_current_election(&mut self) {
+        self.election_cancel_token
+            .take()
+            .map(|sender| sender.send(self.current_term));
     }
 
     fn persist(&self) {

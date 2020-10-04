@@ -43,47 +43,41 @@ impl RpcHandler for AppendEntriesRpcHandler {
 pub(crate) const REQUEST_VOTE_RPC: &'static str = "Raft.RequestVote";
 pub(crate) const APPEND_ENTRIES_RPC: &'static str = "Raft.AppendEntries";
 
-#[derive(Default)]
-pub(crate) struct RpcClient(Vec<Client>);
+#[derive(Clone)]
+pub(crate) struct RpcClient(Client);
 
 impl RpcClient {
     pub(crate) async fn call_request_vote(
-        &self,
-        client_index: usize,
+        self: Self,
         request: RequestVoteArgs,
     ) -> std::io::Result<RequestVoteReply> {
         let data = RequestMessage::from(
             bincode::serialize(&request)
                 .expect("Serialization of requests should not fail"),
         );
-        let reply = self.0[client_index]
-            .call_rpc(REQUEST_VOTE_RPC.to_owned(), data)
-            .await?;
+
+        let reply = self.0.call_rpc(REQUEST_VOTE_RPC.to_owned(), data).await?;
 
         Ok(bincode::deserialize(reply.as_ref())
             .expect("Deserialization of reply should not fail"))
     }
 
     pub(crate) async fn call_append_entries(
-        &self,
-        client_index: usize,
+        self: Self,
         request: AppendEntriesArgs,
     ) -> std::io::Result<AppendEntriesReply> {
         let data = RequestMessage::from(
             bincode::serialize(&request)
                 .expect("Serialization of requests should not fail"),
         );
-        let reply = self.0[client_index]
-            .call_rpc(APPEND_ENTRIES_RPC.to_owned(), data)
-            .await?;
+
+        let reply =
+            self.0.call_rpc(APPEND_ENTRIES_RPC.to_owned(), data).await?;
 
         Ok(bincode::deserialize(reply.as_ref())
             .expect("Deserialization of reply should not fail"))
     }
 }
-
-unsafe impl Send for RpcClient {}
-unsafe impl Sync for RpcClient {}
 
 pub(crate) fn register_server<S: AsRef<str>>(
     raft: Arc<Raft>,
@@ -132,7 +126,7 @@ mod tests {
             client
         };
 
-        let rpc_client = RpcClient(vec![client]);
+        let rpc_client = RpcClient(client);
         let request = RequestVoteArgs {
             term: Term(2021),
 
@@ -141,7 +135,7 @@ mod tests {
             last_log_term: Default::default(),
         };
         let response = futures::executor::block_on(
-            rpc_client.call_request_vote(0, request),
+            rpc_client.clone().call_request_vote(request),
         )?;
         assert_eq!(true, response.vote_granted);
 
@@ -154,7 +148,7 @@ mod tests {
             leader_commit: 0,
         };
         let response = futures::executor::block_on(
-            rpc_client.call_append_entries(0, request),
+            rpc_client.clone().call_append_entries(request),
         )?;
         assert_eq!(2021, response.term.0);
         assert_eq!(false, response.success);

@@ -9,16 +9,14 @@ extern crate serde_derive;
 extern crate tokio;
 
 use std::future::Future;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Duration;
 
-use futures::FutureExt;
-use parking_lot::{Condvar, Mutex};
+use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
 
 use crate::rpcs::RpcClient;
-use std::cell::RefCell;
 
 pub mod rpcs;
 
@@ -134,7 +132,7 @@ struct AppendEntriesReply {
 
 impl Raft {
     pub fn new() -> Self {
-        let mut raft = Self {
+        let raft = Self {
             ..Default::default()
         };
         raft.inner_state.lock().log.push(LogEntry {
@@ -363,7 +361,7 @@ impl Raft {
                 futures::future::select_all(futures_vec),
             )
             .await;
-            let ((one_vote, index, rest), new_token) = match selected {
+            let ((one_vote, _, rest), new_token) = match selected {
                 futures::future::Either::Left(_) => break,
                 futures::future::Either::Right(tuple) => tuple,
             };
@@ -439,7 +437,7 @@ impl Raft {
             let (last_log_index, last_log_term) = rf.last_log_index_and_term();
             let commit_index = rf.commit_index;
             let leader_id = rf.leader_id;
-            let next_index = rf.next_index[leader_id.0];
+            let next_index = rf.next_index[peer_index.0];
 
             let args = AppendEntriesArgs {
                 term,

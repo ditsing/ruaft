@@ -407,24 +407,18 @@ impl Raft {
     ) -> Option<AppendEntriesArgs> {
         let rf = rf.lock();
 
-        // copy states.
-        let term = rf.current_term;
-        let is_leader = rf.state == State::Leader;
-        let (last_log_index, last_log_term) = rf.last_log_index_and_term();
-        let commit_index = rf.commit_index;
-        let leader_id = rf.leader_id;
-
-        if !is_leader {
+        if rf.state == State::Leader {
             return None;
         }
 
+        let (last_log_index, last_log_term) = rf.last_log_index_and_term();
         let args = AppendEntriesArgs {
-            term,
-            leader_id,
+            term: rf.current_term,
+            leader_id: rf.leader_id,
             prev_log_index: last_log_index,
             prev_log_term: last_log_term,
             entries: vec![],
-            leader_commit: commit_index,
+            leader_commit: rf.commit_index,
         };
         Some(args)
     }

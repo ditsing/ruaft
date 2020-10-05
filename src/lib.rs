@@ -287,10 +287,8 @@ impl Raft {
                 // across threads.
                 let rpc_client = rpc_client.clone();
                 // RPCs are started right away.
-                let one_vote = tokio::spawn(Self::request_one_vote(
-                    rpc_client,
-                    args.clone(),
-                ));
+                let one_vote =
+                    tokio::spawn(Self::request_vote(rpc_client, args.clone()));
                 // Futures must be pinned so that they have Unpin, as required
                 // by futures::future::select.
                 votes.push(one_vote);
@@ -307,7 +305,7 @@ impl Raft {
     }
 
     const REQUEST_VOTE_RETRY: usize = 4;
-    async fn request_one_vote(
+    async fn request_vote(
         rpc_client: RpcClient,
         args: RequestVoteArgs,
     ) -> Option<bool> {

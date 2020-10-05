@@ -20,3 +20,19 @@ where
         format!("Timed out after {} retries", max_retry),
     ))
 }
+
+pub struct DropGuard<F: FnOnce() -> ()> {
+    task: Option<F>,
+}
+
+impl<F: FnOnce() -> ()> DropGuard<F> {
+    pub fn new(task: F) -> Self {
+        Self { task: Some(task) }
+    }
+}
+
+impl<F: FnOnce() -> ()> Drop for DropGuard<F> {
+    fn drop(&mut self) {
+        (self.task.take().unwrap())();
+    }
+}

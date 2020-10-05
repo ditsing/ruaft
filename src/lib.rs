@@ -17,7 +17,7 @@ use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
 
 use crate::rpcs::RpcClient;
-use crate::utils::retry_rpc;
+use crate::utils::{retry_rpc, DropGuard};
 
 pub mod rpcs;
 mod utils;
@@ -201,6 +201,8 @@ impl Raft {
                 success: false,
             };
         }
+
+        let _ = rf.deferred_persist();
 
         if rf.current_term < args.term {
             rf.current_term = args.term;
@@ -588,6 +590,10 @@ impl RaftState {
 
     fn persist(&self) {
         // TODO: implement
+    }
+
+    fn deferred_persist(&self) -> impl Drop + '_ {
+        DropGuard::new(move || { self.persist() })
     }
 
     fn last_log_index_and_term(&self) -> (usize, Term) {

@@ -258,7 +258,7 @@ impl Raft {
             let (tx, rx) = futures::channel::oneshot::channel();
             rf.current_term.0 += 1;
 
-            rf.voted_for = Some(self.me);
+            rf.voted_for = Some(me);
             rf.state = State::Candidate;
             rf.reset_election_timer();
             rf.stop_current_election();
@@ -363,19 +363,19 @@ impl Raft {
         let mut rf = rf.lock();
         if rf.current_term == term && rf.state == State::Candidate {
             rf.state = State::Leader;
+            let log_len = rf.log.len();
+            for item in rf.next_index.iter_mut() {
+                *item = log_len;
+            }
+            for item in rf.match_index.iter_mut() {
+                *item = 0;
+            }
+            // TODO: send heartbeats.
+            // Drop the timer and cancel token.
+            rf.election_cancel_token.take();
+            rf.election_timer.take();
+            rf.persist();
         }
-        let log_len = rf.log.len();
-        for item in rf.next_index.iter_mut() {
-            *item = log_len;
-        }
-        for item in rf.match_index.iter_mut() {
-            *item = 0;
-        }
-        // TODO: send heartbeats.
-        // Drop the timer and cancel token.
-        rf.election_cancel_token.take();
-        rf.election_timer.take();
-        rf.persist();
     }
 
     fn schedule_heartbeats(&self, interval: Duration) {
@@ -593,7 +593,7 @@ impl RaftState {
     }
 
     fn deferred_persist(&self) -> impl Drop + '_ {
-        DropGuard::new(move || { self.persist() })
+        DropGuard::new(move || self.persist())
     }
 
     fn last_log_index_and_term(&self) -> (usize, Term) {

@@ -8,7 +8,6 @@ extern crate rand;
 extern crate serde_derive;
 extern crate tokio;
 
-use std::future::Future;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -375,7 +374,9 @@ impl Raft {
                 *item = 0;
             }
             // Sync all logs now.
-            new_log_entry.send(None);
+            new_log_entry
+                .send(None)
+                .expect("Triggering log entry syncing should not fail");
 
             // Drop the timer and cancel token.
             rf.election_cancel_token.take();
@@ -526,7 +527,9 @@ impl Raft {
                         *next_index -= diff;
                     }
 
-                    rerun.send(Some(Peer(peer_index)));
+                    rerun
+                        .send(Some(Peer(peer_index)))
+                        .expect("Triggering log entry syncing should not fail");
                 }
             }
             // Do nothing, not our term anymore.
@@ -536,7 +539,9 @@ impl Raft {
                     HEARTBEAT_INTERVAL_MILLIS,
                 ))
                 .await;
-                rerun.send(Some(Peer(peer_index)));
+                rerun
+                    .send(Some(Peer(peer_index)))
+                    .expect("Triggering log entry syncing should not fail");
             }
         };
     }

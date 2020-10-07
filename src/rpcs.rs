@@ -44,7 +44,7 @@ pub(crate) const REQUEST_VOTE_RPC: &'static str = "Raft.RequestVote";
 pub(crate) const APPEND_ENTRIES_RPC: &'static str = "Raft.AppendEntries";
 
 #[derive(Clone)]
-pub(crate) struct RpcClient(Client);
+pub struct RpcClient(Client);
 
 impl RpcClient {
     pub(crate) async fn call_request_vote(
@@ -109,20 +109,25 @@ pub(crate) fn register_server<S: AsRef<str>>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Term;
+    use crate::{Peer, Term};
 
     #[test]
     fn test_basic_message() -> std::io::Result<()> {
         let client = {
             let network = Network::run_daemon();
-            let raft = Arc::new(Raft::new());
             let name = "test-basic-message";
 
-            register_server(raft, name, network.clone())?;
             let client = network
                 .lock()
                 .expect("Network lock should not be poisoned")
                 .make_client("test-basic-message", name.to_owned() + "-server");
+
+            let raft = Arc::new(Raft::new(
+                vec![RpcClient(client.clone())],
+                0,
+                |_, _| {},
+            ));
+            register_server(raft, name, network.clone())?;
             client
         };
 
@@ -130,9 +135,9 @@ mod tests {
         let request = RequestVoteArgs {
             term: Term(2021),
 
-            candidate_id: Default::default(),
+            candidate_id: Peer(0),
             last_log_index: 0,
-            last_log_term: Default::default(),
+            last_log_term: Term(0),
         };
         let response = futures::executor::block_on(
             rpc_client.clone().call_request_vote(request),
@@ -141,9 +146,9 @@ mod tests {
 
         let request = AppendEntriesArgs {
             term: Term(2021),
-            leader_id: Default::default(),
+            leader_id: Peer(0),
             prev_log_index: 0,
-            prev_log_term: Default::default(),
+            prev_log_term: Term(0),
             entries: vec![],
             leader_commit: 0,
         };

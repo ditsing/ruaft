@@ -297,15 +297,20 @@ impl Raft {
 
             let mut should_run = None;
             while this.keep_running.load(Ordering::SeqCst) {
-                let cancel_handle = should_run
+                let mut cancel_handle = should_run
                     .map(|last_timer_count| this.run_election(last_timer_count))
                     .flatten();
 
                 should_run = {
                     let mut guard = election.timer.lock();
                     let (timer_count, deadline) = *guard;
-                    // TODO: cancel if timer_counter changed since last election
-                    // was scheduled.
+                    if let Some(last_timer_count) = should_run {
+                        // If the timer was changed more than once, we know the
+                        // last scheduled election should have been cancelled.
+                        if timer_count > last_timer_count + 1 {
+                            cancel_handle.take().map(|c| c.send(()));
+                        }
+                    }
                     match deadline {
                         Some(timeout) => loop {
                             let ret =

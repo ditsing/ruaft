@@ -47,6 +47,10 @@ pub(crate) const APPEND_ENTRIES_RPC: &str = "Raft.AppendEntries";
 pub struct RpcClient(Client);
 
 impl RpcClient {
+    pub fn new(client: Client) -> Self {
+        Self(client)
+    }
+
     pub(crate) async fn call_request_vote(
         self: Self,
         request: RequestVoteArgs,
@@ -79,10 +83,10 @@ impl RpcClient {
     }
 }
 
-pub(crate) fn register_server<S: AsRef<str>>(
+pub fn register_server<S: AsRef<str>>(
     raft: Arc<Raft>,
     name: S,
-    network: Arc<Mutex<Network>>,
+    network: &Mutex<Network>,
 ) -> std::io::Result<()> {
     let mut network =
         network.lock().expect("Network lock should not be poisoned");
@@ -127,7 +131,7 @@ mod tests {
                 0,
                 |_, _| {},
             ));
-            register_server(raft, name, network.clone())?;
+            register_server(raft, name, network.as_ref())?;
             client
         };
 

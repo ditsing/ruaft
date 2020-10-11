@@ -18,7 +18,7 @@ use crate::utils::{retry_rpc, DropGuard};
 use crossbeam_utils::sync::WaitGroup;
 
 pub mod rpcs;
-mod utils;
+pub mod utils;
 
 #[derive(Eq, PartialEq)]
 enum State {
@@ -514,14 +514,14 @@ impl Raft {
     fn schedule_heartbeats(&self, interval: Duration) {
         for (peer_index, rpc_client) in self.peers.iter().enumerate() {
             if peer_index != self.me.0 {
-                // Interval and rf are now owned by the outer async function.
-                let mut interval = tokio::time::interval(interval);
+                // rf is now owned by the outer async function.
                 let rf = self.inner_state.clone();
                 // RPC client must be cloned into the outer async function.
                 let rpc_client = rpc_client.clone();
                 // Shutdown signal.
                 let keep_running = self.keep_running.clone();
                 self.thread_pool.spawn(async move {
+                    let mut interval = tokio::time::interval(interval);
                     while keep_running.load(Ordering::SeqCst) {
                         interval.tick().await;
                         if let Some(args) = Self::build_heartbeat(&rf) {

@@ -324,7 +324,9 @@ impl Raft {
                                 // If the next election is cancelled before we
                                 // are back on wait, timer_count will be set to
                                 // a different value.
-                                break Some(timer_count);
+                                guard.0 += 1;
+                                guard.1.take();
+                                break Some(guard.0);
                             }
                         },
                         None => {

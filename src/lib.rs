@@ -195,6 +195,7 @@ impl Raft {
         let mut rf = self.inner_state.lock();
 
         let term = rf.current_term;
+        #[allow(clippy::comparison_chain)]
         if args.term < term {
             return RequestVoteReply {
                 term,
@@ -768,7 +769,7 @@ impl Raft {
             .send(None)
             .expect("Sending to new log entry queue should never fail.");
 
-        return Some((term, index));
+        Some((term, index))
     }
 
     pub fn kill(mut self) {

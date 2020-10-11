@@ -40,8 +40,8 @@ impl RpcHandler for AppendEntriesRpcHandler {
     }
 }
 
-pub(crate) const REQUEST_VOTE_RPC: &'static str = "Raft.RequestVote";
-pub(crate) const APPEND_ENTRIES_RPC: &'static str = "Raft.AppendEntries";
+pub(crate) const REQUEST_VOTE_RPC: &str = "Raft.RequestVote";
+pub(crate) const APPEND_ENTRIES_RPC: &str = "Raft.AppendEntries";
 
 #[derive(Clone)]
 pub struct RpcClient(Client);
@@ -95,7 +95,7 @@ pub(crate) fn register_server<S: AsRef<str>>(
         Box::new(request_vote_rpc_handler),
     )?;
 
-    let append_entries_rpc_handler = AppendEntriesRpcHandler(raft.clone());
+    let append_entries_rpc_handler = AppendEntriesRpcHandler(raft);
     server.register_rpc_handler(
         APPEND_ENTRIES_RPC.to_owned(),
         Box::new(append_entries_rpc_handler),

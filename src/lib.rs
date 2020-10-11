@@ -34,10 +34,10 @@ struct Term(usize);
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 struct Peer(usize);
 
-#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Command(usize);
 
-#[derive(Clone, Copy, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 struct LogEntry {
     term: Term,
     index: usize,
@@ -121,7 +121,7 @@ impl Raft {
         apply_command: Func,
     ) -> Self
     where
-        Func: 'static + Send + FnMut(usize, Command) -> (),
+        Func: 'static + Send + FnMut(usize, Command),
     {
         let peer_size = peers.len();
         let state = RaftState {
@@ -434,7 +434,7 @@ impl Raft {
         if let Ok(reply) = reply {
             return Some(reply.vote_granted && reply.term == term);
         }
-        return None;
+        None
     }
 
     async fn count_vote_util_cancelled(
@@ -564,11 +564,11 @@ impl Raft {
 
     fn run_log_entry_daemon(&mut self) -> std::thread::JoinHandle<()> {
         let (tx, rx) = std::sync::mpsc::channel::<Option<Peer>>();
-        self.new_log_entry.replace(tx.clone());
+        self.new_log_entry.replace(tx);
 
         // Clone everything that the thread needs.
         let this = self.clone();
-        let handle = std::thread::spawn(move || {
+        std::thread::spawn(move || {
             while let Ok(peer) = rx.recv() {
                 if !this.keep_running.load(Ordering::SeqCst) {
                     break;
@@ -586,9 +586,7 @@ impl Raft {
                     }
                 }
             }
-        });
-
-        handle
+        })
     }
 
     async fn sync_log_entry(
@@ -696,7 +694,7 @@ impl Raft {
         mut apply_command: Func,
     ) -> std::thread::JoinHandle<()>
     where
-        Func: 'static + Send + FnMut(usize, Command) -> (),
+        Func: 'static + Send + FnMut(usize, Command),
     {
         let keep_running = self.keep_running.clone();
         let rf = self.inner_state.clone();
@@ -716,7 +714,7 @@ impl Raft {
                         let index = rf.last_applied;
                         let commands: Vec<Command> = rf.log[index..]
                             .iter()
-                            .map(|entry| entry.command)
+                            .map(|entry| entry.command.clone())
                             .collect();
                         (index, commands)
                     } else {

@@ -308,46 +308,44 @@ impl Raft {
                     .map(|last_timer_count| this.run_election(last_timer_count))
                     .flatten();
 
-                should_run = {
-                    let mut guard = election.timer.lock();
-                    let (timer_count, deadline) = *guard;
-                    if let Some(last_timer_count) = should_run {
-                        // If the timer was changed more than once, we know the
-                        // last scheduled election should have been cancelled.
-                        if timer_count > last_timer_count + 1 {
-                            cancel_handle.take().map(|c| c.send(()));
-                        }
+                let mut guard = election.timer.lock();
+                let (timer_count, deadline) = *guard;
+                if let Some(last_timer_count) = should_run {
+                    // If the timer was changed more than once, we know the
+                    // last scheduled election should have been cancelled.
+                    if timer_count > last_timer_count + 1 {
+                        cancel_handle.take().map(|c| c.send(()));
                     }
-                    match deadline {
-                        Some(timeout) => loop {
-                            let ret =
-                                election.signal.wait_until(&mut guard, timeout);
-                            let fired =
-                                ret.timed_out() && Instant::now() < timeout;
-                            // If the timer has been updated, do not schedule,
-                            // break so that we could cancel.
-                            if timer_count != guard.0 {
-                                // Timer has been updated, cancel current
-                                // election, and block on timeout again.
-                                break None;
-                            } else if fired {
-                                // Timer has fired, remove the timer and allow
-                                // running the next election at timer_count.
-                                // If the next election is cancelled before we
-                                // are back on wait, timer_count will be set to
-                                // a different value.
-                                guard.0 += 1;
-                                guard.1.take();
-                                break Some(guard.0);
-                            }
-                        },
-                        None => {
-                            election.signal.wait(&mut guard);
-                            // The timeout has changed, check again.
-                            None
+                }
+                should_run = match deadline {
+                    Some(timeout) => loop {
+                        let ret =
+                            election.signal.wait_until(&mut guard, timeout);
+                        let fired = ret.timed_out() && Instant::now() < timeout;
+                        // If the timer has been updated, do not schedule,
+                        // break so that we could cancel.
+                        if timer_count != guard.0 {
+                            // Timer has been updated, cancel current
+                            // election, and block on timeout again.
+                            break None;
+                        } else if fired {
+                            // Timer has fired, remove the timer and allow
+                            // running the next election at timer_count.
+                            // If the next election is cancelled before we
+                            // are back on wait, timer_count will be set to
+                            // a different value.
+                            guard.0 += 1;
+                            guard.1.take();
+                            break Some(guard.0);
                         }
+                    },
+                    None => {
+                        election.signal.wait(&mut guard);
+                        // The timeout has changed, check again.
+                        None
                     }
                 };
+                drop(guard);
                 // Whenever woken up, cancel the current running election.
                 // There are 3 cases we could reach here
                 // 1. We received an AppendEntries, or decided to vote for

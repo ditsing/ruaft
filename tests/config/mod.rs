@@ -68,7 +68,23 @@ impl Config {
         Err(anyhow!("expected one leader, got none"))
     }
 
-    pub fn check_terms(&self) -> std::io::Result<()> {
+    pub fn check_terms(&self) -> Result<()> {
+        let mut term = None;
+        let state = self.state.lock();
+        for i in 0..self.server_count {
+            if state.connected[i] {
+                if let Some(raft) = &state.rafts[i] {
+                    let raft_term = raft.get_state().0;
+                    if let Some(term) = term {
+                        if term != raft_term {
+                            bail!("Servers disagree on term")
+                        }
+                    } else {
+                        term.replace(raft_term);
+                    }
+                }
+            }
+        }
         Ok(())
     }
 

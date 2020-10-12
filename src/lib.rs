@@ -20,7 +20,7 @@ use crossbeam_utils::sync::WaitGroup;
 pub mod rpcs;
 pub mod utils;
 
-#[derive(Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 enum State {
     Follower,
     Candidate,
@@ -40,7 +40,7 @@ pub type Index = usize;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Command(usize);
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct LogEntry {
     term: Term,
     index: Index,
@@ -89,7 +89,7 @@ pub struct Raft {
     stop_wait_group: WaitGroup,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct RequestVoteArgs {
     term: Term,
     candidate_id: Peer,
@@ -97,13 +97,13 @@ struct RequestVoteArgs {
     last_log_term: Term,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct RequestVoteReply {
     term: Term,
     vote_granted: bool,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct AppendEntriesArgs {
     term: Term,
     leader_id: Peer,
@@ -113,7 +113,7 @@ struct AppendEntriesArgs {
     leader_commit: Index,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct AppendEntriesReply {
     term: Term,
     success: bool,

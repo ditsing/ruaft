@@ -641,7 +641,9 @@ impl Raft {
                     let mut rf = rf.lock();
 
                     let step = &mut rf.current_step[peer_index];
-                    *step += 1;
+                    if *step < 5 {
+                        *step += 1;
+                    }
                     let diff = (1 << 8) << *step;
 
                     let next_index = &mut rf.next_index[peer_index];

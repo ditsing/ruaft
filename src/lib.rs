@@ -541,7 +541,7 @@ impl Raft {
     ) -> Option<AppendEntriesArgs> {
         let rf = rf.lock();
 
-        if rf.is_leader() {
+        if !rf.is_leader() {
             return None;
         }
 
@@ -579,6 +579,9 @@ impl Raft {
             while let Ok(peer) = rx.recv() {
                 if !this.keep_running.load(Ordering::SeqCst) {
                     break;
+                }
+                if !this.inner_state.lock().is_leader() {
+                    continue;
                 }
                 for (i, rpc_client) in this.peers.iter().enumerate() {
                     if i != this.me.0 && peer.map(|p| p.0 == i).unwrap_or(true)

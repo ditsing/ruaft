@@ -10,10 +10,12 @@ where
     Func: FnMut(usize) -> Fut,
 {
     for i in 0..max_retry {
+        if i != 0 {
+            tokio::time::delay_for(Duration::from_millis((1 << i) * 10)).await;
+        }
         if let Ok(reply) = task_gen(i).await {
             return Ok(reply);
         }
-        tokio::time::delay_for(Duration::from_millis((1 << i) * 10)).await;
     }
     Err(std::io::Error::new(
         std::io::ErrorKind::TimedOut,

@@ -24,7 +24,7 @@ impl Config {
     }
 
     fn client_name(client: usize, server: usize) -> String {
-        format!("ruaft-server-{}-to-{}", client, server)
+        format!("ruaft-client-{}-to-{}", client, server)
     }
 
     pub fn begin<S: std::fmt::Display>(&self, msg: S) {

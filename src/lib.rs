@@ -359,9 +359,9 @@ impl Raft {
                 cancel_handle.map(|c| c.send(()));
             }
 
-            // `this` is dropped right here. We cannot drop(this) anymore.
-            let stop_wait_group = this.stop_wait_group;
+            let stop_wait_group = this.stop_wait_group.clone();
             // Making sure the rest of `this` is dropped before the wait group.
+            drop(this);
             drop(stop_wait_group);
         })
     }
@@ -597,9 +597,9 @@ impl Raft {
                 }
             }
 
-            // `this` is dropped right here. We cannot drop(this) anymore.
-            let stop_wait_group = this.stop_wait_group;
+            let stop_wait_group = this.stop_wait_group.clone();
             // Making sure the rest of `this` is dropped before the wait group.
+            drop(this);
             drop(stop_wait_group);
         })
     }

@@ -135,8 +135,12 @@ impl Config {
     pub fn end(&self) {}
 
     pub fn cleanup(&self) {
+        let mut network = unlock(&self.network);
+        for i in 0..self.server_count {
+            network.remove_server(Self::server_name(i));
+        }
         for raft in &mut self.state.lock().rafts {
-            if let Some(_raft) = raft.take() {
+            if let Some(raft) = raft.take() {
                 raft.kill();
             }
         }

@@ -68,6 +68,23 @@ impl Config {
         Err(anyhow!("expected one leader, got none"))
     }
 
+    pub fn check_no_leader(&self) -> Result<()> {
+        let state = self.state.lock();
+        for i in 0..self.server_count {
+            if state.connected[i] {
+                if let Some(raft) = &state.rafts[i] {
+                    if raft.get_state().1 {
+                        bail!(
+                            "expected no leader, but {} claims to be leader",
+                            i
+                        );
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     pub fn check_terms(&self) -> Result<()> {
         let mut term = None;
         let state = self.state.lock();

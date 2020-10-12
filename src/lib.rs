@@ -321,7 +321,7 @@ impl Raft {
                     Some(timeout) => loop {
                         let ret =
                             election.signal.wait_until(&mut guard, timeout);
-                        let fired = ret.timed_out() && Instant::now() < timeout;
+                        let fired = ret.timed_out() && Instant::now() > timeout;
                         // If the timer has been updated, do not schedule,
                         // break so that we could cancel.
                         if timer_count != guard.0 {

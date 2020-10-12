@@ -139,9 +139,9 @@ impl Raft {
             }],
             commit_index: 0,
             last_applied: 0,
-            next_index: Vec::with_capacity(peer_size),
-            match_index: Vec::with_capacity(peer_size),
-            current_step: Vec::with_capacity(peer_size),
+            next_index: vec![0; peer_size],
+            match_index: vec![0; peer_size],
+            current_step: vec![0; peer_size],
             state: State::Follower,
             leader_id: Peer(me),
         };

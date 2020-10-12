@@ -90,7 +90,7 @@ pub fn register_server<S: AsRef<str>>(
 ) -> std::io::Result<()> {
     let mut network =
         network.lock().expect("Network lock should not be poisoned");
-    let server_name = format!("{}-server", name.as_ref());
+    let server_name = name.as_ref().clone();
     let mut server = Server::make_server(server_name.clone());
 
     let request_vote_rpc_handler = RequestVoteRpcHandler(raft.clone());
@@ -124,7 +124,7 @@ mod tests {
             let client = network
                 .lock()
                 .expect("Network lock should not be poisoned")
-                .make_client("test-basic-message", name.to_owned() + "-server");
+                .make_client("test-basic-message", name.to_owned());
 
             let raft = Arc::new(Raft::new(
                 vec![RpcClient(client.clone())],

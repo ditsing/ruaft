@@ -1,12 +1,13 @@
-extern crate labrpc;
-
 use parking_lot::Mutex;
+use rand::{thread_rng, Rng};
 use ruaft::rpcs::register_server;
 use ruaft::{Raft, RpcClient};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 struct ConfigState {
     rafts: Vec<Option<Raft>>,
+    connected: Vec<bool>,
 }
 
 pub struct Config {
@@ -14,6 +15,8 @@ pub struct Config {
     server_count: usize,
     state: Mutex<ConfigState>,
 }
+
+pub use anyhow::Result;
 
 impl Config {
     fn server_name(i: usize) -> String {
@@ -28,31 +31,74 @@ impl Config {
         eprintln!("{}", msg);
     }
 
-    pub fn check_one_leader(&self) -> std::io::Result<()> {
-        Ok(())
+    pub fn check_one_leader(&self) -> Result<usize> {
+        for _ in 0..10 {
+            let millis = 450 + thread_rng().gen_range(0, 100);
+            sleep_millis(millis);
+
+            let mut leaders = HashMap::new();
+            let state = self.state.lock();
+            for i in 0..self.server_count {
+                if state.connected[i] {
+                    if let Some(raft) = &state.rafts[i] {
+                        let (term, is_leader) = raft.get_state();
+                        if is_leader {
+                            leaders.entry(term.0).or_insert(vec![]).push(i)
+                        }
+                    }
+                }
+            }
+
+            let mut last_term_with_leader = 0;
+            let mut last_leader = 0;
+            for (term, leaders) in leaders {
+                if leaders.len() > 1 {
+                    bail!("term {} has {} (>1) leaders", term, leaders.len());
+                }
+                if term > last_term_with_leader {
+                    last_term_with_leader = term;
+                    last_leader = leaders[0];
+                }
+            }
+
+            if last_term_with_leader != 0 {
+                return Ok(last_leader);
+            }
+        }
+        Err(anyhow!("expected one leader, got none"))
     }
 
     pub fn check_terms(&self) -> std::io::Result<()> {
         Ok(())
     }
 
+    pub fn connect(&self, index: usize) {
+        self.set_connect(index, true);
+    }
+
     pub fn disconnect(&self, index: usize) {
+        self.set_connect(index, false);
+    }
+
+    pub fn set_connect(&self, index: usize, yes: bool) {
+        self.state.lock().connected[index] = yes;
+
         let mut network = unlock(&self.network);
-        network.remove_server(&Self::server_name(index));
 
         // Outgoing clients.
         for j in 0..self.server_count {
-            network.set_enable_client(Self::client_name(index, j), false)
+            network.set_enable_client(Self::client_name(index, j), yes)
         }
 
         // Incoming clients.
         for j in 0..self.server_count {
-            network.set_enable_client(Self::client_name(j, index), false);
+            network.set_enable_client(Self::client_name(j, index), yes);
         }
     }
 
     pub fn crash1(&mut self, index: usize) {
         self.disconnect(index);
+
         unlock(self.network.as_ref()).remove_server(Self::server_name(index));
         let raft = {
             let mut state = self.state.lock();
@@ -90,7 +136,7 @@ impl Config {
 
     pub fn cleanup(&self) {
         for raft in &mut self.state.lock().rafts {
-            if let Some(raft) = raft.take() {
+            if let Some(_raft) = raft.take() {
                 raft.kill();
             }
         }
@@ -111,6 +157,7 @@ pub fn make_config(server_count: usize, unreliable: bool) -> Config {
 
     let state = Mutex::new(ConfigState {
         rafts: vec![None; server_count],
+        connected: vec![true; server_count],
     });
     let mut cfg = Config {
         network,

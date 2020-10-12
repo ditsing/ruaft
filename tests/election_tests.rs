@@ -1,9 +1,12 @@
+extern crate labrpc;
 extern crate ruaft;
+#[macro_use]
+extern crate anyhow;
 
 mod config;
 
 #[test]
-fn initial_election() -> std::io::Result<()> {
+fn initial_election() -> config::Result<()> {
     const SERVERS: usize = 3;
     let cfg = config::make_config(SERVERS, false);
     let guard = ruaft::utils::DropGuard::new(|| cfg.cleanup());

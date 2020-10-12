@@ -31,7 +31,7 @@ enum State {
 #[derive(
     Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize,
 )]
-pub struct Term(usize);
+pub struct Term(pub usize);
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 struct Peer(usize);
 
@@ -541,7 +541,7 @@ impl Raft {
     ) -> Option<AppendEntriesArgs> {
         let rf = rf.lock();
 
-        if rf.state == State::Leader {
+        if rf.is_leader() {
             return None;
         }
 
@@ -620,8 +620,7 @@ impl Raft {
                     rf.next_index[peer_index] = match_index + 1;
                     if match_index > rf.match_index[peer_index] {
                         rf.match_index[peer_index] = match_index;
-                        if rf.state == State::Leader && rf.current_term == term
-                        {
+                        if rf.is_leader() && rf.current_term == term {
                             let mut matched = rf.match_index.to_vec();
                             let mid = matched.len() / 2 + 1;
                             matched.sort();
@@ -749,7 +748,7 @@ impl Raft {
     pub fn start(&self, command: Command) -> Option<(Term, Index)> {
         let mut rf = self.inner_state.lock();
         let term = rf.current_term;
-        if rf.state != State::Leader {
+        if !rf.is_leader() {
             return None;
         }
 
@@ -785,6 +784,11 @@ impl Raft {
             ));
         self.inner_state.lock().persist();
     }
+
+    pub fn get_state(&self) -> (Term, bool) {
+        let state = self.inner_state.lock();
+        (state.current_term, state.is_leader())
+    }
 }
 
 impl RaftState {
@@ -800,6 +804,10 @@ impl RaftState {
         let len = self.log.len();
         assert!(len > 0, "There should always be at least one entry in log");
         (len - 1, self.log.last().unwrap().term)
+    }
+
+    fn is_leader(&self) -> bool {
+        self.state == State::Leader
     }
 }
 

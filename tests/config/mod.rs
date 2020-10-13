@@ -1,9 +1,15 @@
-use parking_lot::Mutex;
-use rand::{thread_rng, Rng};
-use ruaft::rpcs::register_server;
-use ruaft::{Raft, RpcClient};
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
+
+pub use anyhow::Result;
+use parking_lot::Mutex;
+use rand::{thread_rng, Rng};
+use tokio::time::Duration;
+
+use ruaft::rpcs::register_server;
+use ruaft::utils::DropGuard;
+use ruaft::{Raft, RpcClient};
 
 struct ConfigState {
     rafts: Vec<Option<Raft>>,
@@ -22,11 +28,6 @@ pub struct Config {
     state: Mutex<ConfigState>,
     log: Arc<Mutex<LogState>>,
 }
-
-pub use anyhow::Result;
-use ruaft::utils::DropGuard;
-use std::time::Instant;
-use tokio::time::Duration;
 
 impl Config {
     fn server_name(i: usize) -> String {
@@ -226,7 +227,7 @@ impl Config {
         }
     }
 
-    pub fn start1(&mut self, index: usize) -> std::io::Result<()> {
+    pub fn start1(&mut self, index: usize) -> Result<()> {
         if self.state.lock().rafts[index].is_some() {
             self.crash1(index);
         }
@@ -249,7 +250,22 @@ impl Config {
         self.state.lock().rafts[index].replace(raft.clone());
 
         let raft = Arc::new(raft);
-        register_server(raft, Self::server_name(index), self.network.as_ref())
+        register_server(raft, Self::server_name(index), self.network.as_ref())?;
+        Ok(())
+    }
+
+    pub fn leader_start(
+        &self,
+        leader: usize,
+        cmd: i32,
+    ) -> Option<(usize, usize)> {
+        self.state.lock().rafts[leader]
+            .as_ref()
+            .map(|raft| {
+                raft.start(ruaft::Command(cmd))
+                    .map(|(term, index)| (term.0, index))
+            })
+            .unwrap()
     }
 
     pub fn end(&self) {}

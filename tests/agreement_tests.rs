@@ -60,3 +60,53 @@ fn fail_agree() -> config::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn fail_no_agree() -> config::Result<()> {
+    const SERVERS: usize = 5;
+    let cfg = config::make_config(SERVERS, false);
+    let _guard = cfg.deferred_cleanup();
+
+    cfg.begin("Test (2B): no agreement if too many followers disconnect");
+
+    cfg.one(10, SERVERS, false)?;
+
+    // 3 of 5 followers disconnect
+    let leader = cfg.check_one_leader()?;
+    cfg.disconnect((leader + 1) % SERVERS);
+    cfg.disconnect((leader + 2) % SERVERS);
+    cfg.disconnect((leader + 3) % SERVERS);
+
+    let result = cfg.leader_start(leader, 20);
+    assert!(result.is_some(), "leader rejected start()");
+    let index = result.unwrap().1;
+    assert_eq!(2, index, "expected index 2, got {}", index);
+
+    config::sleep_election_timeouts(2);
+
+    let (commit_count, _) = cfg.committed_count(index)?;
+    assert_eq!(
+        0, commit_count,
+        "{} committed but no majority",
+        commit_count
+    );
+
+    // repair
+    cfg.connect((leader + 1) % SERVERS);
+    cfg.connect((leader + 2) % SERVERS);
+    cfg.connect((leader + 3) % SERVERS);
+
+    // the disconnected majority may have chosen a leader from
+    // among their own ranks, forgetting index 2.
+    let leader2 = cfg.check_one_leader()?;
+    let result = cfg.leader_start(leader2, 30);
+    assert!(result.is_some(), "leader2 rejected start()");
+    let index = result.unwrap().1;
+    assert!(index == 2 || index == 3, "unexpected index {}", index);
+
+    cfg.one(1000, SERVERS, true)?;
+
+    cfg.end();
+
+    Ok(())
+}

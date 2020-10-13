@@ -38,7 +38,7 @@ struct Peer(usize);
 pub type Index = usize;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Command(usize);
+pub struct Command(pub i32);
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct LogEntry {
@@ -139,7 +139,7 @@ impl Raft {
             }],
             commit_index: 0,
             last_applied: 0,
-            next_index: vec![0; peer_size],
+            next_index: vec![1; peer_size],
             match_index: vec![0; peer_size],
             current_step: vec![0; peer_size],
             state: State::Follower,
@@ -262,7 +262,7 @@ impl Raft {
         self.election.reset_election_timer();
 
         if rf.log.len() <= args.prev_log_index
-            || rf.log[args.prev_log_index].term != args.term
+            || rf.log[args.prev_log_index].term != args.prev_log_term
         {
             return AppendEntriesReply {
                 term: args.term,
@@ -677,7 +677,8 @@ impl Raft {
         peer_index: usize,
     ) -> AppendEntriesArgs {
         let rf = rf.lock();
-        let (prev_log_index, prev_log_term) = rf.last_log_index_and_term();
+        let prev_log_index = rf.next_index[peer_index] - 1;
+        let prev_log_term = rf.log[prev_log_index].term;
         AppendEntriesArgs {
             term: rf.current_term,
             leader_id: rf.leader_id,

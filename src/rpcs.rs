@@ -160,7 +160,7 @@ mod tests {
             rpc_client.clone().call_append_entries(request),
         )?;
         assert_eq!(2021, response.term.0);
-        assert_eq!(false, response.success);
+        assert_eq!(true, response.success);
 
         Ok(())
     }

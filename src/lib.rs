@@ -6,17 +6,21 @@ extern crate rand;
 extern crate serde_derive;
 extern crate tokio;
 
+use std::convert::TryFrom;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use crossbeam_utils::sync::WaitGroup;
 use parking_lot::{Condvar, Mutex};
 use rand::{thread_rng, Rng};
 
+use crate::persister::PersistedRaftState;
+pub use crate::persister::Persister;
 pub use crate::rpcs::RpcClient;
 use crate::utils::{retry_rpc, DropGuard};
-use crossbeam_utils::sync::WaitGroup;
 
+mod persister;
 pub mod rpcs;
 pub mod utils;
 
@@ -79,6 +83,8 @@ pub struct Raft {
 
     me: Peer,
 
+    persister: Arc<dyn Persister>,
+
     new_log_entry: Option<std::sync::mpsc::Sender<Option<Peer>>>,
     apply_command_signal: Arc<Condvar>,
     keep_running: Arc<AtomicBool>,
@@ -123,13 +129,14 @@ impl Raft {
     pub fn new<Func>(
         peers: Vec<RpcClient>,
         me: usize,
+        persister: Arc<dyn Persister>,
         apply_command: Func,
     ) -> Self
     where
         Func: 'static + Send + FnMut(Index, Command),
     {
         let peer_size = peers.len();
-        let state = RaftState {
+        let mut state = RaftState {
             current_term: Term(0),
             voted_for: None,
             log: vec![LogEntry {
@@ -145,6 +152,14 @@ impl Raft {
             state: State::Follower,
             leader_id: Peer(me),
         };
+
+        if let Ok(persisted_state) =
+            PersistedRaftState::try_from(persister.read_state())
+        {
+            state.current_term = persisted_state.current_term;
+            state.voted_for = persisted_state.voted_for;
+            state.log = persisted_state.log;
+        }
 
         let election = ElectionState {
             timer: Mutex::new((0, None)),
@@ -164,6 +179,7 @@ impl Raft {
             inner_state: Arc::new(Mutex::new(state)),
             peers,
             me: Peer(me),
+            persister,
             new_log_entry: None,
             apply_command_signal: Arc::new(Default::default()),
             keep_running: Arc::new(Default::default()),
@@ -172,7 +188,6 @@ impl Raft {
             stop_wait_group: WaitGroup::new(),
         };
 
-        // TODO: read persist.
         this.keep_running.store(true, Ordering::SeqCst);
         // Running in a standalone thread.
         this.run_log_entry_daemon();

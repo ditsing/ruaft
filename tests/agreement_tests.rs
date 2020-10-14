@@ -1,5 +1,6 @@
 #[macro_use]
 extern crate anyhow;
+extern crate bytes;
 extern crate labrpc;
 extern crate ruaft;
 

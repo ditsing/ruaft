@@ -112,8 +112,20 @@ pub fn register_server<S: AsRef<str>>(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use bytes::Bytes;
+
     use crate::{Peer, Term};
+
+    use super::*;
+
+    type DoNothingPersister = ();
+    impl crate::Persister for DoNothingPersister {
+        fn read_state(&self) -> Bytes {
+            Bytes::new()
+        }
+
+        fn save_state(&self, _bytes: Bytes) {}
+    }
 
     #[test]
     fn test_basic_message() -> std::io::Result<()> {
@@ -129,6 +141,7 @@ mod tests {
             let raft = Arc::new(Raft::new(
                 vec![RpcClient(client.clone())],
                 0,
+                Arc::new(()),
                 |_, _| {},
             ));
             register_server(raft, name, network.as_ref())?;

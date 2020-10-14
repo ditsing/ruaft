@@ -11,6 +11,8 @@ use ruaft::rpcs::register_server;
 use ruaft::utils::DropGuard;
 use ruaft::{Raft, RpcClient};
 
+pub mod persister;
+
 struct ConfigState {
     rafts: Vec<Option<Raft>>,
     connected: Vec<bool>,
@@ -291,11 +293,13 @@ impl Config {
                 )))
             }
         }
+        let persister = Arc::new(persister::Persister::new());
 
         let log_clone = self.log.clone();
-        let raft = Raft::new(clients, index, move |cmd_index, cmd| {
-            Self::apply_command(log_clone.clone(), index, cmd_index, cmd.0)
-        });
+        let raft =
+            Raft::new(clients, index, persister, move |cmd_index, cmd| {
+                Self::apply_command(log_clone.clone(), index, cmd_index, cmd.0)
+            });
         self.state.lock().rafts[index].replace(raft.clone());
 
         let raft = Arc::new(raft);

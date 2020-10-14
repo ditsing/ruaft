@@ -199,18 +199,23 @@ impl Config {
     }
 
     pub fn set_connect(&self, index: usize, yes: bool) {
-        self.state.lock().connected[index] = yes;
+        let mut state = self.state.lock();
+        state.connected[index] = yes;
 
         let mut network = unlock(&self.network);
 
         // Outgoing clients.
         for j in 0..self.server_count {
-            network.set_enable_client(Self::client_name(index, j), yes)
+            if state.connected[j] {
+                network.set_enable_client(Self::client_name(index, j), yes)
+            }
         }
 
         // Incoming clients.
         for j in 0..self.server_count {
-            network.set_enable_client(Self::client_name(j, index), yes);
+            if state.connected[j] {
+                network.set_enable_client(Self::client_name(j, index), yes);
+            }
         }
     }
 

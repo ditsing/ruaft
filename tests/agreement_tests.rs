@@ -160,7 +160,7 @@ fn rejoin() -> config::Result<()> {
 
 #[test]
 fn backup() -> config::Result<()> {
-    const SERVERS: usize = 3;
+    const SERVERS: usize = 5;
     let cfg = config::make_config(SERVERS, false);
     let _guard = cfg.deferred_cleanup();
 

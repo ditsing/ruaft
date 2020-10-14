@@ -1,7 +1,9 @@
-extern crate labrpc;
-extern crate ruaft;
 #[macro_use]
 extern crate anyhow;
+extern crate labrpc;
+extern crate ruaft;
+
+use rand::{thread_rng, Rng};
 
 mod config;
 
@@ -24,6 +26,7 @@ fn basic_agreement() -> config::Result<()> {
         );
     }
 
+    drop(_guard);
     Ok(())
 }
 
@@ -58,6 +61,7 @@ fn fail_agree() -> config::Result<()> {
 
     cfg.end();
 
+    drop(_guard);
     Ok(())
 }
 
@@ -108,6 +112,7 @@ fn fail_no_agree() -> config::Result<()> {
 
     cfg.end();
 
+    drop(_guard);
     Ok(())
 }
 
@@ -146,6 +151,85 @@ fn rejoin() -> config::Result<()> {
     cfg.connect(leader2);
 
     cfg.one(105, SERVERS, true)?;
+
+    cfg.end();
+
+    drop(_guard);
+    Ok(())
+}
+
+#[test]
+fn backup() -> config::Result<()> {
+    const SERVERS: usize = 3;
+    let cfg = config::make_config(SERVERS, false);
+    let _guard = cfg.deferred_cleanup();
+
+    cfg.begin(
+        "Test (2B): leader backs up quickly over incorrect follower logs",
+    );
+
+    cfg.one(thread_rng().gen(), SERVERS, true)?;
+
+    // put leader and one follower in a partition
+    let leader1 = cfg.check_one_leader()?;
+    cfg.disconnect((leader1 + 2) % SERVERS);
+    cfg.disconnect((leader1 + 3) % SERVERS);
+    cfg.disconnect((leader1 + 4) % SERVERS);
+
+    // submit lots of commands that won't commit
+    for _ in 0..SERVERS {
+        cfg.leader_start(leader1, thread_rng().gen());
+    }
+
+    config::sleep_election_timeouts(2);
+
+    cfg.disconnect((leader1 + 0) % SERVERS);
+    cfg.disconnect((leader1 + 1) % SERVERS);
+
+    // allow other partition to recover
+    cfg.connect((leader1 + 2) % SERVERS);
+    cfg.connect((leader1 + 3) % SERVERS);
+    cfg.connect((leader1 + 4) % SERVERS);
+
+    // lots of successful commands to new group.
+    for _ in 0..50 {
+        cfg.one(thread_rng().gen(), 3, true)?;
+    }
+
+    // now another partitioned leader and one follower
+    let leader2 = cfg.check_one_leader()?;
+    let mut other = (leader1 + 2) % SERVERS;
+    if leader2 == other {
+        other = (leader2 + 1) % SERVERS;
+    }
+    cfg.disconnect(other);
+
+    // lots more commands that won't commit
+    for _ in 0..50 {
+        cfg.leader_start(leader2, thread_rng().gen());
+    }
+
+    config::sleep_election_timeouts(2);
+
+    // bring original leader back to life,
+    for i in 0..SERVERS {
+        cfg.disconnect(i);
+    }
+
+    cfg.connect((leader1 + 0) % SERVERS);
+    cfg.connect((leader1 + 1) % SERVERS);
+    cfg.connect(other);
+
+    // lots of successful commands to new group.
+    for _ in 0..50 {
+        cfg.one(thread_rng().gen(), 3, true)?;
+    }
+
+    // now everyone
+    for i in 0..SERVERS {
+        cfg.connect(i);
+    }
+    cfg.one(thread_rng().gen(), SERVERS, true)?;
 
     cfg.end();
 

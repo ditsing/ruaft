@@ -1,7 +1,7 @@
-extern crate labrpc;
-extern crate ruaft;
 #[macro_use]
 extern crate anyhow;
+extern crate labrpc;
+extern crate ruaft;
 
 mod config;
 
@@ -38,7 +38,7 @@ fn initial_election() -> config::Result<()> {
 fn re_election() -> config::Result<()> {
     const SERVERS: usize = 3;
     let cfg = config::make_config(SERVERS, false);
-    let _guard = ruaft::utils::DropGuard::new(|| cfg.cleanup());
+    let _guard = cfg.deferred_cleanup();
 
     cfg.begin("Test (2A): election after network failure");
 
@@ -64,5 +64,6 @@ fn re_election() -> config::Result<()> {
 
     cfg.end();
 
+    drop(_guard);
     Ok(())
 }

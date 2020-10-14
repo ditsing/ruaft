@@ -110,3 +110,45 @@ fn fail_no_agree() -> config::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn rejoin() -> config::Result<()> {
+    const SERVERS: usize = 3;
+    let cfg = config::make_config(SERVERS, false);
+    let _guard = cfg.deferred_cleanup();
+
+    cfg.begin("Test (2B): rejoin of partitioned leader");
+
+    cfg.one(101, SERVERS, true)?;
+
+    // leader network failure
+    let leader1 = cfg.check_one_leader()?;
+    cfg.disconnect(leader1);
+
+    // make old leader try to agree on some entries
+    cfg.leader_start(leader1, 102);
+    cfg.leader_start(leader1, 103);
+    cfg.leader_start(leader1, 104);
+
+    // new leader commits, also for index=2
+    cfg.one(103, 2, true)?;
+
+    // new leader network failure
+    let leader2 = cfg.check_one_leader()?;
+    cfg.disconnect(leader2);
+
+    // old leader connected again
+    cfg.connect(leader1);
+
+    cfg.one(104, 2, true)?;
+
+    // all together now
+    cfg.connect(leader2);
+
+    cfg.one(105, SERVERS, true)?;
+
+    cfg.end();
+
+    drop(_guard);
+    Ok(())
+}

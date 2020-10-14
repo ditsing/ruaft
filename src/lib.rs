@@ -18,7 +18,7 @@ use rand::{thread_rng, Rng};
 use crate::persister::PersistedRaftState;
 pub use crate::persister::Persister;
 pub use crate::rpcs::RpcClient;
-use crate::utils::{retry_rpc, DropGuard};
+use crate::utils::retry_rpc;
 
 mod persister;
 pub mod rpcs;
@@ -222,7 +222,7 @@ impl Raft {
             rf.state = State::Follower;
 
             self.election.reset_election_timer();
-            rf.persist();
+            self.persister.save_state(rf.persisted_state().into());
         }
 
         let voted_for = rf.voted_for;
@@ -238,7 +238,7 @@ impl Raft {
             // current term. It does not hurt to update the timer again.
             // We do need to persist, though.
             self.election.reset_election_timer();
-            rf.persist();
+            self.persister.save_state(rf.persisted_state().into());
 
             RequestVoteReply {
                 term: args.term,
@@ -264,11 +264,10 @@ impl Raft {
             };
         }
 
-        let _ = rf.deferred_persist();
-
         if rf.current_term < args.term {
             rf.current_term = args.term;
             rf.voted_for = None;
+            self.persister.save_state(rf.persisted_state().into());
         }
 
         rf.state = State::Follower;
@@ -296,6 +295,8 @@ impl Raft {
                 rf.log.push(entry.clone());
             }
         }
+
+        self.persister.save_state(rf.persisted_state().into());
 
         if args.leader_commit > rf.commit_index {
             rf.commit_index = if args.leader_commit < rf.log.len() {
@@ -401,7 +402,7 @@ impl Raft {
             rf.voted_for = Some(me);
             rf.state = State::Candidate;
 
-            rf.persist();
+            self.persister.save_state(rf.persisted_state().into());
 
             let term = rf.current_term;
             let (last_log_index, last_log_term) = rf.last_log_index_and_term();
@@ -522,7 +523,6 @@ impl Raft {
             new_log_entry
                 .send(None)
                 .expect("Triggering log entry syncing should not fail");
-            rf.persist();
         }
     }
 
@@ -779,7 +779,7 @@ impl Raft {
             index,
             command,
         });
-        rf.persist();
+        self.persister.save_state(rf.persisted_state().into());
 
         self.new_log_entry
             .clone()
@@ -803,7 +803,6 @@ impl Raft {
             .shutdown_timeout(Duration::from_millis(
                 HEARTBEAT_INTERVAL_MILLIS * 2,
             ));
-        self.inner_state.lock().persist();
     }
 
     pub fn get_state(&self) -> (Term, bool) {
@@ -813,12 +812,8 @@ impl Raft {
 }
 
 impl RaftState {
-    fn persist(&self) {
-        // TODO: implement
-    }
-
-    fn deferred_persist(&self) -> impl Drop + '_ {
-        DropGuard::new(move || self.persist())
+    fn persisted_state(&self) -> PersistedRaftState {
+        self.into()
     }
 
     fn last_log_index_and_term(&self) -> (Index, Term) {

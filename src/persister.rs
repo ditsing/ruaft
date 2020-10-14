@@ -18,7 +18,12 @@ pub(crate) struct PersistedRaftState {
 
 impl<T: AsRef<RaftState>> From<T> for PersistedRaftState {
     fn from(raft_state: T) -> Self {
-        let raft_state = raft_state.as_ref();
+        Self::from(raft_state.as_ref())
+    }
+}
+
+impl From<&RaftState> for PersistedRaftState {
+    fn from(raft_state: &RaftState) -> Self {
         Self {
             current_term: raft_state.current_term,
             voted_for: raft_state.voted_for,

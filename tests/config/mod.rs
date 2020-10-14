@@ -96,7 +96,7 @@ impl Config {
         Ok(())
     }
 
-    pub fn check_terms(&self) -> Result<()> {
+    pub fn check_terms(&self) -> Result<Option<usize>> {
         let mut term = None;
         let state = self.state.lock();
         for i in 0..self.server_count {
@@ -113,7 +113,8 @@ impl Config {
                 }
             }
         }
-        Ok(())
+        // Unwrap type Term into usize.
+        Ok(term.map(|term| term.0))
     }
 
     /// Returns the number of peers that committed at least `index` commands,
@@ -128,11 +129,12 @@ impl Config {
             }
             if log.committed_logs[i].len() > index {
                 let command = log.committed_logs[i][index];
-                if count > 0 {
-                    assert_eq!(
-                        command, cmd,
+                if count > 0 && command != cmd {
+                    bail!(
                         "committed values do not match: index {}, {}, {}",
-                        index, cmd, command
+                        index,
+                        cmd,
+                        command
                     )
                 }
                 count += 1;
@@ -140,6 +142,48 @@ impl Config {
             }
         }
         Ok((count, cmd))
+    }
+
+    pub fn wait(
+        &self,
+        index: usize,
+        min_count: usize,
+        at_term: Option<usize>,
+    ) -> Result<Option<i32>> {
+        let mut sleep_time_mills = 10;
+        for _ in 0..30 {
+            let (count, _) = self.committed_count(index)?;
+            if count >= min_count {
+                break;
+            }
+            sleep_millis(sleep_time_mills);
+            if sleep_time_mills < 1000 {
+                sleep_time_mills <<= 1;
+            }
+
+            if let Some(at_term) = at_term {
+                let state = self.state.lock();
+                for raft in &state.rafts {
+                    if let Some(raft) = raft {
+                        let (term, _) = raft.get_state();
+                        if term.0 > at_term {
+                            return Ok(None);
+                        }
+                    }
+                }
+            }
+        }
+
+        let (count, cmd) = self.committed_count(index)?;
+        if count < min_count {
+            bail!(
+                "only {} decided for index {}; wanted {}",
+                count,
+                index,
+                min_count
+            )
+        }
+        Ok(Some(cmd))
     }
 
     pub fn one(
@@ -259,6 +303,7 @@ impl Config {
         Ok(())
     }
 
+    /// Start a new command, returns (term, index).
     pub fn leader_start(
         &self,
         leader: usize,
@@ -271,6 +316,10 @@ impl Config {
                     .map(|(term, index)| (term.0, index))
             })
             .unwrap()
+    }
+
+    pub fn total_rpcs(&self) -> usize {
+        unlock(&self.network).get_total_rpc_count()
     }
 
     pub fn end(&self) {}

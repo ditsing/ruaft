@@ -236,3 +236,107 @@ fn backup() -> config::Result<()> {
     drop(_guard);
     Ok(())
 }
+
+#[test]
+fn count() -> config::Result<()> {
+    const SERVERS: usize = 3;
+    let cfg = config::make_config(SERVERS, false);
+    let _guard = cfg.deferred_cleanup();
+
+    cfg.begin("Test (2B): RPC counts aren't too high");
+
+    cfg.check_one_leader()?;
+    let total = cfg.total_rpcs();
+    assert!(
+        total >= 1 && total <= 30,
+        "too many or few RPCs ({}) to elect initial leader",
+        total
+    );
+
+    let mut retries = 0;
+    let (success, total) = loop {
+        if retries == 5 {
+            break (false, 0);
+        }
+        if retries != 0 {
+            config::sleep_millis(3000);
+        }
+        retries += 1;
+
+        let leader = cfg.check_one_leader()?;
+        let start_total = cfg.total_rpcs();
+
+        const ITERS: usize = 10;
+        let (term, start_index) = match cfg.leader_start(leader, 1) {
+            Some(pair) => pair,
+            None => continue,
+        };
+
+        let mut cmds = vec![];
+        for i in 1..(ITERS + 2) {
+            let cmd: i32 = thread_rng().gen();
+            cmds.push(cmd);
+
+            let index = match cfg.leader_start(leader, cmd) {
+                Some((new_term, index)) => {
+                    if new_term == term {
+                        Some(index)
+                    } else {
+                        None
+                    }
+                }
+                None => None,
+            };
+            if let Some(index) = index {
+                assert_eq!(start_index + i, index, "start() failed");
+            } else {
+                retries = 0;
+                break;
+            }
+        }
+        if retries == 0 {
+            continue;
+        }
+        for i in 1..(ITERS + 1) {
+            let cmd = cfg.wait(start_index + i, SERVERS, Some(term))?;
+            if let Some(cmd) = cmd {
+                assert_eq!(
+                    cmd,
+                    cmds[i - 1],
+                    "wrong value {} committed for index {}; expected {:?}",
+                    cmd,
+                    start_index + i,
+                    cmds
+                )
+            } else {
+                retries = 0;
+                break;
+            }
+        }
+        if term != cfg.check_terms()?.expect("terms should be agreed on") {
+            retries = 0;
+        }
+        if retries == 0 {
+            continue;
+        }
+
+        let diff = cfg.total_rpcs() - start_total;
+        if diff > (ITERS + 1 + 3) * 3 {
+            panic!("too many RPCs ({}) for {} entries", diff, ITERS);
+        }
+
+        break (true, cfg.total_rpcs());
+    };
+
+    assert!(success, "term change too often");
+
+    config::sleep_election_timeouts(1);
+
+    let diff = cfg.total_rpcs() - total;
+    assert!(diff < 3 * 20, "too many RPCs ({}) for 1 second of idleness");
+
+    cfg.end();
+
+    drop(_guard);
+    Ok(())
+}

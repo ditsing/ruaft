@@ -4,6 +4,8 @@ extern crate bytes;
 extern crate labrpc;
 extern crate ruaft;
 
+use rand::{thread_rng, Rng};
+
 mod config;
 
 #[test]
@@ -102,6 +104,101 @@ fn persist2() -> config::Result<()> {
     }
 
     cfg.one(1000, SERVERS, true)?;
+
+    cfg.end();
+
+    drop(_guard);
+    Ok(())
+}
+
+#[test]
+fn persist3() -> config::Result<()> {
+    const SERVERS: usize = 3;
+    let cfg = config::make_config(SERVERS, false);
+    let _guard = cfg.deferred_cleanup();
+
+    cfg.begin(
+        "Test (2C): partitioned leader and one follower crash, leader restarts",
+    );
+
+    cfg.one(101, 3, true)?;
+
+    let leader = cfg.check_one_leader()?;
+    cfg.disconnect((leader + 2) % SERVERS);
+
+    cfg.one(102, 2, true)?;
+
+    cfg.crash1((leader + 0) % SERVERS);
+    cfg.crash1((leader + 1) % SERVERS);
+    cfg.connect((leader + 2) % SERVERS);
+    cfg.start1((leader + 0) % SERVERS)?;
+    cfg.connect((leader + 0) % SERVERS);
+
+    cfg.one(103, 2, true)?;
+
+    cfg.start1((leader + 1) % SERVERS)?;
+    cfg.connect((leader + 1) % SERVERS);
+
+    cfg.one(104, SERVERS, true)?;
+
+    drop(_guard);
+
+    Ok(())
+}
+
+#[test]
+fn figure8() -> config::Result<()> {
+    const SERVERS: usize = 5;
+    let cfg = config::make_config(SERVERS, false);
+    let _guard = cfg.deferred_cleanup();
+
+    cfg.begin("Test (2C): Figure 8");
+
+    cfg.one(thread_rng().gen(), 1, true)?;
+
+    let mut nup = SERVERS;
+    for _ in 0..1000 {
+        let mut leader = None;
+        for i in 0..SERVERS {
+            if cfg.is_server_alive(i) {
+                if let Some(_) = cfg.leader_start(i, thread_rng().gen()) {
+                    leader = Some(i);
+                }
+            }
+        }
+
+        let millis_upper = if thread_rng().gen_ratio(100, 1000) {
+            config::LONG_ELECTION_TIMEOUT_MILLIS >> 1
+        } else {
+            // Magic number 13?
+            13
+        };
+        let millis = thread_rng().gen_range(0, millis_upper);
+        config::sleep_millis(millis);
+
+        if let Some(leader) = leader {
+            cfg.crash1(leader);
+            nup -= 1;
+        }
+
+        if nup < 3 {
+            let index = thread_rng().gen_range(0, SERVERS);
+            if !cfg.is_server_alive(index) {
+                cfg.start1(index)?;
+                cfg.connect(index);
+                nup += 1
+            }
+        }
+    }
+
+    for index in 0..SERVERS {
+        if !cfg.is_server_alive(index) {
+            cfg.start1(index)?;
+            cfg.connect(index);
+        }
+    }
+
+    cfg.one(thread_rng().gen(), SERVERS, true)?;
 
     cfg.end();
 

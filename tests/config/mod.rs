@@ -327,6 +327,10 @@ impl Config {
             .unwrap()
     }
 
+    pub fn is_server_alive(&self, index: usize) -> bool {
+        self.state.lock().rafts[index].is_some()
+    }
+
     pub fn total_rpcs(&self) -> usize {
         unlock(&self.network).get_total_rpc_count()
     }
@@ -447,7 +451,7 @@ pub fn sleep_millis(mills: u64) {
     std::thread::sleep(std::time::Duration::from_millis(mills))
 }
 
-const LONG_ELECTION_TIMEOUT_MILLIS: u64 = 1000;
+pub const LONG_ELECTION_TIMEOUT_MILLIS: u64 = 1000;
 pub fn sleep_election_timeouts(count: u64) {
     sleep_millis(LONG_ELECTION_TIMEOUT_MILLIS * count)
 }

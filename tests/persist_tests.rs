@@ -5,6 +5,7 @@ extern crate labrpc;
 extern crate ruaft;
 
 use rand::{thread_rng, Rng};
+use std::sync::Arc;
 
 mod config;
 
@@ -199,6 +200,42 @@ fn figure8() -> config::Result<()> {
     }
 
     cfg.one(thread_rng().gen(), SERVERS, true)?;
+
+    cfg.end();
+
+    drop(_guard);
+    Ok(())
+}
+
+#[test]
+fn unreliable_agree() -> config::Result<()> {
+    const SERVERS: usize = 5;
+    let cfg = Arc::new(config::make_config(SERVERS, true));
+    let guard_cfg = cfg.clone();
+    let _guard = guard_cfg.deferred_cleanup();
+
+    cfg.begin("Test (2C): unreliable agreement");
+
+    let mut handles = vec![];
+    let cfg = Arc::new(cfg);
+    for iters in 1..50 {
+        for j in 0..4 {
+            let cfg = cfg.clone();
+            let handle =
+                std::thread::spawn(move || cfg.one(100 * iters + j, 1, true));
+            handles.push(handle);
+        }
+
+        cfg.one(iters, 1, true)?;
+    }
+
+    cfg.set_unreliable(false);
+
+    for handle in handles {
+        handle.join().expect("Thread join should not fail")?;
+    }
+
+    cfg.one(100, SERVERS, true)?;
 
     cfg.end();
 

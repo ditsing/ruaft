@@ -22,6 +22,7 @@ struct LogState {
     committed_logs: Vec<Vec<i32>>,
     results: Vec<Result<()>>,
     max_index: usize,
+    saved: Vec<Arc<persister::Persister>>,
 }
 
 pub struct Config {
@@ -29,7 +30,6 @@ pub struct Config {
     server_count: usize,
     state: Mutex<ConfigState>,
     log: Arc<Mutex<LogState>>,
-    saved: std::cell::RefCell<Vec<Arc<persister::Persister>>>,
 }
 
 impl Config {
@@ -274,13 +274,14 @@ impl Config {
             let mut state = self.state.lock();
             state.rafts[index].take()
         };
-        let mut saved = self.saved.borrow_mut();
-        let data = saved[index].read_state();
+
+        let mut log = self.log.lock();
+        let data = log.saved[index].read_state();
         if let Some(raft) = raft {
             raft.kill();
         }
-        saved[index] = Arc::new(persister::Persister::new());
-        saved[index].save_state(data);
+        log.saved[index] = Arc::new(persister::Persister::new());
+        log.saved[index].save_state(data);
     }
 
     pub fn start1(&self, index: usize) -> Result<()> {
@@ -298,7 +299,7 @@ impl Config {
                 )))
             }
         }
-        let persister = self.saved.borrow()[index].clone();
+        let persister = self.log.lock().saved[index].clone();
 
         let log_clone = self.log.clone();
         let raft =
@@ -333,6 +334,10 @@ impl Config {
 
     pub fn total_rpcs(&self) -> usize {
         unlock(&self.network).get_total_rpc_count()
+    }
+
+    pub fn set_unreliable(&self, yes: bool) {
+        unlock(&self.network).set_reliable(!yes);
     }
 
     pub fn end(&self) {}
@@ -421,23 +426,22 @@ pub fn make_config(server_count: usize, unreliable: bool) -> Config {
         rafts: vec![None; server_count],
         connected: vec![true; server_count],
     });
+
+    let mut saved = vec![];
+    saved.resize_with(server_count, || Arc::new(persister::Persister::new()));
     let log = Arc::new(Mutex::new(LogState {
         committed_logs: vec![vec![]; server_count],
         results: vec![],
         max_index: 0,
+        saved,
     }));
     log.lock().results.resize_with(server_count, || Ok(()));
 
-    let saved = std::cell::RefCell::new(vec![]);
-    saved
-        .borrow_mut()
-        .resize_with(server_count, || Arc::new(persister::Persister::new()));
     let cfg = Config {
         network,
         server_count,
         state,
         log,
-        saved,
     };
 
     for i in 0..server_count {

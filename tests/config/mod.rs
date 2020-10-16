@@ -328,6 +328,10 @@ impl Config {
             .unwrap()
     }
 
+    pub fn is_connected(&self, index: usize) -> bool {
+        self.state.lock().connected[index]
+    }
+
     pub fn is_server_alive(&self, index: usize) -> bool {
         self.state.lock().rafts[index].is_some()
     }
@@ -338,6 +342,10 @@ impl Config {
 
     pub fn set_unreliable(&self, yes: bool) {
         unlock(&self.network).set_reliable(!yes);
+    }
+
+    pub fn set_long_reordering(&self, yes: bool) {
+        unlock(&self.network).set_long_reordering(yes);
     }
 
     pub fn end(&self) {}

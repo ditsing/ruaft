@@ -627,10 +627,25 @@ impl Raft {
         apply_command_signal: Arc<Condvar>,
     ) {
         // TODO: cancel in flight changes?
-        let args = Self::build_append_entries(&rf, peer_index);
+        let args = match Self::build_append_entries(&rf, peer_index) {
+            Some(args) => args,
+            None => return,
+        };
         let term = args.term;
         let match_index = args.prev_log_index + args.entries.len();
-        let succeeded = Self::append_entries(rpc_client, args).await;
+        let result = tokio::time::timeout(
+            Duration::from_millis(HEARTBEAT_INTERVAL_MILLIS),
+            Self::append_entries(rpc_client, args),
+        )
+        .await;
+
+        let succeeded = match result {
+            Ok(succeeded) => succeeded,
+            Err(_) => {
+                let _ = rerun.send(Some(Peer(peer_index)));
+                return;
+            }
+        };
         match succeeded {
             Ok(Some(succeeded)) => {
                 if succeeded {
@@ -690,18 +705,21 @@ impl Raft {
     fn build_append_entries(
         rf: &Arc<Mutex<RaftState>>,
         peer_index: usize,
-    ) -> AppendEntriesArgs {
+    ) -> Option<AppendEntriesArgs> {
         let rf = rf.lock();
+        if !rf.is_leader() {
+            return None;
+        }
         let prev_log_index = rf.next_index[peer_index] - 1;
         let prev_log_term = rf.log[prev_log_index].term;
-        AppendEntriesArgs {
+        Some(AppendEntriesArgs {
             term: rf.current_term,
             leader_id: rf.leader_id,
             prev_log_index,
             prev_log_term,
             entries: rf.log[rf.next_index[peer_index]..].to_vec(),
             leader_commit: rf.commit_index,
-        }
+        })
     }
 
     const APPEND_ENTRIES_RETRY: usize = 3;
@@ -743,12 +761,13 @@ impl Raft {
                         );
                     }
                     if rf.last_applied < rf.commit_index {
-                        rf.last_applied += 1;
-                        let index = rf.last_applied;
-                        let commands: Vec<Command> = rf.log[index..]
+                        let index = rf.last_applied + 1;
+                        let last_one = rf.commit_index + 1;
+                        let commands: Vec<Command> = rf.log[index..last_one]
                             .iter()
                             .map(|entry| entry.command.clone())
                             .collect();
+                        rf.last_applied = rf.commit_index;
                         (index, commands)
                     } else {
                         continue;

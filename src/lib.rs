@@ -436,6 +436,7 @@ impl Raft {
 
         let (tx, rx) = futures::channel::oneshot::channel();
         self.thread_pool.spawn(Self::count_vote_util_cancelled(
+            me,
             term,
             self.inner_state.clone(),
             self.election.clone(),
@@ -464,6 +465,7 @@ impl Raft {
     }
 
     async fn count_vote_util_cancelled(
+        me: Peer,
         term: Term,
         rf: Arc<Mutex<RaftState>>,
         election: Arc<ElectionState>,
@@ -509,6 +511,7 @@ impl Raft {
             election.stop_election_timer();
 
             rf.state = State::Leader;
+            rf.leader_id = me;
             let log_len = rf.log.len();
             for item in rf.next_index.iter_mut() {
                 *item = log_len;

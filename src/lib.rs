@@ -333,6 +333,12 @@ impl Raft {
                         cancel_handle.take().map(|c| c.send(()));
                     }
                 }
+                // check the running signal before sleeping. We are holding the
+                // timer lock, so no one can change it. The kill() method will
+                // not be able to notify this thread before `wait` is called.
+                if !this.keep_running.load(Ordering::SeqCst) {
+                    break;
+                }
                 should_run = match deadline {
                     Some(timeout) => loop {
                         let ret =

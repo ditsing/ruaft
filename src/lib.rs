@@ -454,7 +454,7 @@ impl Raft {
         Some(tx)
     }
 
-    const REQUEST_VOTE_RETRY: usize = 4;
+    const REQUEST_VOTE_RETRY: usize = 1;
     async fn request_vote(
         rpc_client: RpcClient,
         args: RequestVoteArgs,
@@ -582,7 +582,7 @@ impl Raft {
         Some(args)
     }
 
-    const HEARTBEAT_RETRY: usize = 3;
+    const HEARTBEAT_RETRY: usize = 1;
     async fn send_heartbeat(
         rpc_client: RpcClient,
         args: AppendEntriesArgs,
@@ -733,7 +733,7 @@ impl Raft {
         })
     }
 
-    const APPEND_ENTRIES_RETRY: usize = 3;
+    const APPEND_ENTRIES_RETRY: usize = 1;
     async fn append_entries(
         rpc_client: RpcClient,
         args: AppendEntriesArgs,

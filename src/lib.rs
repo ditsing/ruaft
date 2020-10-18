@@ -460,10 +460,11 @@ impl Raft {
         args: RequestVoteArgs,
     ) -> Option<bool> {
         let term = args.term;
-        let reply = retry_rpc(Self::REQUEST_VOTE_RETRY, move |_round| {
-            rpc_client.clone().call_request_vote(args.clone())
-        })
-        .await;
+        let reply =
+            retry_rpc(Self::REQUEST_VOTE_RETRY, RPC_DEADLINE, move |_round| {
+                rpc_client.clone().call_request_vote(args.clone())
+            })
+            .await;
         if let Ok(reply) = reply {
             return Some(reply.vote_granted && reply.term == term);
         }
@@ -586,7 +587,7 @@ impl Raft {
         rpc_client: RpcClient,
         args: AppendEntriesArgs,
     ) -> std::io::Result<()> {
-        retry_rpc(Self::HEARTBEAT_RETRY, move |_round| {
+        retry_rpc(Self::HEARTBEAT_RETRY, RPC_DEADLINE, move |_round| {
             rpc_client.clone().call_append_entries(args.clone())
         })
         .await?;
@@ -654,19 +655,7 @@ impl Raft {
         };
         let term = args.term;
         let match_index = args.prev_log_index + args.entries.len();
-        let result = tokio::time::timeout(
-            RPC_DEADLINE,
-            Self::append_entries(rpc_client, args),
-        )
-        .await;
-
-        let succeeded = match result {
-            Ok(succeeded) => succeeded,
-            Err(_) => {
-                let _ = rerun.send(Some(Peer(peer_index)));
-                return;
-            }
-        };
+        let succeeded = Self::append_entries(rpc_client, args).await;
         match succeeded {
             Ok(Some(succeeded)) => {
                 if succeeded {
@@ -750,9 +739,11 @@ impl Raft {
         args: AppendEntriesArgs,
     ) -> std::io::Result<Option<bool>> {
         let term = args.term;
-        let reply = retry_rpc(Self::APPEND_ENTRIES_RETRY, move |_round| {
-            rpc_client.clone().call_append_entries(args.clone())
-        })
+        let reply = retry_rpc(
+            Self::APPEND_ENTRIES_RETRY,
+            RPC_DEADLINE,
+            move |_round| rpc_client.clone().call_append_entries(args.clone()),
+        )
         .await?;
         Ok(if reply.term == term {
             Some(reply.success)

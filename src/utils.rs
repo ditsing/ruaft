@@ -3,6 +3,7 @@ use std::time::Duration;
 
 pub async fn retry_rpc<Func, Fut, T>(
     max_retry: usize,
+    deadline: Duration,
     mut task_gen: Func,
 ) -> std::io::Result<T>
 where
@@ -13,8 +14,12 @@ where
         if i != 0 {
             tokio::time::delay_for(Duration::from_millis((1 << i) * 10)).await;
         }
-        if let Ok(reply) = task_gen(i).await {
-            return Ok(reply);
+        // Not timed-out.
+        if let Ok(reply) = tokio::time::timeout(deadline, task_gen(i)).await {
+            // And no error
+            if let Ok(reply) = reply {
+                return Ok(reply);
+            }
         }
     }
     Err(std::io::Error::new(

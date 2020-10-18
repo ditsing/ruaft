@@ -864,7 +864,7 @@ impl ElectionState {
     fn reset_election_timer(&self) {
         let mut guard = self.timer.lock();
         guard.0 += 1;
-        guard.1.replace(Instant::now() + Self::election_timeout());
+        guard.1.replace(Self::election_timeout());
         self.signal.notify_one();
     }
 
@@ -874,16 +874,17 @@ impl ElectionState {
             return false;
         }
         guard.0 += 1;
-        guard.1.replace(Instant::now() + Self::election_timeout());
+        guard.1.replace(Self::election_timeout());
         self.signal.notify_one();
         true
     }
 
-    fn election_timeout() -> Duration {
-        Duration::from_millis(
-            ELECTION_TIMEOUT_BASE_MILLIS
-                + thread_rng().gen_range(0, ELECTION_TIMEOUT_VAR_MILLIS),
-        )
+    fn election_timeout() -> Instant {
+        Instant::now()
+            + Duration::from_millis(
+                ELECTION_TIMEOUT_BASE_MILLIS
+                    + thread_rng().gen_range(0, ELECTION_TIMEOUT_VAR_MILLIS),
+            )
     }
 
     fn stop_election_timer(&self) {

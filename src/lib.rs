@@ -655,7 +655,7 @@ impl Raft {
         let term = args.term;
         let match_index = args.prev_log_index + args.entries.len();
         let result = tokio::time::timeout(
-            Duration::from_millis(HEARTBEAT_INTERVAL_MILLIS),
+            RPC_DEADLINE,
             Self::append_entries(rpc_client, args),
         )
         .await;
@@ -871,6 +871,7 @@ impl RaftState {
 const HEARTBEAT_INTERVAL_MILLIS: u64 = 150;
 const ELECTION_TIMEOUT_BASE_MILLIS: u64 = 150;
 const ELECTION_TIMEOUT_VAR_MILLIS: u64 = 250;
+const RPC_DEADLINE: Duration = Duration::from_secs(2);
 
 impl ElectionState {
     fn reset_election_timer(&self) {

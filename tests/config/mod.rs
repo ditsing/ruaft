@@ -270,16 +270,16 @@ impl Config {
         self.disconnect(index);
 
         unlock(self.network.as_ref()).remove_server(Self::server_name(index));
-        let raft = {
-            let mut state = self.state.lock();
-            state.rafts[index].take()
-        };
+        let raft = self.state.lock().rafts[index].take();
 
-        let mut log = self.log.lock();
-        let data = log.saved[index].read_state();
+        let data = self.log.lock().saved[index].read_state();
+        // Make sure to give up the log lock before calling external code, which
+        // might directly or indirectly block on the log lock, e.g. through
+        // the apply command function.
         if let Some(raft) = raft {
             raft.kill();
         }
+        let mut log = self.log.lock();
         log.saved[index] = Arc::new(persister::Persister::new());
         log.saved[index].save_state(data);
     }

@@ -167,11 +167,10 @@ impl Raft {
         };
         election.reset_election_timer();
 
-        let thread_pool = tokio::runtime::Builder::new()
-            .threaded_scheduler()
+        let thread_pool = tokio::runtime::Builder::new_multi_thread()
             .enable_time()
             .thread_name(format!("raft-instance-{}", me))
-            .core_threads(peer_size)
+            .worker_threads(peer_size)
             .max_threads(peer_size * 2)
             .build()
             .expect("Creating thread pool should not fail");
@@ -702,7 +701,7 @@ impl Raft {
             // Do nothing, not our term anymore.
             Ok(None) => {}
             Err(_) => {
-                tokio::time::delay_for(Duration::from_millis(
+                tokio::time::sleep(Duration::from_millis(
                     HEARTBEAT_INTERVAL_MILLIS,
                 ))
                 .await;

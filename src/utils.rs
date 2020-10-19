@@ -12,7 +12,7 @@ where
 {
     for i in 0..max_retry {
         if i != 0 {
-            tokio::time::delay_for(Duration::from_millis((1 << i) * 10)).await;
+            tokio::time::sleep(Duration::from_millis((1 << i) * 10)).await;
         }
         // Not timed-out.
         if let Ok(reply) = tokio::time::timeout(deadline, task_gen(i)).await {

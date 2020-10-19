@@ -58,8 +58,6 @@ fn persist() -> config::Result<()> {
     cfg.one(16, SERVERS, true)?;
 
     cfg.end();
-
-    drop(_guard);
     Ok(())
 }
 
@@ -110,8 +108,6 @@ fn persist2() -> config::Result<()> {
     cfg.one(1000, SERVERS, true)?;
 
     cfg.end();
-
-    drop(_guard);
     Ok(())
 }
 
@@ -145,8 +141,7 @@ fn persist3() -> config::Result<()> {
 
     cfg.one(104, SERVERS, true)?;
 
-    drop(_guard);
-
+    cfg.end();
     Ok(())
 }
 
@@ -205,8 +200,6 @@ fn figure8() -> config::Result<()> {
     cfg.one(thread_rng().gen(), SERVERS, true)?;
 
     cfg.end();
-
-    drop(_guard);
     Ok(())
 }
 
@@ -241,8 +234,6 @@ fn unreliable_agree() -> config::Result<()> {
     cfg.one(100, SERVERS, true)?;
 
     cfg.end();
-
-    drop(_guard);
     Ok(())
 }
 
@@ -306,7 +297,7 @@ fn figure8_unreliable() -> config::Result<()> {
 
     cfg.one(thread_rng().gen_range(0, 10000), SERVERS, true)?;
 
-    drop(_guard);
+    cfg.end();
     Ok(())
 }
 
@@ -424,8 +415,6 @@ fn internal_churn(unreliable: bool) -> config::Result<()> {
     }
 
     cfg.end();
-
-    drop(_guard);
     Ok(())
 }
 

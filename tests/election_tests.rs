@@ -30,8 +30,6 @@ fn initial_election() -> config::Result<()> {
     cfg.check_one_leader()?;
 
     cfg.end();
-
-    drop(guard);
     Ok(())
 }
 
@@ -64,7 +62,5 @@ fn re_election() -> config::Result<()> {
     cfg.check_one_leader()?;
 
     cfg.end();
-
-    drop(_guard);
     Ok(())
 }

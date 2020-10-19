@@ -27,7 +27,7 @@ fn basic_agreement() -> config::Result<()> {
         );
     }
 
-    drop(_guard);
+    cfg.end();
     Ok(())
 }
 
@@ -61,8 +61,6 @@ fn fail_agree() -> config::Result<()> {
     cfg.one(107, SERVERS, true)?;
 
     cfg.end();
-
-    drop(_guard);
     Ok(())
 }
 
@@ -112,8 +110,6 @@ fn fail_no_agree() -> config::Result<()> {
     cfg.one(1000, SERVERS, true)?;
 
     cfg.end();
-
-    drop(_guard);
     Ok(())
 }
 
@@ -154,8 +150,6 @@ fn rejoin() -> config::Result<()> {
     cfg.one(105, SERVERS, true)?;
 
     cfg.end();
-
-    drop(_guard);
     Ok(())
 }
 
@@ -233,8 +227,6 @@ fn backup() -> config::Result<()> {
     cfg.one(thread_rng().gen(), SERVERS, true)?;
 
     cfg.end();
-
-    drop(_guard);
     Ok(())
 }
 
@@ -337,7 +329,5 @@ fn count() -> config::Result<()> {
     assert!(diff < 3 * 20, "too many RPCs ({}) for 1 second of idleness");
 
     cfg.end();
-
-    drop(_guard);
     Ok(())
 }

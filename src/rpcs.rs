@@ -1,8 +1,9 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use labrpc::{
     Client, Network, ReplyMessage, RequestMessage, RpcHandler, Server,
 };
+use parking_lot::Mutex;
 
 use crate::{
     AppendEntriesArgs, AppendEntriesReply, Raft, RequestVoteArgs,
@@ -88,8 +89,7 @@ pub fn register_server<S: AsRef<str>>(
     name: S,
     network: &Mutex<Network>,
 ) -> std::io::Result<()> {
-    let mut network =
-        network.lock().expect("Network lock should not be poisoned");
+    let mut network = network.lock();
     let server_name = name.as_ref().clone();
     let mut server = Server::make_server(server_name.clone());
 
@@ -135,7 +135,6 @@ mod tests {
 
             let client = network
                 .lock()
-                .expect("Network lock should not be poisoned")
                 .make_client("test-basic-message", name.to_owned());
 
             let raft = Arc::new(Raft::new(

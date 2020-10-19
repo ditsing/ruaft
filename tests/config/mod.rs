@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 pub use anyhow::Result;
-use parking_lot::Mutex;
+use parking_lot::{Mutex, MutexGuard};
 use rand::{thread_rng, Rng};
 use tokio::time::Duration;
 
@@ -26,7 +26,7 @@ struct LogState {
 }
 
 pub struct Config {
-    network: Arc<std::sync::Mutex<labrpc::Network>>,
+    network: Arc<Mutex<labrpc::Network>>,
     server_count: usize,
     state: Mutex<ConfigState>,
     log: Arc<Mutex<LogState>>,
@@ -249,7 +249,7 @@ impl Config {
         let mut state = self.state.lock();
         state.connected[index] = yes;
 
-        let mut network = unlock(&self.network);
+        let mut network = self.network.lock();
 
         // Outgoing clients.
         for j in 0..self.server_count {
@@ -269,7 +269,7 @@ impl Config {
     pub fn crash1(&self, index: usize) {
         self.disconnect(index);
 
-        unlock(self.network.as_ref()).remove_server(Self::server_name(index));
+        self.network.lock().remove_server(Self::server_name(index));
         let raft = self.state.lock().rafts[index].take();
 
         let data = self.log.lock().saved[index].read_state();
@@ -291,7 +291,7 @@ impl Config {
 
         let mut clients = vec![];
         {
-            let mut network = unlock(&self.network);
+            let mut network = self.network.lock();
             for j in 0..self.server_count {
                 clients.push(RpcClient::new(network.make_client(
                     Self::client_name(index, j),
@@ -337,21 +337,21 @@ impl Config {
     }
 
     pub fn total_rpcs(&self) -> usize {
-        unlock(&self.network).get_total_rpc_count()
+        self.network.lock().get_total_rpc_count()
     }
 
     pub fn set_unreliable(&self, yes: bool) {
-        unlock(&self.network).set_reliable(!yes);
+        self.network.lock().set_reliable(!yes);
     }
 
     pub fn set_long_reordering(&self, yes: bool) {
-        unlock(&self.network).set_long_reordering(yes);
+        self.network.lock().set_long_reordering(yes);
     }
 
     pub fn end(&self) {}
 
     pub fn cleanup(&self) {
-        let mut network = unlock(&self.network);
+        let mut network = self.network.lock();
         for i in 0..self.server_count {
             network.remove_server(Self::server_name(i));
         }
@@ -418,14 +418,10 @@ impl Config {
     }
 }
 
-fn unlock<T>(locked: &std::sync::Mutex<T>) -> std::sync::MutexGuard<T> {
-    locked.lock().expect("Unlocking network should not fail")
-}
-
 pub fn make_config(server_count: usize, unreliable: bool) -> Config {
     let network = labrpc::Network::run_daemon();
     {
-        let mut unlocked_network = unlock(&network);
+        let mut unlocked_network = network.lock();
         unlocked_network.set_reliable(!unreliable);
         unlocked_network.set_long_delays(true);
     }

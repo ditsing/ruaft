@@ -272,6 +272,14 @@ impl Config {
         self.network.lock().remove_server(Self::server_name(index));
         let raft = self.state.lock().rafts[index].take();
 
+        // There is a potential race condition here. It can be produced by
+        // 1. Leader sends an AppendEntries request to follower.
+        // 2. Follower received the request but have not processed it.
+        // 3. We removed follower from the network and took a snapshot of the
+        // follower's state.
+        // 4. Follower appended entries, replied to the leader. Note although
+        // the follower is removed from the network, it can still send replies.
+        // 5. The leader believes the entries are appended, but they are not.
         let data = self.log.lock().saved[index].read_state();
         // Make sure to give up the log lock before calling external code, which
         // might directly or indirectly block on the log lock, e.g. through
@@ -355,6 +363,7 @@ impl Config {
         for i in 0..self.server_count {
             network.remove_server(Self::server_name(i));
         }
+        network.stop();
         for raft in &mut self.state.lock().rafts {
             if let Some(raft) = raft.take() {
                 raft.kill();

@@ -648,7 +648,6 @@ impl Raft {
             return;
         }
 
-        // TODO: cancel in flight changes?
         let args = match Self::build_append_entries(&rf, peer_index) {
             Some(args) => args,
             None => return,

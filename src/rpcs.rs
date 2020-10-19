@@ -90,8 +90,8 @@ pub fn register_server<S: AsRef<str>>(
     network: &Mutex<Network>,
 ) -> std::io::Result<()> {
     let mut network = network.lock();
-    let server_name = name.as_ref().clone();
-    let mut server = Server::make_server(server_name.clone());
+    let server_name = name.as_ref();
+    let mut server = Server::make_server(server_name);
 
     let request_vote_rpc_handler = RequestVoteRpcHandler(raft.clone());
     server.register_rpc_handler(

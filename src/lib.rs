@@ -471,6 +471,7 @@ impl Raft {
         None
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn count_vote_util_cancelled(
         me: Peer,
         term: Term,

@@ -126,6 +126,10 @@ struct AppendEntriesReply {
 }
 
 impl Raft {
+    /// Create a new raft instance.
+    ///
+    /// Each instance will create at least 3 + (number of peers) threads. The
+    /// extensive usage of threads is to minimize latency.
     pub fn new<Func>(
         peers: Vec<RpcClient>,
         me: usize,

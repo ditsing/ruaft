@@ -1,8 +1,11 @@
 [package]
 name = "ruaft"
 version = "0.1.0"
+description = "Raft implemented in Rust"
 authors = ["Jing Yang <ditsing@gmail.com>"]
 edition = "2018"
+license = "MIT"
+keywords = ["raft", "consensus-protocol"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

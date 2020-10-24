@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 pub use anyhow::Result;
-use parking_lot::{Mutex, MutexGuard};
+use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
 use tokio::time::Duration;
 

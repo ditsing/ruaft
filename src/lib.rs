@@ -660,6 +660,11 @@ impl Raft {
         match succeeded {
             Ok(Some(true)) => {
                 let mut rf = rf.lock();
+
+                if rf.current_term != term {
+                    return;
+                }
+
                 rf.next_index[peer_index] = match_index + 1;
                 rf.current_step[peer_index] = 0;
                 if match_index > rf.match_index[peer_index] {

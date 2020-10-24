@@ -534,9 +534,7 @@ impl Raft {
                 *item = 0;
             }
             // Sync all logs now.
-            new_log_entry
-                .send(None)
-                .expect("Triggering log entry syncing should not fail");
+            let _ = new_log_entry.send(None);
         }
     }
 
@@ -696,9 +694,8 @@ impl Raft {
                     *next_index -= diff;
                 }
 
-                rerun
-                    .send(Some(Peer(peer_index)))
-                    .expect("Triggering log entry syncing should not fail");
+                // Ignore the error. The log syncing thread must have died.
+                let _ = rerun.send(Some(Peer(peer_index)));
             }
             // Do nothing, not our term anymore.
             Ok(None) => {}
@@ -707,9 +704,8 @@ impl Raft {
                     HEARTBEAT_INTERVAL_MILLIS,
                 ))
                 .await;
-                rerun
-                    .send(Some(Peer(peer_index)))
-                    .expect("Triggering log entry syncing should not fail");
+                // Ignore the error. The log syncing thread must have died.
+                let _ = rerun.send(Some(Peer(peer_index)));
             }
         };
     }
@@ -814,11 +810,7 @@ impl Raft {
         });
         self.persister.save_state(rf.persisted_state().into());
 
-        self.new_log_entry
-            .clone()
-            .unwrap()
-            .send(None)
-            .expect("Sending to new log entry queue should never fail.");
+        let _ = self.new_log_entry.clone().unwrap().send(None);
 
         Some((term, index))
     }

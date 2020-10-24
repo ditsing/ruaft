@@ -8,7 +8,6 @@ use rand::{thread_rng, Rng};
 use tokio::time::Duration;
 
 use ruaft::rpcs::register_server;
-use ruaft::utils::DropGuard;
 use ruaft::{Persister, Raft, RpcClient};
 
 pub mod persister;
@@ -369,10 +368,6 @@ impl Config {
                 raft.kill();
             }
         }
-    }
-
-    pub fn deferred_cleanup(&self) -> impl Drop + '_ {
-        DropGuard::new(move || self.cleanup())
     }
 }
 

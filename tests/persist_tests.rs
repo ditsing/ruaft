@@ -3,6 +3,8 @@ extern crate anyhow;
 extern crate bytes;
 extern crate labrpc;
 extern crate ruaft;
+#[macro_use]
+extern crate scopeguard;
 
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
@@ -16,7 +18,7 @@ mod config;
 fn persist() -> config::Result<()> {
     const SERVERS: usize = 5;
     let cfg = config::make_config(SERVERS, false);
-    let _guard = cfg.deferred_cleanup();
+    defer!(cfg.cleanup());
 
     cfg.begin("Test (2C): basic persistence");
 
@@ -65,7 +67,7 @@ fn persist() -> config::Result<()> {
 fn persist2() -> config::Result<()> {
     const SERVERS: usize = 5;
     let cfg = config::make_config(SERVERS, false);
-    let _guard = cfg.deferred_cleanup();
+    defer!(cfg.cleanup());
 
     cfg.begin("Test (2C): more persistence");
 
@@ -115,7 +117,7 @@ fn persist2() -> config::Result<()> {
 fn persist3() -> config::Result<()> {
     const SERVERS: usize = 3;
     let cfg = config::make_config(SERVERS, false);
-    let _guard = cfg.deferred_cleanup();
+    defer!(cfg.cleanup());
 
     cfg.begin(
         "Test (2C): partitioned leader and one follower crash, leader restarts",
@@ -149,7 +151,7 @@ fn persist3() -> config::Result<()> {
 fn figure8() -> config::Result<()> {
     const SERVERS: usize = 5;
     let cfg = config::make_config(SERVERS, false);
-    let _guard = cfg.deferred_cleanup();
+    defer!(cfg.cleanup());
 
     cfg.begin("Test (2C): Figure 8");
 
@@ -207,13 +209,11 @@ fn figure8() -> config::Result<()> {
 fn unreliable_agree() -> config::Result<()> {
     const SERVERS: usize = 5;
     let cfg = Arc::new(config::make_config(SERVERS, true));
-    let guard_cfg = cfg.clone();
-    let _guard = guard_cfg.deferred_cleanup();
+    defer!(cfg.cleanup());
 
     cfg.begin("Test (2C): unreliable agreement");
 
     let mut handles = vec![];
-    let cfg = Arc::new(cfg);
     for iters in 1..50 {
         for j in 0..4 {
             let cfg = cfg.clone();
@@ -241,7 +241,7 @@ fn unreliable_agree() -> config::Result<()> {
 fn figure8_unreliable() -> config::Result<()> {
     const SERVERS: usize = 5;
     let cfg = config::make_config(SERVERS, false);
-    let _guard = cfg.deferred_cleanup();
+    defer!(cfg.cleanup());
 
     cfg.begin("Test (2C): Figure 8 (unreliable)");
 
@@ -304,8 +304,7 @@ fn figure8_unreliable() -> config::Result<()> {
 fn internal_churn(unreliable: bool) -> config::Result<()> {
     const SERVERS: usize = 5;
     let cfg = Arc::new(config::make_config(SERVERS, false));
-    let cfg_clone = cfg.clone();
-    let _guard = cfg_clone.deferred_cleanup();
+    defer!(cfg.cleanup());
 
     if unreliable {
         cfg.begin("Test (2C): unreliable churn");

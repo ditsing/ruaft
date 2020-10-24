@@ -3,6 +3,8 @@ extern crate anyhow;
 extern crate bytes;
 extern crate labrpc;
 extern crate ruaft;
+#[macro_use]
+extern crate scopeguard;
 
 use rand::{thread_rng, Rng};
 
@@ -12,7 +14,7 @@ mod config;
 fn basic_agreement() -> config::Result<()> {
     const SERVERS: usize = 5;
     let cfg = config::make_config(SERVERS, false);
-    let _guard = cfg.deferred_cleanup();
+    defer!(cfg.cleanup());
 
     cfg.begin("Test (2B): basic agreement");
     for index in 1..4 {
@@ -35,7 +37,7 @@ fn basic_agreement() -> config::Result<()> {
 fn fail_agree() -> config::Result<()> {
     const SERVERS: usize = 3;
     let cfg = config::make_config(SERVERS, false);
-    let _guard = cfg.deferred_cleanup();
+    defer!(cfg.cleanup());
 
     cfg.begin("Test (2B): agreement despite follower disconnection");
 
@@ -68,7 +70,7 @@ fn fail_agree() -> config::Result<()> {
 fn fail_no_agree() -> config::Result<()> {
     const SERVERS: usize = 5;
     let cfg = config::make_config(SERVERS, false);
-    let _guard = cfg.deferred_cleanup();
+    defer!(cfg.cleanup());
 
     cfg.begin("Test (2B): no agreement if too many followers disconnect");
 
@@ -117,7 +119,7 @@ fn fail_no_agree() -> config::Result<()> {
 fn rejoin() -> config::Result<()> {
     const SERVERS: usize = 3;
     let cfg = config::make_config(SERVERS, false);
-    let _guard = cfg.deferred_cleanup();
+    defer!(cfg.cleanup());
 
     cfg.begin("Test (2B): rejoin of partitioned leader");
 
@@ -157,7 +159,7 @@ fn rejoin() -> config::Result<()> {
 fn backup() -> config::Result<()> {
     const SERVERS: usize = 5;
     let cfg = config::make_config(SERVERS, false);
-    let _guard = cfg.deferred_cleanup();
+    defer!(cfg.cleanup());
 
     cfg.begin(
         "Test (2B): leader backs up quickly over incorrect follower logs",
@@ -234,7 +236,7 @@ fn backup() -> config::Result<()> {
 fn count() -> config::Result<()> {
     const SERVERS: usize = 3;
     let cfg = config::make_config(SERVERS, false);
-    let _guard = cfg.deferred_cleanup();
+    defer!(cfg.cleanup());
 
     cfg.begin("Test (2B): RPC counts aren't too high");
 

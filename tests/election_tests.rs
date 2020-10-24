@@ -3,6 +3,8 @@ extern crate anyhow;
 extern crate bytes;
 extern crate labrpc;
 extern crate ruaft;
+#[macro_use]
+extern crate scopeguard;
 
 mod config;
 
@@ -10,7 +12,7 @@ mod config;
 fn initial_election() -> config::Result<()> {
     const SERVERS: usize = 3;
     let cfg = config::make_config(SERVERS, false);
-    let guard = ruaft::utils::DropGuard::new(|| cfg.cleanup());
+    defer!(cfg.cleanup());
 
     cfg.begin("Test (2A): initial election");
 
@@ -37,7 +39,7 @@ fn initial_election() -> config::Result<()> {
 fn re_election() -> config::Result<()> {
     const SERVERS: usize = 3;
     let cfg = config::make_config(SERVERS, false);
-    let _guard = cfg.deferred_cleanup();
+    defer!(cfg.cleanup());
 
     cfg.begin("Test (2A): election after network failure");
 

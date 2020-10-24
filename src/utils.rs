@@ -1,13 +1,13 @@
 use std::future::Future;
 use std::time::Duration;
 
-pub async fn retry_rpc<Func, Fut, T>(
+pub async fn retry_rpc<'a, Func, Fut, T>(
     max_retry: usize,
     deadline: Duration,
     mut task_gen: Func,
 ) -> std::io::Result<T>
 where
-    Fut: Future<Output = std::io::Result<T>> + Send + 'static,
+    Fut: Future<Output = std::io::Result<T>> + Send + 'a,
     Func: FnMut(usize) -> Fut,
 {
     for i in 0..max_retry {

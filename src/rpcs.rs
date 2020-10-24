@@ -44,7 +44,6 @@ impl RpcHandler for AppendEntriesRpcHandler {
 pub(crate) const REQUEST_VOTE_RPC: &str = "Raft.RequestVote";
 pub(crate) const APPEND_ENTRIES_RPC: &str = "Raft.AppendEntries";
 
-#[derive(Clone)]
 pub struct RpcClient(Client);
 
 impl RpcClient {
@@ -53,7 +52,7 @@ impl RpcClient {
     }
 
     pub(crate) async fn call_request_vote(
-        self: Self,
+        &self,
         request: RequestVoteArgs,
     ) -> std::io::Result<RequestVoteReply> {
         let data = RequestMessage::from(
@@ -68,7 +67,7 @@ impl RpcClient {
     }
 
     pub(crate) async fn call_append_entries(
-        self: Self,
+        &self,
         request: AppendEntriesArgs,
     ) -> std::io::Result<AppendEntriesReply> {
         let data = RequestMessage::from(
@@ -138,12 +137,16 @@ mod tests {
                 .make_client("test-basic-message", name.to_owned());
 
             let raft = Arc::new(Raft::new(
-                vec![RpcClient(client.clone())],
+                vec![RpcClient(client)],
                 0,
                 Arc::new(()),
                 |_, _| {},
             ));
             register_server(raft, name, network.as_ref())?;
+
+            let client = network
+                .lock()
+                .make_client("test-basic-message", name.to_owned());
             client
         };
 
@@ -155,9 +158,8 @@ mod tests {
             last_log_index: 0,
             last_log_term: Term(0),
         };
-        let response = futures::executor::block_on(
-            rpc_client.clone().call_request_vote(request),
-        )?;
+        let response =
+            futures::executor::block_on(rpc_client.call_request_vote(request))?;
         assert_eq!(true, response.vote_granted);
 
         let request = AppendEntriesArgs {
@@ -169,7 +171,7 @@ mod tests {
             leader_commit: 0,
         };
         let response = futures::executor::block_on(
-            rpc_client.clone().call_append_entries(request),
+            rpc_client.call_append_entries(request),
         )?;
         assert_eq!(2021, response.term.0);
         assert_eq!(true, response.success);

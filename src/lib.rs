@@ -79,7 +79,7 @@ struct ElectionState {
 #[derive(Clone)]
 pub struct Raft {
     inner_state: Arc<Mutex<RaftState>>,
-    peers: Vec<RpcClient>,
+    peers: Vec<Arc<RpcClient>>,
 
     me: Peer,
 
@@ -178,6 +178,7 @@ impl Raft {
             .max_threads(peer_size * 2)
             .build()
             .expect("Creating thread pool should not fail");
+        let peers = peers.into_iter().map(|r| Arc::new(r)).collect();
         let mut this = Raft {
             inner_state: Arc::new(Mutex::new(state)),
             peers,
@@ -459,13 +460,13 @@ impl Raft {
 
     const REQUEST_VOTE_RETRY: usize = 1;
     async fn request_vote(
-        rpc_client: RpcClient,
+        rpc_client: Arc<RpcClient>,
         args: RequestVoteArgs,
     ) -> Option<bool> {
         let term = args.term;
         let reply =
-            retry_rpc(Self::REQUEST_VOTE_RETRY, RPC_DEADLINE, move |_round| {
-                rpc_client.clone().call_request_vote(args.clone())
+            retry_rpc(Self::REQUEST_VOTE_RETRY, RPC_DEADLINE, |_round| {
+                rpc_client.call_request_vote(args.clone())
             })
             .await;
         if let Ok(reply) = reply {
@@ -586,11 +587,11 @@ impl Raft {
 
     const HEARTBEAT_RETRY: usize = 1;
     async fn send_heartbeat(
-        rpc_client: RpcClient,
+        rpc_client: Arc<RpcClient>,
         args: AppendEntriesArgs,
     ) -> std::io::Result<()> {
-        retry_rpc(Self::HEARTBEAT_RETRY, RPC_DEADLINE, move |_round| {
-            rpc_client.clone().call_append_entries(args.clone())
+        retry_rpc(Self::HEARTBEAT_RETRY, RPC_DEADLINE, |_round| {
+            rpc_client.call_append_entries(args.clone())
         })
         .await?;
         Ok(())
@@ -639,7 +640,7 @@ impl Raft {
 
     async fn sync_log_entry(
         rf: Arc<Mutex<RaftState>>,
-        rpc_client: RpcClient,
+        rpc_client: Arc<RpcClient>,
         peer_index: usize,
         rerun: std::sync::mpsc::Sender<Option<Peer>>,
         openings: Arc<Vec<AtomicUsize>>,
@@ -656,7 +657,7 @@ impl Raft {
         };
         let term = args.term;
         let match_index = args.prev_log_index + args.entries.len();
-        let succeeded = Self::append_entries(rpc_client, args).await;
+        let succeeded = Self::append_entries(&rpc_client, args).await;
         match succeeded {
             Ok(Some(true)) => {
                 let mut rf = rf.lock();
@@ -737,16 +738,15 @@ impl Raft {
 
     const APPEND_ENTRIES_RETRY: usize = 1;
     async fn append_entries(
-        rpc_client: RpcClient,
+        rpc_client: &RpcClient,
         args: AppendEntriesArgs,
     ) -> std::io::Result<Option<bool>> {
         let term = args.term;
-        let reply = retry_rpc(
-            Self::APPEND_ENTRIES_RETRY,
-            RPC_DEADLINE,
-            move |_round| rpc_client.clone().call_append_entries(args.clone()),
-        )
-        .await?;
+        let reply =
+            retry_rpc(Self::APPEND_ENTRIES_RETRY, RPC_DEADLINE, |_round| {
+                rpc_client.call_append_entries(args.clone())
+            })
+            .await?;
         Ok(if reply.term == term {
             Some(reply.success)
         } else {

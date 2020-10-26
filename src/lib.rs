@@ -178,7 +178,7 @@ impl Raft {
             .max_threads(peer_size * 2)
             .build()
             .expect("Creating thread pool should not fail");
-        let peers = peers.into_iter().map(|r| Arc::new(r)).collect();
+        let peers = peers.into_iter().map(Arc::new).collect();
         let mut this = Raft {
             inner_state: Arc::new(Mutex::new(state)),
             peers,

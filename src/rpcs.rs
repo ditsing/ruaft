@@ -1,8 +1,6 @@
 use std::sync::Arc;
 
-use labrpc::{
-    Client, Network, ReplyMessage, RequestMessage, RpcHandler, Server,
-};
+use labrpc::{Client, Network, ReplyMessage, RequestMessage, Server};
 use parking_lot::Mutex;
 
 use crate::{
@@ -10,35 +8,26 @@ use crate::{
     RequestVoteReply,
 };
 
-struct RequestVoteRpcHandler(Arc<Raft>);
+fn proxy_request_vote(raft: &Raft, data: RequestMessage) -> ReplyMessage {
+    let reply = raft.process_request_vote(
+        bincode::deserialize(data.as_ref())
+            .expect("Deserialization of requests should not fail"),
+    );
 
-impl RpcHandler for RequestVoteRpcHandler {
-    fn call(&self, data: RequestMessage) -> ReplyMessage {
-        let reply = self.0.process_request_vote(
-            bincode::deserialize(data.as_ref())
-                .expect("Deserialization of requests should not fail"),
-        );
-
-        ReplyMessage::from(
-            bincode::serialize(&reply)
-                .expect("Serialization of reply should not fail"),
-        )
-    }
+    ReplyMessage::from(
+        bincode::serialize(&reply)
+            .expect("Serialization of reply should not fail"),
+    )
 }
+fn proxy_append_entries(raft: &Raft, data: RequestMessage) -> ReplyMessage {
+    let reply = raft.process_append_entries(
+        bincode::deserialize(data.as_ref())
+            .expect("Deserialization should not fail"),
+    );
 
-struct AppendEntriesRpcHandler(Arc<Raft>);
-
-impl RpcHandler for AppendEntriesRpcHandler {
-    fn call(&self, data: RequestMessage) -> ReplyMessage {
-        let reply = self.0.process_append_entries(
-            bincode::deserialize(data.as_ref())
-                .expect("Deserialization should not fail"),
-        );
-
-        ReplyMessage::from(
-            bincode::serialize(&reply).expect("Serialization should not fail"),
-        )
-    }
+    ReplyMessage::from(
+        bincode::serialize(&reply).expect("Serialization should not fail"),
+    )
 }
 
 pub(crate) const REQUEST_VOTE_RPC: &str = "Raft.RequestVote";
@@ -92,16 +81,20 @@ pub fn register_server<S: AsRef<str>>(
     let server_name = name.as_ref();
     let mut server = Server::make_server(server_name);
 
-    let request_vote_rpc_handler = RequestVoteRpcHandler(raft.clone());
+    let raft_clone = raft.clone();
     server.register_rpc_handler(
         REQUEST_VOTE_RPC.to_owned(),
-        Box::new(request_vote_rpc_handler),
+        Box::new(move |request| {
+            proxy_request_vote(raft_clone.as_ref(), request)
+        }),
     )?;
 
-    let append_entries_rpc_handler = AppendEntriesRpcHandler(raft);
+    let raft_clone = raft;
     server.register_rpc_handler(
         APPEND_ENTRIES_RPC.to_owned(),
-        Box::new(append_entries_rpc_handler),
+        Box::new(move |request| {
+            proxy_append_entries(raft_clone.as_ref(), request)
+        }),
     )?;
 
     network.add_server(server_name, server);

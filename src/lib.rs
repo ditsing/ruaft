@@ -490,7 +490,10 @@ impl Raft {
         let mut against_count = 0;
         let mut cancel_token = cancel_token;
         let mut futures_vec = votes;
-        while vote_count < majority && against_count <= majority {
+        while vote_count < majority
+            && against_count <= majority
+            && !futures_vec.is_empty()
+        {
             // Mixing tokio futures with futures-rs ones. Fingers crossed.
             let selected = futures::future::select(
                 cancel_token,

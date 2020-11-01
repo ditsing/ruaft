@@ -431,15 +431,13 @@ impl Raft {
         let mut votes = vec![];
         for (index, rpc_client) in self.peers.iter().enumerate() {
             if index != self.me.0 {
-                // RpcClient must be cloned to avoid sending its reference
-                // across threads.
+                // RpcClient must be cloned so that it lives long enough for
+                // spawn(), which requires static life time.
                 let rpc_client = rpc_client.clone();
                 // RPCs are started right away.
                 let one_vote = self
                     .thread_pool
                     .spawn(Self::request_vote(rpc_client, args.clone()));
-                // Futures must be pinned so that they have Unpin, as required
-                // by futures::future::select.
                 votes.push(one_vote);
             }
         }

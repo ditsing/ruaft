@@ -692,7 +692,7 @@ impl Raft {
                 if *step < 5 {
                     *step += 1;
                 }
-                let diff = (1 << 8) << *step;
+                let diff = 4 << *step;
 
                 let next_index = &mut rf.next_index[peer_index];
                 if diff >= *next_index {

@@ -363,6 +363,7 @@ impl Config {
             network.remove_server(Self::server_name(i));
         }
         network.stop();
+        drop(network);
         for raft in &mut self.state.lock().rafts {
             if let Some(raft) = raft.take() {
                 raft.kill();

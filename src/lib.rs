@@ -672,7 +672,7 @@ impl Raft {
                     if rf.is_leader() && rf.current_term == term {
                         let mut matched = rf.match_index.to_vec();
                         let mid = matched.len() / 2 + 1;
-                        matched.sort();
+                        matched.sort_unstable();
                         let new_commit_index = matched[mid];
                         if new_commit_index > rf.commit_index
                             && rf.log[new_commit_index].term == rf.current_term

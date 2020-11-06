@@ -447,10 +447,9 @@ impl Raft {
             me,
             term,
             self.inner_state.clone(),
-            self.election.clone(),
             votes,
-            self.peers.len() / 2,
             rx,
+            self.election.clone(),
             self.new_log_entry.clone().unwrap(),
         ));
         Some(tx)
@@ -473,23 +472,22 @@ impl Raft {
         None
     }
 
-    #[allow(clippy::too_many_arguments)]
     async fn count_vote_util_cancelled(
         me: Peer,
         term: Term,
         rf: Arc<Mutex<RaftState>>,
-        election: Arc<ElectionState>,
         votes: Vec<tokio::task::JoinHandle<Option<bool>>>,
-        majority: usize,
         cancel_token: futures::channel::oneshot::Receiver<()>,
+        election: Arc<ElectionState>,
         new_log_entry: std::sync::mpsc::Sender<Option<Peer>>,
     ) {
+        let quorum = votes.len() >> 1;
         let mut vote_count = 0;
         let mut against_count = 0;
         let mut cancel_token = cancel_token;
         let mut futures_vec = votes;
-        while vote_count < majority
-            && against_count <= majority
+        while vote_count < quorum
+            && against_count <= quorum
             && !futures_vec.is_empty()
         {
             // Mixing tokio futures with futures-rs ones. Fingers crossed.
@@ -515,7 +513,7 @@ impl Raft {
             }
         }
 
-        if vote_count < majority {
+        if vote_count < quorum {
             return;
         }
         let mut rf = rf.lock();

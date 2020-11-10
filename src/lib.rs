@@ -1,5 +1,6 @@
 extern crate bincode;
-extern crate futures;
+extern crate futures_channel;
+extern crate futures_util;
 extern crate labrpc;
 extern crate rand;
 #[macro_use]
@@ -395,7 +396,7 @@ impl Raft {
     fn run_election(
         &self,
         timer_count: usize,
-    ) -> Option<futures::channel::oneshot::Sender<()>> {
+    ) -> Option<futures_channel::oneshot::Sender<()>> {
         let me = self.me;
         let (term, args) = {
             let mut rf = self.inner_state.lock();
@@ -442,7 +443,7 @@ impl Raft {
             }
         }
 
-        let (tx, rx) = futures::channel::oneshot::channel();
+        let (tx, rx) = futures_channel::oneshot::channel();
         self.thread_pool.spawn(Self::count_vote_util_cancelled(
             me,
             term,
@@ -477,7 +478,7 @@ impl Raft {
         term: Term,
         rf: Arc<Mutex<RaftState>>,
         votes: Vec<tokio::task::JoinHandle<Option<bool>>>,
-        cancel_token: futures::channel::oneshot::Receiver<()>,
+        cancel_token: futures_channel::oneshot::Receiver<()>,
         election: Arc<ElectionState>,
         new_log_entry: std::sync::mpsc::Sender<Option<Peer>>,
     ) {
@@ -491,14 +492,14 @@ impl Raft {
             && !futures_vec.is_empty()
         {
             // Mixing tokio futures with futures-rs ones. Fingers crossed.
-            let selected = futures::future::select(
+            let selected = futures_util::future::select(
                 cancel_token,
-                futures::future::select_all(futures_vec),
+                futures_util::future::select_all(futures_vec),
             )
             .await;
             let ((one_vote, _, rest), new_token) = match selected {
-                futures::future::Either::Left(_) => break,
-                futures::future::Either::Right(tuple) => tuple,
+                futures_util::future::Either::Left(_) => break,
+                futures_util::future::Either::Right(tuple) => tuple,
             };
 
             futures_vec = rest;

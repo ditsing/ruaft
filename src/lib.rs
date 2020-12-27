@@ -179,7 +179,6 @@ impl Raft {
             .enable_time()
             .thread_name(format!("raft-instance-{}", me))
             .worker_threads(peer_size)
-            .max_threads(peer_size * 2)
             .build()
             .expect("Creating thread pool should not fail");
         let peers = peers.into_iter().map(Arc::new).collect();

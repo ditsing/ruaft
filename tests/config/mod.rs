@@ -46,7 +46,7 @@ impl Config {
 
     pub fn check_one_leader(&self) -> Result<usize> {
         for _ in 0..10 {
-            let millis = 450 + thread_rng().gen_range(0, 100);
+            let millis = 450 + thread_rng().gen_range(0..100);
             sleep_millis(millis);
 
             let mut leaders = HashMap::new();

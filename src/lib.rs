@@ -891,7 +891,7 @@ impl ElectionState {
         Instant::now()
             + Duration::from_millis(
                 ELECTION_TIMEOUT_BASE_MILLIS
-                    + thread_rng().gen_range(0, ELECTION_TIMEOUT_VAR_MILLIS),
+                    + thread_rng().gen_range(0..ELECTION_TIMEOUT_VAR_MILLIS),
             )
     }
 

@@ -174,7 +174,7 @@ fn figure8() -> config::Result<()> {
             // Magic number 13?
             13
         };
-        let millis = thread_rng().gen_range(0, millis_upper);
+        let millis = thread_rng().gen_range(0..millis_upper);
         config::sleep_millis(millis);
 
         if let Some(leader) = leader {
@@ -183,7 +183,7 @@ fn figure8() -> config::Result<()> {
         }
 
         if nup < 3 {
-            let index = thread_rng().gen_range(0, SERVERS);
+            let index = thread_rng().gen_range(0..SERVERS);
             if !cfg.is_server_alive(index) {
                 cfg.start1(index)?;
                 cfg.connect(index);
@@ -245,7 +245,7 @@ fn figure8_unreliable() -> config::Result<()> {
 
     cfg.begin("Test (2C): Figure 8 (unreliable)");
 
-    cfg.one(thread_rng().gen_range(0, 10000), 1, true)?;
+    cfg.one(thread_rng().gen_range(0..10000), 1, true)?;
 
     let mut nup = SERVERS;
     for iters in 0..1000 {
@@ -270,7 +270,7 @@ fn figure8_unreliable() -> config::Result<()> {
             // Magic number 13?
             13
         };
-        let millis = thread_rng().gen_range(0, millis_upper);
+        let millis = thread_rng().gen_range(0..millis_upper);
         config::sleep_millis(millis);
 
         if let Some(leader) = leader {
@@ -281,7 +281,7 @@ fn figure8_unreliable() -> config::Result<()> {
         }
 
         if nup < 3 {
-            let index = thread_rng().gen_range(0, SERVERS);
+            let index = thread_rng().gen_range(0..SERVERS);
             if !cfg.is_connected(index) {
                 cfg.connect(index);
                 nup += 1
@@ -295,7 +295,7 @@ fn figure8_unreliable() -> config::Result<()> {
         }
     }
 
-    cfg.one(thread_rng().gen_range(0, 10000), SERVERS, true)?;
+    cfg.one(thread_rng().gen_range(0..10000), SERVERS, true)?;
 
     cfg.end();
     Ok(())
@@ -359,10 +359,10 @@ fn internal_churn(unreliable: bool) -> config::Result<()> {
 
     for _ in 0..20 {
         if thread_rng().gen_ratio(200, 1000) {
-            cfg.disconnect(thread_rng().gen_range(0, SERVERS));
+            cfg.disconnect(thread_rng().gen_range(0..SERVERS));
         }
         if thread_rng().gen_ratio(500, 1000) {
-            let server = thread_rng().gen_range(0, SERVERS);
+            let server = thread_rng().gen_range(0..SERVERS);
             if !cfg.is_server_alive(server) {
                 cfg.start1(server)?;
             }
@@ -370,7 +370,7 @@ fn internal_churn(unreliable: bool) -> config::Result<()> {
         }
 
         if thread_rng().gen_ratio(200, 1000) {
-            let server = thread_rng().gen_range(0, SERVERS);
+            let server = thread_rng().gen_range(0..SERVERS);
             if cfg.is_server_alive(server) {
                 cfg.crash1(server);
             }

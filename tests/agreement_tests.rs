@@ -328,7 +328,11 @@ fn count() -> config::Result<()> {
     config::sleep_election_timeouts(1);
 
     let diff = cfg.total_rpcs() - total;
-    assert!(diff < 3 * 20, "too many RPCs ({}) for 1 second of idleness");
+    assert!(
+        diff < 3 * 20,
+        "too many RPCs ({}) for 1 second of idleness",
+        diff
+    );
 
     cfg.end();
     Ok(())

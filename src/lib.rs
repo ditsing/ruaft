@@ -23,6 +23,7 @@ pub(crate) use crate::raft_state::State;
 pub use crate::rpcs::RpcClient;
 use crate::utils::retry_rpc;
 
+mod log_array;
 mod persister;
 mod raft_state;
 pub mod rpcs;
@@ -137,11 +138,7 @@ where
         let mut state = RaftState {
             current_term: Term(0),
             voted_for: None,
-            log: vec![LogEntry {
-                term: Term(0),
-                index: 0,
-                command: Command::default(),
-            }],
+            log: log_array::LogArray::create(),
             commit_index: 0,
             last_applied: 0,
             next_index: vec![1; peer_size],
@@ -156,7 +153,7 @@ where
         {
             state.current_term = persisted_state.current_term;
             state.voted_for = persisted_state.voted_for;
-            state.log = persisted_state.log;
+            state.log = log_array::LogArray::restore(persisted_state.log).unwrap();
         }
 
         let election = ElectionState {
@@ -231,7 +228,7 @@ where
         }
 
         let voted_for = rf.voted_for;
-        let (last_log_index, last_log_term) = rf.last_log_index_and_term();
+        let (last_log_index, last_log_term) = rf.log.last_index_term();
         if (voted_for.is_none() || voted_for == Some(args.candidate_id))
             && (args.last_log_term > last_log_term
                 || (args.last_log_term == last_log_term
@@ -426,7 +423,7 @@ where
             self.persister.save_state(rf.persisted_state().into());
 
             let term = rf.current_term;
-            let (last_log_index, last_log_term) = rf.last_log_index_and_term();
+            let (last_log_index, last_log_term) = rf.log.last_index_term();
 
             (
                 term,
@@ -585,7 +582,7 @@ where
             return None;
         }
 
-        let (last_log_index, last_log_term) = rf.last_log_index_and_term();
+        let (last_log_index, last_log_term) = rf.log.last_index_term();
         let args = AppendEntriesArgs {
             term: rf.current_term,
             leader_id: rf.leader_id,
@@ -762,7 +759,7 @@ where
             leader_id: rf.leader_id,
             prev_log_index,
             prev_log_term,
-            entries: rf.log[rf.next_index[peer_index]..].to_vec(),
+            entries: rf.log.after(rf.next_index[peer_index]).to_vec(),
             leader_commit: rf.commit_index,
         })
     }
@@ -810,7 +807,7 @@ where
                     if rf.last_applied < rf.commit_index {
                         let index = rf.last_applied + 1;
                         let last_one = rf.commit_index + 1;
-                        let commands: Vec<Command> = rf.log[index..last_one]
+                        let commands: Vec<Command> = rf.log.between(index, last_one)
                             .iter()
                             .map(|entry| entry.command.clone())
                             .collect();
@@ -839,12 +836,7 @@ where
             return None;
         }
 
-        let index = rf.log.len();
-        rf.log.push(LogEntry {
-            term,
-            index,
-            command,
-        });
+        let index = rf.log.add(term, command);
         self.persister.save_state(rf.persisted_state().into());
 
         let _ = self.new_log_entry.clone().unwrap().send(None);

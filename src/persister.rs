@@ -31,7 +31,7 @@ impl<Command: Clone> From<&RaftState<Command>> for PersistedRaftState<Command> {
         Self {
             current_term: raft_state.current_term,
             voted_for: raft_state.voted_for,
-            log: raft_state.log.clone(),
+            log: raft_state.log.all().to_vec(),
         }
     }
 }

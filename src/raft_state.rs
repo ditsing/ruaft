@@ -1,4 +1,6 @@
-use crate::{persister::PersistedRaftState, Index, LogEntry, Peer, Term};
+use crate::{
+    log_array::LogArray, persister::PersistedRaftState, Index, Peer, Term,
+};
 
 #[derive(Debug, Eq, PartialEq)]
 pub(crate) enum State {
@@ -11,7 +13,7 @@ pub(crate) enum State {
 pub(crate) struct RaftState<Command> {
     pub current_term: Term,
     pub voted_for: Option<Peer>,
-    pub log: Vec<LogEntry<Command>>,
+    pub log: LogArray,
 
     pub commit_index: Index,
     pub last_applied: Index,
@@ -32,12 +34,6 @@ impl<Command: Clone> RaftState<Command> {
 }
 
 impl<Command> RaftState<Command> {
-    pub fn last_log_index_and_term(&self) -> (Index, Term) {
-        let len = self.log.len();
-        assert!(len > 0, "There should always be at least one entry in log");
-        (len - 1, self.log.last().unwrap().term)
-    }
-
     pub fn is_leader(&self) -> bool {
         self.state == State::Leader
     }

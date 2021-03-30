@@ -18,20 +18,15 @@ use rand::{thread_rng, Rng};
 
 use crate::persister::PersistedRaftState;
 pub use crate::persister::Persister;
+pub(crate) use crate::raft_state::RaftState;
+pub(crate) use crate::raft_state::State;
 pub use crate::rpcs::RpcClient;
 use crate::utils::retry_rpc;
 
 mod persister;
+mod raft_state;
 pub mod rpcs;
 pub mod utils;
-
-#[derive(Debug, Eq, PartialEq)]
-enum State {
-    Follower,
-    Candidate,
-    // TODO: add PreVote
-    Leader,
-}
 
 #[derive(
     Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize,
@@ -51,23 +46,6 @@ struct LogEntry {
     index: Index,
     // TODO: Allow sending of arbitrary information.
     command: Command,
-}
-
-struct RaftState {
-    current_term: Term,
-    voted_for: Option<Peer>,
-    log: Vec<LogEntry>,
-
-    commit_index: Index,
-    last_applied: Index,
-
-    next_index: Vec<Index>,
-    match_index: Vec<Index>,
-    current_step: Vec<i64>,
-
-    state: State,
-
-    leader_id: Peer,
 }
 
 struct ElectionState {
@@ -844,22 +822,6 @@ impl Raft {
     pub fn get_state(&self) -> (Term, bool) {
         let state = self.inner_state.lock();
         (state.current_term, state.is_leader())
-    }
-}
-
-impl RaftState {
-    fn persisted_state(&self) -> PersistedRaftState {
-        self.into()
-    }
-
-    fn last_log_index_and_term(&self) -> (Index, Term) {
-        let len = self.log.len();
-        assert!(len > 0, "There should always be at least one entry in log");
-        (len - 1, self.log.last().unwrap().term)
-    }
-
-    fn is_leader(&self) -> bool {
-        self.state == State::Leader
     }
 }
 

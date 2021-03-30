@@ -122,7 +122,8 @@ impl LogArray {
     pub fn shift(&mut self, index: Index, snapshot: bytes::Bytes) {
         // Discard everything before index and store the snapshot.
         let offset = self.check_middle_index(index);
-        self.inner = self.inner.split_off(offset);
+        // WARNING: Potentially all entries after offset would be copied.
+        self.inner.drain(0..offset);
         self.snapshot = snapshot;
 
         // Override the first entry, we know there is at least one entry. This is not strictly

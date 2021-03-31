@@ -81,7 +81,7 @@ impl<C> std::ops::Index<usize> for LogArray<C> {
 
 // Mutations
 impl<C> LogArray<C> {
-    pub fn add(&mut self, term: Term, command: C) -> Index {
+    pub fn add_command(&mut self, term: Term, command: C) -> Index {
         let index = self.len();
         self.push(LogEntry {
             index,

@@ -841,7 +841,7 @@ where
             return None;
         }
 
-        let index = rf.log.add(term, command);
+        let index = rf.log.add_command(term, command);
         self.persister.save_state(rf.persisted_state().into());
 
         let _ = self.new_log_entry.clone().unwrap().send(None);

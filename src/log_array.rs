@@ -1,5 +1,4 @@
 use crate::{Index, LogEntry, Term};
-use std::mem::swap;
 
 pub(crate) struct LogArray<C> {
     inner: Vec<LogEntry<C>>,
@@ -145,7 +144,7 @@ impl<C: Default> LogArray<C> {
         snapshot: bytes::Bytes,
     ) -> Vec<LogEntry<C>> {
         let mut inner = vec![Self::build_first_entry(index, term)];
-        swap(&mut inner, &mut self.inner);
+        std::mem::swap(&mut inner, &mut self.inner);
         self.snapshot = snapshot;
 
         self.check_one_element();

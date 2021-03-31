@@ -13,7 +13,7 @@ pub(crate) enum State {
 pub(crate) struct RaftState<Command> {
     pub current_term: Term,
     pub voted_for: Option<Peer>,
-    pub log: LogArray,
+    pub log: LogArray<Command>,
 
     pub commit_index: Index,
     pub last_applied: Index,

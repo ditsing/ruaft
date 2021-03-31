@@ -153,7 +153,8 @@ where
         {
             state.current_term = persisted_state.current_term;
             state.voted_for = persisted_state.voted_for;
-            state.log = log_array::LogArray::restore(persisted_state.log).unwrap();
+            state.log =
+                log_array::LogArray::restore(persisted_state.log).unwrap();
         }
 
         let election = ElectionState {
@@ -201,9 +202,10 @@ where
 // Command must be
 // 1. clone: they are copied to the persister.
 // 2. serialize: they are converted to bytes to persist.
+// 3. default: a default value is used as the first element of the log.
 impl<Command> Raft<Command>
 where
-    Command: Clone + serde::Serialize,
+    Command: Clone + serde::Serialize + Default,
 {
     pub(crate) fn process_request_vote(
         &self,
@@ -321,9 +323,10 @@ where
 // 1. clone: they are copied to the persister.
 // 2. send: Arc<Mutex<Vec<LogEntry<Command>>>> must be send, it is moved to another thread.
 // 3. serialize: they are converted to bytes to persist.
+// 4. default: a default value is used as the first element of log.
 impl<Command> Raft<Command>
 where
-    Command: 'static + Clone + Send + serde::Serialize,
+    Command: 'static + Clone + Send + serde::Serialize + Default,
 {
     fn run_election_timer(&self) -> std::thread::JoinHandle<()> {
         let this = self.clone();
@@ -807,7 +810,9 @@ where
                     if rf.last_applied < rf.commit_index {
                         let index = rf.last_applied + 1;
                         let last_one = rf.commit_index + 1;
-                        let commands: Vec<Command> = rf.log.between(index, last_one)
+                        let commands: Vec<Command> = rf
+                            .log
+                            .between(index, last_one)
                             .iter()
                             .map(|entry| entry.command.clone())
                             .collect();

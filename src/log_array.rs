@@ -1,13 +1,13 @@
-use crate::{Command, Index, LogEntry, Term};
+use crate::{Index, LogEntry, Term};
 use std::mem::swap;
 
-pub(crate) struct LogArray {
-    inner: Vec<LogEntry>,
+pub(crate) struct LogArray<C> {
+    inner: Vec<LogEntry<C>>,
     snapshot: bytes::Bytes,
 }
 
-impl LogArray {
-    pub fn create() -> LogArray {
+impl<C: Default> LogArray<C> {
+    pub fn create() -> LogArray<C> {
         let ret = LogArray {
             inner: vec![Self::build_first_entry(0, Term(0))],
             snapshot: bytes::Bytes::new(),
@@ -16,7 +16,7 @@ impl LogArray {
         ret
     }
 
-    pub fn restore(inner: Vec<LogEntry>) -> std::io::Result<Self> {
+    pub fn restore(inner: Vec<LogEntry<C>>) -> std::io::Result<Self> {
         Ok(LogArray {
             inner,
             snapshot: bytes::Bytes::new(),
@@ -25,7 +25,7 @@ impl LogArray {
 }
 
 // Log accessors
-impl LogArray {
+impl<C> LogArray<C> {
     pub fn start_offset(&self) -> Index {
         self.first_entry().index
     }
@@ -45,23 +45,23 @@ impl LogArray {
         (last_entry.index, last_entry.term)
     }
 
-    pub fn at(&self, index: Index) -> &LogEntry {
+    pub fn at(&self, index: Index) -> &LogEntry<C> {
         let index = self.check_start_index(index);
         &self.inner[index]
     }
 
-    pub fn after(&self, index: Index) -> &[LogEntry] {
+    pub fn after(&self, index: Index) -> &[LogEntry<C>] {
         let index = self.check_start_index(index);
         &self.inner[index..]
     }
 
-    pub fn between(&self, start: Index, end: Index) -> &[LogEntry] {
+    pub fn between(&self, start: Index, end: Index) -> &[LogEntry<C>] {
         let start = self.check_start_index(start);
         let end = self.check_end_index(end);
         &self.inner[start..end]
     }
 
-    pub fn all(&self) -> &[LogEntry] {
+    pub fn all(&self) -> &[LogEntry<C>] {
         &self.inner[..]
     }
 
@@ -71,8 +71,8 @@ impl LogArray {
     }
 }
 
-impl std::ops::Index<usize> for LogArray {
-    type Output = LogEntry;
+impl<C> std::ops::Index<usize> for LogArray<C> {
+    type Output = LogEntry<C>;
 
     fn index(&self, index: usize) -> &Self::Output {
         self.at(index)
@@ -80,8 +80,8 @@ impl std::ops::Index<usize> for LogArray {
 }
 
 // Mutations
-impl LogArray {
-    pub fn add(&mut self, term: Term, command: Command) -> Index {
+impl<C> LogArray<C> {
+    pub fn add(&mut self, term: Term, command: C) -> Index {
         let index = self.len();
         self.push(LogEntry {
             index,
@@ -91,13 +91,9 @@ impl LogArray {
         index
     }
 
-    pub fn push(&mut self, log_entry: LogEntry) {
+    pub fn push(&mut self, log_entry: LogEntry<C>) {
         let index = log_entry.index;
-        assert_eq!(
-            index,
-            self.len(),
-            "Expecting new index to be exact at len",
-        );
+        assert_eq!(index, self.len(), "Expecting new index to be exact at len");
         self.inner.push(log_entry);
         assert_eq!(
             index + 1,
@@ -117,7 +113,9 @@ impl LogArray {
         self.inner.truncate(index);
         self.check_one_element()
     }
+}
 
+impl<C: Default> LogArray<C> {
     #[allow(dead_code)]
     pub fn shift(&mut self, index: Index, snapshot: bytes::Bytes) {
         // Discard everything before index and store the snapshot.
@@ -145,7 +143,7 @@ impl LogArray {
         index: Index,
         term: Term,
         snapshot: bytes::Bytes,
-    ) -> Vec<LogEntry> {
+    ) -> Vec<LogEntry<C>> {
         let mut inner = vec![Self::build_first_entry(index, term)];
         swap(&mut inner, &mut self.inner);
         self.snapshot = snapshot;
@@ -156,14 +154,14 @@ impl LogArray {
     }
 }
 
-impl LogArray {
-    fn first_entry(&self) -> &LogEntry {
+impl<C> LogArray<C> {
+    fn first_entry(&self) -> &LogEntry<C> {
         self.inner
             .first()
             .expect("There must be at least one element in log")
     }
 
-    fn last_entry(&self) -> &LogEntry {
+    fn last_entry(&self) -> &LogEntry<C> {
         &self
             .inner
             .last()
@@ -216,12 +214,14 @@ impl LogArray {
             "There must be at least one element in log"
         )
     }
+}
 
-    fn build_first_entry(index: Index, term: Term) -> LogEntry {
+impl<C: Default> LogArray<C> {
+    fn build_first_entry(index: Index, term: Term) -> LogEntry<C> {
         LogEntry {
             index,
             term,
-            command: Command(0),
+            command: C::default(),
         }
     }
 }

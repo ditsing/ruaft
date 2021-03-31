@@ -8,10 +8,10 @@ pub(crate) enum State {
     Leader,
 }
 
-pub(crate) struct RaftState {
+pub(crate) struct RaftState<Command> {
     pub current_term: Term,
     pub voted_for: Option<Peer>,
-    pub log: Vec<LogEntry>,
+    pub log: Vec<LogEntry<Command>>,
 
     pub commit_index: Index,
     pub last_applied: Index,
@@ -25,11 +25,13 @@ pub(crate) struct RaftState {
     pub leader_id: Peer,
 }
 
-impl RaftState {
-    pub fn persisted_state(&self) -> PersistedRaftState {
+impl<Command: Clone> RaftState<Command> {
+    pub fn persisted_state(&self) -> PersistedRaftState<Command> {
         self.into()
     }
+}
 
+impl<Command> RaftState<Command> {
     pub fn last_log_index_and_term(&self) -> (Index, Term) {
         let len = self.log.len();
         assert!(len > 0, "There should always be at least one entry in log");

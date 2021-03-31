@@ -7,8 +7,13 @@ use crate::{
     AppendEntriesArgs, AppendEntriesReply, Raft, RequestVoteArgs,
     RequestVoteReply,
 };
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
-fn proxy_request_vote(raft: &Raft, data: RequestMessage) -> ReplyMessage {
+fn proxy_request_vote<Command: Clone + Serialize + DeserializeOwned>(
+    raft: &Raft<Command>,
+    data: RequestMessage,
+) -> ReplyMessage {
     let reply = raft.process_request_vote(
         bincode::deserialize(data.as_ref())
             .expect("Deserialization of requests should not fail"),
@@ -19,7 +24,10 @@ fn proxy_request_vote(raft: &Raft, data: RequestMessage) -> ReplyMessage {
             .expect("Serialization of reply should not fail"),
     )
 }
-fn proxy_append_entries(raft: &Raft, data: RequestMessage) -> ReplyMessage {
+fn proxy_append_entries<Command: Clone + Serialize + DeserializeOwned>(
+    raft: &Raft<Command>,
+    data: RequestMessage,
+) -> ReplyMessage {
     let reply = raft.process_append_entries(
         bincode::deserialize(data.as_ref())
             .expect("Deserialization should not fail"),
@@ -55,9 +63,9 @@ impl RpcClient {
             .expect("Deserialization of reply should not fail"))
     }
 
-    pub(crate) async fn call_append_entries(
+    pub(crate) async fn call_append_entries<Command: Serialize>(
         &self,
-        request: AppendEntriesArgs,
+        request: AppendEntriesArgs<Command>,
     ) -> std::io::Result<AppendEntriesReply> {
         let data = RequestMessage::from(
             bincode::serialize(&request)
@@ -72,8 +80,11 @@ impl RpcClient {
     }
 }
 
-pub fn register_server<S: AsRef<str>>(
-    raft: Arc<Raft>,
+pub fn register_server<
+    Command: 'static + Clone + Serialize + DeserializeOwned,
+    S: AsRef<str>,
+>(
+    raft: Arc<Raft<Command>>,
     name: S,
     network: &Mutex<Network>,
 ) -> std::io::Result<()> {
@@ -133,7 +144,7 @@ mod tests {
                 vec![RpcClient(client)],
                 0,
                 Arc::new(()),
-                |_, _| {},
+                |_, _: i32| {},
             ));
             register_server(raft, name, network.as_ref())?;
 
@@ -155,7 +166,7 @@ mod tests {
             futures::executor::block_on(rpc_client.call_request_vote(request))?;
         assert_eq!(true, response.vote_granted);
 
-        let request = AppendEntriesArgs {
+        let request = AppendEntriesArgs::<i32> {
             term: Term(2021),
             leader_id: Peer(0),
             prev_log_index: 0,

@@ -13,7 +13,7 @@ use ruaft::{Persister, Raft, RpcClient};
 pub mod persister;
 
 struct ConfigState {
-    rafts: Vec<Option<Raft>>,
+    rafts: Vec<Option<Raft<i32>>>,
     connected: Vec<bool>,
 }
 
@@ -204,9 +204,7 @@ impl Config {
                 let state = self.state.lock();
                 if state.connected[cnt] {
                     if let Some(raft) = &state.rafts[cnt] {
-                        if let Some((_, index)) =
-                            raft.start(ruaft::Command(cmd))
-                        {
+                        if let Some((_, index)) = raft.start(cmd) {
                             first_index.replace(index);
                         }
                     }
@@ -311,7 +309,7 @@ impl Config {
         let log_clone = self.log.clone();
         let raft =
             Raft::new(clients, index, persister, move |cmd_index, cmd| {
-                Self::apply_command(log_clone.clone(), index, cmd_index, cmd.0)
+                Self::apply_command(log_clone.clone(), index, cmd_index, cmd)
             });
         self.state.lock().rafts[index].replace(raft.clone());
 
@@ -328,10 +326,7 @@ impl Config {
     ) -> Option<(usize, usize)> {
         self.state.lock().rafts[leader]
             .as_ref()
-            .map(|raft| {
-                raft.start(ruaft::Command(cmd))
-                    .map(|(term, index)| (term.0, index))
-            })
+            .map(|raft| raft.start(cmd).map(|(term, index)| (term.0, index)))
             .unwrap()
     }
 

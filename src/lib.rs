@@ -38,10 +38,7 @@ struct Peer(usize);
 pub type Index = usize;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Command(pub i32);
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct LogEntry {
+struct LogEntry<Command> {
     term: Term,
     index: Index,
     // TODO: Allow sending of arbitrary information.
@@ -56,8 +53,8 @@ struct ElectionState {
 }
 
 #[derive(Clone)]
-pub struct Raft {
-    inner_state: Arc<Mutex<RaftState>>,
+pub struct Raft<Command> {
+    inner_state: Arc<Mutex<RaftState<Command>>>,
     peers: Vec<Arc<RpcClient>>,
 
     me: Peer,
@@ -89,12 +86,12 @@ struct RequestVoteReply {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct AppendEntriesArgs {
+struct AppendEntriesArgs<Command> {
     term: Term,
     leader_id: Peer,
     prev_log_index: Index,
     prev_log_term: Term,
-    entries: Vec<LogEntry>,
+    entries: Vec<LogEntry<Command>>,
     leader_commit: Index,
 }
 
@@ -107,7 +104,24 @@ struct AppendEntriesReply {
 #[repr(align(64))]
 struct Opening(Arc<AtomicUsize>);
 
-impl Raft {
+// Commands must be
+// 0. 'static: they have to live long enough for thread pools.
+// 1. clone: they are put in vectors and request messages.
+// 2. serializable: they are sent over RPCs and persisted.
+// 3. deserializable: they are restored from storage.
+// 4. send: they are referenced in futures.
+// 5. sync: they are shared to other threads.
+// 6. default, because we need an element for the first entry.
+impl<Command> Raft<Command>
+where
+    Command: 'static
+        + Clone
+        + serde::Serialize
+        + serde::de::DeserializeOwned
+        + Send
+        + Sync
+        + Default,
+{
     /// Create a new raft instance.
     ///
     /// Each instance will create at least 3 + (number of peers) threads. The
@@ -128,7 +142,7 @@ impl Raft {
             log: vec![LogEntry {
                 term: Term(0),
                 index: 0,
-                command: Command(0),
+                command: Command::default(),
             }],
             commit_index: 0,
             last_applied: 0,
@@ -187,7 +201,15 @@ impl Raft {
         this.run_election_timer();
         this
     }
+}
 
+// Command must be
+// 1. clone: they are copied to the persister.
+// 2. serialize: they are converted to bytes to persist.
+impl<Command> Raft<Command>
+where
+    Command: Clone + serde::Serialize,
+{
     pub(crate) fn process_request_vote(
         &self,
         args: RequestVoteArgs,
@@ -239,7 +261,7 @@ impl Raft {
 
     pub(crate) fn process_append_entries(
         &self,
-        args: AppendEntriesArgs,
+        args: AppendEntriesArgs<Command>,
     ) -> AppendEntriesReply {
         let mut rf = self.inner_state.lock();
         if rf.current_term > args.term {
@@ -297,7 +319,18 @@ impl Raft {
             success: true,
         }
     }
+}
 
+// Command must be
+// 0. 'static: Raft<Command> must be 'static, it is moved to another thread.
+// 1. clone: they are copied to the persister.
+// 2. send: Arc<Mutex<Vec<LogEntry<Command>>>> must be send, it is moved to another thread.
+// 3. sync: AppendEntries<Command> are used across await points for RPC retries.
+// 4. serialize: they are converted to bytes to persist.
+impl<Command> Raft<Command>
+where
+    Command: 'static + Clone + Send + Sync + serde::Serialize,
+{
     fn run_election_timer(&self) -> std::thread::JoinHandle<()> {
         let this = self.clone();
         std::thread::spawn(move || {
@@ -456,7 +489,7 @@ impl Raft {
     async fn count_vote_util_cancelled(
         me: Peer,
         term: Term,
-        rf: Arc<Mutex<RaftState>>,
+        rf: Arc<Mutex<RaftState<Command>>>,
         votes: Vec<tokio::task::JoinHandle<Option<bool>>>,
         cancel_token: futures_channel::oneshot::Receiver<()>,
         election: Arc<ElectionState>,
@@ -545,8 +578,8 @@ impl Raft {
     }
 
     fn build_heartbeat(
-        rf: &Arc<Mutex<RaftState>>,
-    ) -> Option<AppendEntriesArgs> {
+        rf: &Arc<Mutex<RaftState<Command>>>,
+    ) -> Option<AppendEntriesArgs<Command>> {
         let rf = rf.lock();
 
         if !rf.is_leader() {
@@ -568,7 +601,7 @@ impl Raft {
     const HEARTBEAT_RETRY: usize = 1;
     async fn send_heartbeat(
         rpc_client: Arc<RpcClient>,
-        args: AppendEntriesArgs,
+        args: AppendEntriesArgs<Command>,
     ) -> std::io::Result<()> {
         retry_rpc(Self::HEARTBEAT_RETRY, RPC_DEADLINE, |_round| {
             rpc_client.call_append_entries(args.clone())
@@ -624,7 +657,7 @@ impl Raft {
     }
 
     async fn sync_log_entry(
-        rf: Arc<Mutex<RaftState>>,
+        rf: Arc<Mutex<RaftState<Command>>>,
         rpc_client: Arc<RpcClient>,
         peer_index: usize,
         rerun: std::sync::mpsc::Sender<Option<Peer>>,
@@ -701,9 +734,9 @@ impl Raft {
     }
 
     fn build_append_entries(
-        rf: &Arc<Mutex<RaftState>>,
+        rf: &Arc<Mutex<RaftState<Command>>>,
         peer_index: usize,
-    ) -> Option<AppendEntriesArgs> {
+    ) -> Option<AppendEntriesArgs<Command>> {
         let rf = rf.lock();
         if !rf.is_leader() {
             return None;
@@ -723,7 +756,7 @@ impl Raft {
     const APPEND_ENTRIES_RETRY: usize = 1;
     async fn append_entries(
         rpc_client: &RpcClient,
-        args: AppendEntriesArgs,
+        args: AppendEntriesArgs<Command>,
     ) -> std::io::Result<Option<bool>> {
         let term = args.term;
         let reply =

@@ -1,11 +1,37 @@
 use crate::{Index, LogEntry, Term};
 
+/// A log array that stores a tail of the whole Raft log.
+///
+/// The Raft log represented by the log array has length `end()`. Only log
+/// entries after `start()` are physically stored in the log array (with some
+/// caveats). The index and term of log entries in range `[start(), end())` are
+/// accessible. A snapshot is stored at the beginning of the log array, which
+/// covers all commands before and **including** `start()`. The command at
+/// `start()` is **not** accessible, but all commands after that are.
+///
+/// New entries can be appended to the end of the Raft log via `add_command()`
+/// or `push()`.
+///
+/// The log array can be truncated to at most one entry, which is at `start()`
+/// and contains the snapshot. The start of the log array can be shifted towards
+/// `end()`, if another snapshot at that position is provided.
+///
+/// The log array can also be reset to a single entry, contains an index, a term
+/// and a snapshot, via `reset()`.
+///
+/// The log array is guaranteed to have at least one element, containing an
+/// index, a term and a snapshot.
+///
+/// All APIs **will** panic if the given index(es) are out of bound.
+///
+/// NOT THREAD SAFE.
 pub(crate) struct LogArray<C> {
     inner: Vec<LogEntry<C>>,
     snapshot: bytes::Bytes,
 }
 
 impl<C: Default> LogArray<C> {
+    /// Create the initial Raft log with no user-supplied commands.
     pub fn create() -> LogArray<C> {
         let ret = LogArray {
             inner: vec![Self::build_first_entry(0, Term(0))],
@@ -25,45 +51,55 @@ impl<C: Default> LogArray<C> {
 
 // Log accessors
 impl<C> LogArray<C> {
+    /// The start of the stored log entries. The command at this index is no
+    /// longer accessible, since it is included in the snapshot.
     pub fn start(&self) -> Index {
         self.first_entry().index
     }
 
+    /// The end index of the Raft log.
     pub fn end(&self) -> usize {
         self.start() + self.inner.len()
     }
 
+    /// The first index and term stored in this log array.
     #[allow(dead_code)]
     pub fn first_index_term(&self) -> (Index, Term) {
         let first_entry = self.first_entry();
         (first_entry.index, first_entry.term)
     }
 
+    /// The last index and term of the Raft log.
     pub fn last_index_term(&self) -> (Index, Term) {
         let last_entry = self.last_entry();
         (last_entry.index, last_entry.term)
     }
 
+    /// The log entry at the given index.
     pub fn at(&self, index: Index) -> &LogEntry<C> {
         let index = self.check_start_index(index);
         &self.inner[index]
     }
 
+    /// All log entries after the given index.
     pub fn after(&self, index: Index) -> &[LogEntry<C>] {
         let index = self.check_start_index(index);
         &self.inner[index..]
     }
 
+    /// All log entries in range [start, end).
     pub fn between(&self, start: Index, end: Index) -> &[LogEntry<C>] {
         let start = self.check_start_index(start);
         let end = self.check_end_index(end);
         &self.inner[start..end]
     }
 
+    /// All log entries stored in the array.
     pub fn all(&self) -> &[LogEntry<C>] {
         &self.inner[..]
     }
 
+    /// The snapshot before and including `start()`.
     #[allow(dead_code)]
     pub fn snapshot(&self) -> &bytes::Bytes {
         &self.snapshot
@@ -80,6 +116,8 @@ impl<C> std::ops::Index<usize> for LogArray<C> {
 
 // Mutations
 impl<C> LogArray<C> {
+    /// Add a new entry to the Raft log, with term and command. The new index is
+    /// returned.
     pub fn add_command(&mut self, term: Term, command: C) -> Index {
         let index = self.end();
         self.push(LogEntry {
@@ -90,6 +128,8 @@ impl<C> LogArray<C> {
         index
     }
 
+    /// Push a LogEntry into the Raft log. The index of the log entry must match
+    /// the next index in the log.
     pub fn push(&mut self, log_entry: LogEntry<C>) {
         let index = log_entry.index;
         assert_eq!(index, self.end(), "Expecting new index to be exact at len");
@@ -107,6 +147,7 @@ impl<C> LogArray<C> {
         self.check_one_element();
     }
 
+    /// Remove all log entries on and after `index`.
     pub fn truncate(&mut self, index: Index) {
         let index = self.check_middle_index(index);
         self.inner.truncate(index);
@@ -115,6 +156,8 @@ impl<C> LogArray<C> {
 }
 
 impl<C: Default> LogArray<C> {
+    /// Shift the start of the array to `index`, and store a new snapshot that
+    /// covers all commands before and at `index`.
     #[allow(dead_code)]
     pub fn shift(&mut self, index: Index, snapshot: bytes::Bytes) {
         // Discard everything before index and store the snapshot.
@@ -123,8 +166,9 @@ impl<C: Default> LogArray<C> {
         self.inner.drain(0..offset);
         self.snapshot = snapshot;
 
-        // Override the first entry, we know there is at least one entry. This is not strictly
-        // needed. One benefit is that the command can be released after this point.
+        // Override the first entry, we know there is at least one entry. This
+        // is not strictly needed. One benefit is that the command can be
+        // released after this point.
         let (first_index, first_term) = self.first_index_term();
         self.inner[0] = Self::build_first_entry(first_index, first_term);
 
@@ -136,6 +180,8 @@ impl<C: Default> LogArray<C> {
         self.check_one_element()
     }
 
+    /// Reset the array to contain only one snapshot at the given `index` with
+    /// the given `term`.
     #[allow(dead_code)]
     pub fn reset(
         &mut self,

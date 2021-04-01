@@ -279,7 +279,7 @@ where
 
         self.election.reset_election_timer();
 
-        if rf.log.len() <= args.prev_log_index
+        if rf.log.end() <= args.prev_log_index
             || rf.log[args.prev_log_index].term != args.prev_log_term
         {
             return AppendEntriesReply {
@@ -290,7 +290,7 @@ where
 
         for (i, entry) in args.entries.iter().enumerate() {
             let index = i + args.prev_log_index + 1;
-            if rf.log.len() > index {
+            if rf.log.end() > index {
                 if rf.log[index].term != entry.term {
                     rf.log.truncate(index);
                     rf.log.push(entry.clone());
@@ -303,10 +303,10 @@ where
         self.persister.save_state(rf.persisted_state().into());
 
         if args.leader_commit > rf.commit_index {
-            rf.commit_index = if args.leader_commit < rf.log.len() {
+            rf.commit_index = if args.leader_commit < rf.log.end() {
                 args.leader_commit
             } else {
-                rf.log.len() - 1
+                rf.log.end() - 1
             };
             self.apply_command_signal.notify_one();
         }
@@ -536,7 +536,7 @@ where
 
             rf.state = State::Leader;
             rf.leader_id = me;
-            let log_len = rf.log.len();
+            let log_len = rf.log.end();
             for item in rf.next_index.iter_mut() {
                 *item = log_len;
             }

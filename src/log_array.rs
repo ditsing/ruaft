@@ -25,12 +25,12 @@ impl<C: Default> LogArray<C> {
 
 // Log accessors
 impl<C> LogArray<C> {
-    pub fn start_offset(&self) -> Index {
+    pub fn start(&self) -> Index {
         self.first_entry().index
     }
 
-    pub fn len(&self) -> usize {
-        self.start_offset() + self.inner.len()
+    pub fn end(&self) -> usize {
+        self.start() + self.inner.len()
     }
 
     #[allow(dead_code)]
@@ -81,7 +81,7 @@ impl<C> std::ops::Index<usize> for LogArray<C> {
 // Mutations
 impl<C> LogArray<C> {
     pub fn add_command(&mut self, term: Term, command: C) -> Index {
-        let index = self.len();
+        let index = self.end();
         self.push(LogEntry {
             index,
             term,
@@ -92,11 +92,11 @@ impl<C> LogArray<C> {
 
     pub fn push(&mut self, log_entry: LogEntry<C>) {
         let index = log_entry.index;
-        assert_eq!(index, self.len(), "Expecting new index to be exact at len");
+        assert_eq!(index, self.end(), "Expecting new index to be exact at len");
         self.inner.push(log_entry);
         assert_eq!(
             index + 1,
-            self.len(),
+            self.end(),
             "Expecting len increase by one after push",
         );
         assert_eq!(
@@ -168,16 +168,16 @@ impl<C> LogArray<C> {
     }
 
     fn offset(&self, index: Index) -> usize {
-        index - self.start_offset()
+        index - self.start()
     }
 
     fn check_start_index(&self, index: Index) -> usize {
         assert!(
-            index >= self.start_offset() && index < self.len(),
+            index >= self.start() && index < self.end(),
             "Accessing start log index {} out of range [{}, {})",
             index,
-            self.start_offset(),
-            self.len()
+            self.start(),
+            self.end()
         );
 
         self.offset(index)
@@ -185,11 +185,11 @@ impl<C> LogArray<C> {
 
     fn check_end_index(&self, index: Index) -> usize {
         assert!(
-            index > self.start_offset() && index <= self.len(),
+            index > self.start() && index <= self.end(),
             "Accessing end log index {} out of range ({}, {}]",
             index,
-            self.start_offset(),
-            self.len()
+            self.start(),
+            self.end()
         );
 
         self.offset(index)
@@ -197,11 +197,11 @@ impl<C> LogArray<C> {
 
     fn check_middle_index(&self, index: Index) -> usize {
         assert!(
-            index > self.start_offset() && index < self.len(),
+            index > self.start() && index < self.end(),
             "Log index {} out of range ({}, {})",
             index,
-            self.start_offset(),
-            self.len()
+            self.start(),
+            self.end()
         );
 
         self.offset(index)
@@ -260,7 +260,7 @@ mod tests {
         let log = LogArray::<i32>::create();
         log.check_one_element();
 
-        assert_eq!(1, log.len());
+        assert_eq!(1, log.end());
         assert_eq!((0, Term(0)), log.first_index_term());
         assert_eq!(0, log[0].command);
     }
@@ -270,21 +270,21 @@ mod tests {
     fn test_restore() {}
 
     #[test]
-    fn test_start_offset() {
+    fn test_start() {
         let log = make_log_array_range(9, 17);
-        assert_eq!(9, log.start_offset());
+        assert_eq!(9, log.start());
 
         let log = make_log_array(9);
-        assert_eq!(0, log.start_offset());
+        assert_eq!(0, log.start());
     }
 
     #[test]
-    fn test_len() {
+    fn test_end() {
         let log = make_log_array(7);
-        assert_eq!(7, log.len());
+        assert_eq!(7, log.end());
 
         let log = make_log_array_range(8, 17);
-        assert_eq!(17, log.len());
+        assert_eq!(17, log.end());
     }
 
     #[test]
@@ -389,7 +389,7 @@ mod tests {
         assert_eq!(8, log.at(index).term.0);
         assert_eq!(9, log.at(index).command);
         assert_eq!(index, end);
-        assert_eq!(index + 1, log.len());
+        assert_eq!(index + 1, log.end());
     }
 
     #[test]
@@ -402,7 +402,7 @@ mod tests {
         });
         assert_eq!(8, log.at(end).term.0);
         assert_eq!(1, log.at(end).command);
-        assert_eq!(end + 1, log.len());
+        assert_eq!(end + 1, log.end());
     }
 
     #[test]
@@ -431,7 +431,7 @@ mod tests {
     fn test_truncate() {
         let (start, _, mut log) = default_log_array();
         log.truncate(start + 5);
-        assert_eq!(start + 5, log.len());
+        assert_eq!(start + 5, log.end());
         for i in start..start + 5 {
             assert_eq!(log[i].index, i);
             assert_eq!(log[i].term.0, i / 3);
@@ -617,8 +617,8 @@ mod tests {
         for i in 0..100 {
             log.add_command(Term(5), i);
         }
-        assert_eq!(0, log.start_offset());
-        assert_eq!(105, log.len());
+        assert_eq!(0, log.start());
+        assert_eq!(105, log.end());
 
         assert_eq!((0, Term(0)), log.first_index_term());
         assert_eq!((104, Term(5)), log.last_index_term());
@@ -629,8 +629,8 @@ mod tests {
 
         log.truncate(50);
         // End changed, start does not.
-        assert_eq!(0, log.start_offset());
-        assert_eq!(50, log.len());
+        assert_eq!(0, log.start());
+        assert_eq!(50, log.end());
 
         assert_eq!((49, Term(5)), log.last_index_term());
         assert_eq!(49, log.at(49).index);
@@ -644,7 +644,7 @@ mod tests {
 
         log.shift(5, bytes::Bytes::new());
         // Start changed, end did not;
-        assert_eq!(5, log.start_offset());
+        assert_eq!(5, log.start());
 
         assert_eq!((5, Term(5)), log.first_index_term());
         assert_eq!(5, log.at(5).index);
@@ -662,7 +662,7 @@ mod tests {
 
         // Reset!
         log.reset(9, Term(7), bytes::Bytes::from_static(&[7, 8, 9]));
-        assert_eq!(10, log.len());
+        assert_eq!(10, log.end());
         assert_eq!(1, log.all().len());
         assert_eq!(log.first_index_term(), log.last_index_term());
         assert_eq!(bytes::Bytes::from_static(&[7, 8, 9]), log.snapshot());

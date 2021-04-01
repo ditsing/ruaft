@@ -63,7 +63,6 @@ impl<C> LogArray<C> {
     }
 
     /// The first index and term stored in this log array.
-    #[allow(dead_code)]
     pub fn first_index_term(&self) -> (Index, Term) {
         let first_entry = self.first_entry();
         (first_entry.index, first_entry.term)
@@ -101,8 +100,8 @@ impl<C> LogArray<C> {
 
     /// The snapshot before and including `start()`.
     #[allow(dead_code)]
-    pub fn snapshot(&self) -> &bytes::Bytes {
-        &self.snapshot
+    pub fn snapshot(&self) -> ((Index, Term), &bytes::Bytes) {
+        (self.first_index_term(), &self.snapshot)
     }
 }
 
@@ -338,7 +337,10 @@ mod tests {
         let (start, end, log) = default_log_array();
         assert_eq!((start, Term(2)), log.first_index_term());
         assert_eq!((end - 1, Term(5)), log.last_index_term());
-        assert_eq!(bytes::Bytes::from_static(&[1, 2, 3]), log.snapshot());
+        assert_eq!(
+            ((start, Term(2)), &bytes::Bytes::from_static(&[1, 2, 3])),
+            log.snapshot()
+        );
 
         let all = log.all();
         assert_eq!(end - start, all.len());
@@ -686,7 +688,10 @@ mod tests {
         // catch_unwind().
 
         // Snapshot is not changed.
-        assert_eq!(bytes::Bytes::from_static(&[1, 2, 3]), log.snapshot());
+        assert_eq!(
+            ((0, Term(0)), &bytes::Bytes::from_static(&[1, 2, 3])),
+            log.snapshot()
+        );
 
         log.shift(5, bytes::Bytes::new());
         // Start changed, end did not;
@@ -699,7 +704,7 @@ mod tests {
         // catch_unwind().
 
         // Snapshot is changed, too.
-        assert_eq!(bytes::Bytes::new(), log.snapshot());
+        assert_eq!(((5, Term(5)), &bytes::Bytes::new()), log.snapshot());
 
         // Ranged accessors.
         assert_eq!(45, log.all().len());
@@ -711,6 +716,9 @@ mod tests {
         assert_eq!(10, log.end());
         assert_eq!(1, log.all().len());
         assert_eq!(log.first_index_term(), log.last_index_term());
-        assert_eq!(bytes::Bytes::from_static(&[7, 8, 9]), log.snapshot());
+        assert_eq!(
+            ((9, Term(7)), &bytes::Bytes::from_static(&[7, 8, 9])),
+            log.snapshot()
+        );
     }
 }

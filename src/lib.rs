@@ -306,7 +306,7 @@ where
             rf.commit_index = if args.leader_commit < rf.log.end() {
                 args.leader_commit
             } else {
-                rf.log.end() - 1
+                rf.log.last_index_term().0
             };
             self.apply_command_signal.notify_one();
         }

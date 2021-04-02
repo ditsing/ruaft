@@ -23,6 +23,7 @@ pub(crate) use crate::raft_state::State;
 pub use crate::rpcs::RpcClient;
 use crate::utils::retry_rpc;
 
+mod index_term;
 mod log_array;
 mod persister;
 mod raft_state;
@@ -230,11 +231,11 @@ where
         }
 
         let voted_for = rf.voted_for;
-        let (last_log_index, last_log_term) = rf.log.last_index_term();
+        let last_log = rf.log.last_index_term();
         if (voted_for.is_none() || voted_for == Some(args.candidate_id))
-            && (args.last_log_term > last_log_term
-                || (args.last_log_term == last_log_term
-                    && args.last_log_index >= last_log_index))
+            && (args.last_log_term > last_log.term
+                || (args.last_log_term == last_log.term
+                    && args.last_log_index >= last_log.index))
         {
             rf.voted_for = Some(args.candidate_id);
 
@@ -306,7 +307,7 @@ where
             rf.commit_index = if args.leader_commit < rf.log.end() {
                 args.leader_commit
             } else {
-                rf.log.last_index_term().0
+                rf.log.last_index_term().index
             };
             self.apply_command_signal.notify_one();
         }
@@ -426,7 +427,8 @@ where
             self.persister.save_state(rf.persisted_state().into());
 
             let term = rf.current_term;
-            let (last_log_index, last_log_term) = rf.log.last_index_term();
+            let (last_log_index, last_log_term) =
+                rf.log.last_index_term().unpack();
 
             (
                 term,
@@ -585,12 +587,12 @@ where
             return None;
         }
 
-        let (last_log_index, last_log_term) = rf.log.last_index_term();
+        let last_log = rf.log.last_index_term();
         let args = AppendEntriesArgs {
             term: rf.current_term,
             leader_id: rf.leader_id,
-            prev_log_index: last_log_index,
-            prev_log_term: last_log_term,
+            prev_log_index: last_log.index,
+            prev_log_term: last_log.term,
             entries: vec![],
             leader_commit: rf.commit_index,
         };

@@ -1,4 +1,7 @@
-use crate::{Index, Peer, Raft, RaftState, State, Term};
+use crate::utils::retry_rpc;
+use crate::{
+    Index, Peer, Raft, RaftState, RpcClient, State, Term, RPC_DEADLINE,
+};
 use parking_lot::Mutex;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -13,6 +16,7 @@ pub(crate) struct InstallSnapshotArgs {
     done: bool,
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct InstallSnapshotReply {
     term: Term,
 }
@@ -68,6 +72,7 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
         InstallSnapshotReply { term: args.term }
     }
 
+    #[allow(unused)]
     fn build_install_snapshot(
         rf: &Mutex<RaftState<C>>,
     ) -> Option<InstallSnapshotArgs> {
@@ -85,5 +90,21 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
             offset: 0,
             done: true,
         })
+    }
+
+    const INSTALL_SNAPSHOT_RETRY: usize = 1;
+    #[allow(unused)]
+    async fn send_install_snapshot(
+        rpc_client: &RpcClient,
+        args: InstallSnapshotArgs,
+    ) -> std::io::Result<bool> {
+        let term = args.term;
+        let reply = retry_rpc(
+            Self::INSTALL_SNAPSHOT_RETRY,
+            RPC_DEADLINE,
+            move |_round| rpc_client.call_install_snapshot(args.clone()),
+        )
+        .await?;
+        Ok(reply.term == term)
     }
 }

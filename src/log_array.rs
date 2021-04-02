@@ -28,7 +28,7 @@ use crate::{Index, LogEntry, Term};
 /// NOT THREAD SAFE.
 pub(crate) struct LogArray<C> {
     inner: Vec<LogEntry<C>>,
-    snapshot: bytes::Bytes,
+    snapshot: Vec<u8>,
 }
 
 impl<C: Default> LogArray<C> {
@@ -36,7 +36,7 @@ impl<C: Default> LogArray<C> {
     pub fn create() -> LogArray<C> {
         let ret = LogArray {
             inner: vec![Self::build_first_entry(0, Term(0))],
-            snapshot: bytes::Bytes::new(),
+            snapshot: vec![],
         };
         ret.check_one_element();
         ret
@@ -45,7 +45,7 @@ impl<C: Default> LogArray<C> {
     pub fn restore(inner: Vec<LogEntry<C>>) -> std::io::Result<Self> {
         Ok(LogArray {
             inner,
-            snapshot: bytes::Bytes::new(),
+            snapshot: vec![],
         })
     }
 }
@@ -99,7 +99,7 @@ impl<C> LogArray<C> {
 
     /// The snapshot before and including `start()`.
     #[allow(dead_code)]
-    pub fn snapshot(&self) -> (IndexTerm, &bytes::Bytes) {
+    pub fn snapshot(&self) -> (IndexTerm, &[u8]) {
         (self.first_index_term(), &self.snapshot)
     }
 }
@@ -157,7 +157,7 @@ impl<C: Default> LogArray<C> {
     /// Shift the start of the array to `index`, and store a new snapshot that
     /// covers all commands before and at `index`.
     #[allow(dead_code)]
-    pub fn shift(&mut self, index: Index, snapshot: bytes::Bytes) {
+    pub fn shift(&mut self, index: Index, snapshot: Vec<u8>) {
         // Discard everything before index and store the snapshot.
         let offset = self.check_middle_index(index);
         // WARNING: Potentially all entries after offset would be copied.
@@ -185,7 +185,7 @@ impl<C: Default> LogArray<C> {
         &mut self,
         index: Index,
         term: Term,
-        snapshot: bytes::Bytes,
+        snapshot: Vec<u8>,
     ) -> Vec<LogEntry<C>> {
         let mut inner = vec![Self::build_first_entry(index, term)];
         std::mem::swap(&mut inner, &mut self.inner);
@@ -291,7 +291,7 @@ mod tests {
 
         LogArray {
             inner: ret,
-            snapshot: bytes::Bytes::from_static(&[1, 2, 3]),
+            snapshot: vec![1, 2, 3],
         }
     }
 
@@ -337,10 +337,7 @@ mod tests {
         assert_eq!((start, Term(2)), log.first_index_term().into());
         assert_eq!((end - 1, Term(5)), log.last_index_term().into());
         assert_eq!(
-            (
-                (start, Term(2)).into(),
-                &bytes::Bytes::from_static(&[1, 2, 3])
-            ),
+            ((start, Term(2)).into(), [1, 2, 3].as_ref()),
             log.snapshot()
         );
 
@@ -526,7 +523,7 @@ mod tests {
         assert!(offset > start);
         assert!(offset < end);
 
-        log.shift(offset, bytes::Bytes::new());
+        log.shift(offset, vec![]);
 
         assert_eq!((offset, Term(3)), log.first_index_term().into());
         assert_eq!(0, log[offset].command);
@@ -538,7 +535,7 @@ mod tests {
             assert_eq!(i / 3, all[i - offset].term.0);
         }
 
-        assert_eq!(bytes::Bytes::new(), log.snapshot);
+        assert_eq!(log.snapshot, vec![]);
     }
 
     #[test]
@@ -546,7 +543,7 @@ mod tests {
     fn test_shift_before_start() {
         let (start, end, mut log) = default_log_array();
         assert!(start < end);
-        log.shift(start - 1, bytes::Bytes::new());
+        log.shift(start - 1, vec![]);
     }
 
     #[test]
@@ -554,7 +551,7 @@ mod tests {
     fn test_shift_at_start() {
         let (start, end, mut log) = default_log_array();
         assert!(start < end);
-        log.shift(start, bytes::Bytes::new());
+        log.shift(start, vec![]);
     }
 
     #[test]
@@ -562,7 +559,7 @@ mod tests {
     fn test_shift_at_end() {
         let (start, end, mut log) = default_log_array();
         assert!(start < end);
-        log.shift(end, bytes::Bytes::new());
+        log.shift(end, vec![]);
     }
 
     #[test]
@@ -570,15 +567,15 @@ mod tests {
     fn test_shift_after_end() {
         let (start, end, mut log) = default_log_array();
         assert!(start < end);
-        log.shift(end + 1, bytes::Bytes::new());
+        log.shift(end + 1, vec![]);
     }
 
     #[test]
     fn test_reset() {
         let (start, end, mut log) = default_log_array();
-        let dump = log.reset(88, Term(99), bytes::Bytes::from_static(&[1, 2]));
+        let dump = log.reset(88, Term(99), vec![1, 2]);
         assert_eq!(1, log.all().len());
-        assert_eq!(bytes::Bytes::from_static(&[1, 2]), log.snapshot);
+        assert_eq!(vec![1, 2], log.snapshot);
         assert_eq!(88, log[88].index);
         assert_eq!(99, log[88].term.0);
         assert_eq!(0, log[88].command);
@@ -690,12 +687,9 @@ mod tests {
         // catch_unwind().
 
         // Snapshot is not changed.
-        assert_eq!(
-            ((0, Term(0)).into(), &bytes::Bytes::from_static(&[1, 2, 3])),
-            log.snapshot()
-        );
+        assert_eq!(((0, Term(0)).into(), [1, 2, 3].as_ref()), log.snapshot());
 
-        log.shift(5, bytes::Bytes::new());
+        log.shift(5, vec![]);
         // Start changed, end did not;
         assert_eq!(5, log.start());
 
@@ -706,7 +700,7 @@ mod tests {
         // catch_unwind().
 
         // Snapshot is changed, too.
-        assert_eq!(((5, Term(5)).into(), &bytes::Bytes::new()), log.snapshot());
+        assert_eq!(((5, Term(5)).into(), [].as_ref()), log.snapshot());
 
         // Ranged accessors.
         assert_eq!(45, log.all().len());
@@ -714,13 +708,10 @@ mod tests {
         assert_eq!(20, log.between(20, 40).len());
 
         // Reset!
-        log.reset(9, Term(7), bytes::Bytes::from_static(&[7, 8, 9]));
+        log.reset(9, Term(7), vec![7, 8, 9]);
         assert_eq!(10, log.end());
         assert_eq!(1, log.all().len());
         assert_eq!(log.first_index_term(), log.last_index_term());
-        assert_eq!(
-            ((9, Term(7)).into(), &bytes::Bytes::from_static(&[7, 8, 9])),
-            log.snapshot()
-        );
+        assert_eq!(((9, Term(7)).into(), [7, 8, 9].as_ref()), log.snapshot());
     }
 }

@@ -24,6 +24,7 @@ pub use crate::rpcs::RpcClient;
 use crate::utils::retry_rpc;
 
 mod index_term;
+mod install_snapshot;
 mod log_array;
 mod persister;
 mod raft_state;

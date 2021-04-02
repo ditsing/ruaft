@@ -577,7 +577,7 @@ where
     }
 
     fn build_heartbeat(
-        rf: &Arc<Mutex<RaftState<Command>>>,
+        rf: &Mutex<RaftState<Command>>,
     ) -> Option<AppendEntriesArgs<Command>> {
         let rf = rf.lock();
 
@@ -748,7 +748,7 @@ where
     }
 
     fn build_append_entries(
-        rf: &Arc<Mutex<RaftState<Command>>>,
+        rf: &Mutex<RaftState<Command>>,
         peer_index: usize,
     ) -> Option<AppendEntriesArgs<Command>> {
         let rf = rf.lock();

@@ -10,7 +10,7 @@ use crate::{
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-fn proxy_request_vote<Command: Clone + Serialize + DeserializeOwned>(
+fn proxy_request_vote<Command: Clone + Serialize>(
     raft: &Raft<Command>,
     data: RequestMessage,
 ) -> ReplyMessage {
@@ -24,6 +24,7 @@ fn proxy_request_vote<Command: Clone + Serialize + DeserializeOwned>(
             .expect("Serialization of reply should not fail"),
     )
 }
+
 fn proxy_append_entries<Command: Clone + Serialize + DeserializeOwned>(
     raft: &Raft<Command>,
     data: RequestMessage,

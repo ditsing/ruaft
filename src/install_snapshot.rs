@@ -2,13 +2,12 @@ use crate::utils::retry_rpc;
 use crate::{
     Index, Peer, Raft, RaftState, RpcClient, State, Term, RPC_DEADLINE,
 };
-use parking_lot::Mutex;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct InstallSnapshotArgs {
-    term: Term,
+    pub(crate) term: Term,
     leader_id: Peer,
-    last_included_index: Index,
+    pub(crate) last_included_index: Index,
     last_included_term: Term,
     // TODO(ditsing): this seems less efficient.
     data: Vec<u8>,
@@ -72,16 +71,11 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
         InstallSnapshotReply { term: args.term }
     }
 
-    #[allow(unused)]
-    fn build_install_snapshot(
-        rf: &Mutex<RaftState<C>>,
-    ) -> Option<InstallSnapshotArgs> {
-        let rf = rf.lock();
-        if !rf.is_leader() {
-            return None;
-        }
+    pub(crate) fn build_install_snapshot(
+        rf: &RaftState<C>,
+    ) -> InstallSnapshotArgs {
         let (last, snapshot) = rf.log.snapshot();
-        Some(InstallSnapshotArgs {
+        InstallSnapshotArgs {
             term: rf.current_term,
             leader_id: rf.leader_id,
             last_included_index: last.index,
@@ -89,15 +83,14 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
             data: snapshot.to_owned(),
             offset: 0,
             done: true,
-        })
+        }
     }
 
     const INSTALL_SNAPSHOT_RETRY: usize = 1;
-    #[allow(unused)]
-    async fn send_install_snapshot(
+    pub(crate) async fn send_install_snapshot(
         rpc_client: &RpcClient,
         args: InstallSnapshotArgs,
-    ) -> std::io::Result<bool> {
+    ) -> std::io::Result<Option<bool>> {
         let term = args.term;
         let reply = retry_rpc(
             Self::INSTALL_SNAPSHOT_RETRY,
@@ -105,6 +98,6 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
             move |_round| rpc_client.call_install_snapshot(args.clone()),
         )
         .await?;
-        Ok(reply.term == term)
+        Ok(if reply.term == term { Some(true) } else { None })
     }
 }

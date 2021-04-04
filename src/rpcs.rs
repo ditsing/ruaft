@@ -173,6 +173,12 @@ mod tests {
         }
 
         fn save_state(&self, _bytes: Bytes) {}
+
+        fn state_size(&self) -> usize {
+            0
+        }
+
+        fn save_snapshot_and_state(&self, _: Bytes, _: &[u8]) {}
     }
 
     #[test]

@@ -9,6 +9,9 @@ use serde::Serialize;
 pub trait Persister: Send + Sync {
     fn read_state(&self) -> Bytes;
     fn save_state(&self, bytes: Bytes);
+    fn state_size(&self) -> usize;
+
+    fn save_snapshot_and_state(&self, state: Bytes, snapshot: &[u8]);
 }
 
 #[derive(Serialize, Deserialize)]

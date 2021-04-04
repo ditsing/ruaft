@@ -22,6 +22,7 @@ pub use crate::persister::Persister;
 pub(crate) use crate::raft_state::RaftState;
 pub(crate) use crate::raft_state::State;
 pub use crate::rpcs::RpcClient;
+use crate::snapshot::SnapshotDaemon;
 use crate::utils::retry_rpc;
 
 mod index_term;
@@ -30,6 +31,7 @@ mod log_array;
 mod persister;
 mod raft_state;
 pub mod rpcs;
+mod snapshot;
 pub mod utils;
 
 #[derive(
@@ -69,6 +71,7 @@ pub struct Raft<Command> {
     apply_command_signal: Arc<Condvar>,
     keep_running: Arc<AtomicBool>,
     election: Arc<ElectionState>,
+    snapshot_daemon: Arc<SnapshotDaemon>,
 
     thread_pool: Arc<tokio::runtime::Runtime>,
 
@@ -182,6 +185,7 @@ where
             apply_command_signal: Arc::new(Default::default()),
             keep_running: Arc::new(Default::default()),
             election: Arc::new(election),
+            snapshot_daemon: Default::default(),
             thread_pool: Arc::new(thread_pool),
             stop_wait_group: WaitGroup::new(),
         };

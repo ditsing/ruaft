@@ -847,6 +847,7 @@ where
         let keep_running = self.keep_running.clone();
         let rf = self.inner_state.clone();
         let condvar = self.apply_command_signal.clone();
+        let snapshot_daemon = self.snapshot_daemon.clone();
         let stop_wait_group = self.stop_wait_group.clone();
         std::thread::spawn(move || {
             while keep_running.load(Ordering::SeqCst) {
@@ -877,6 +878,7 @@ where
                 // Release the lock while calling external functions.
                 for command in commands {
                     apply_command(index, command);
+                    snapshot_daemon.trigger();
                     index += 1;
                 }
             }

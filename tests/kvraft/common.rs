@@ -4,13 +4,13 @@ use std::sync::atomic::{AtomicU64, Ordering};
 #[derive(
     Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize,
 )]
-struct UniqueId {
+pub struct UniqueId {
     clerk_id: u64,
     sequence_id: u64,
 }
 
 #[derive(Debug)]
-struct UniqueIdSequence {
+pub struct UniqueIdSequence {
     clerk_id: u64,
     sequence_id: AtomicU64,
 }
@@ -39,41 +39,44 @@ impl UniqueIdSequence {
     }
 }
 
+pub(crate) const GET: &str = "KVServer.Get";
+pub(crate) const PUT_APPEND: &str = "KVServer.PutAppend";
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
-enum PutAppendEnum {
+pub enum PutAppendEnum {
     Put,
     Append,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct PutAppendArgs {
-    key: String,
-    value: String,
-    op: PutAppendEnum,
+pub struct PutAppendArgs {
+    pub key: String,
+    pub value: String,
+    pub op: PutAppendEnum,
 
-    unique_id: UniqueId,
+    pub unique_id: UniqueId,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-enum KvError {
+pub enum KvError {
     NoKey,
     Other(String),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct PutAppendReply {
-    result: Result<(), KvError>,
+pub struct PutAppendReply {
+    pub result: Result<(), KvError>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct GetArgs {
-    key: String,
+pub struct GetArgs {
+    pub key: String,
 
-    unique_id: UniqueId,
+    pub unique_id: UniqueId,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct GetReply {
-    result: Result<String, KvError>,
-    is_retry: bool,
+pub struct GetReply {
+    pub result: Result<String, KvError>,
+    pub is_retry: bool,
 }

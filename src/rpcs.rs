@@ -3,6 +3,7 @@ use std::sync::Arc;
 use labrpc::{Client, Network, ReplyMessage, RequestMessage, Server};
 use parking_lot::Mutex;
 
+use crate::install_snapshot::{InstallSnapshotArgs, InstallSnapshotReply};
 use crate::{
     AppendEntriesArgs, AppendEntriesReply, Raft, RequestVoteArgs,
     RequestVoteReply,
@@ -41,8 +42,23 @@ fn proxy_append_entries<
     )
 }
 
+fn proxy_install_snapshot<Command: Clone + Serialize + Default>(
+    raft: &Raft<Command>,
+    data: RequestMessage,
+) -> ReplyMessage {
+    let reply = raft.process_install_snapshot(
+        bincode::deserialize(data.as_ref())
+            .expect("Deserialization should not fail"),
+    );
+
+    ReplyMessage::from(
+        bincode::serialize(&reply).expect("Serialization should not fail"),
+    )
+}
+
 pub(crate) const REQUEST_VOTE_RPC: &str = "Raft.RequestVote";
 pub(crate) const APPEND_ENTRIES_RPC: &str = "Raft.AppendEntries";
+pub(crate) const INSTALL_SNAPSHOT_RPC: &str = "Raft.InstallSnapshot";
 
 pub struct RpcClient(Client);
 
@@ -81,6 +97,24 @@ impl RpcClient {
         Ok(bincode::deserialize(reply.as_ref())
             .expect("Deserialization of reply should not fail"))
     }
+
+    pub(crate) async fn call_install_snapshot(
+        &self,
+        request: InstallSnapshotArgs,
+    ) -> std::io::Result<InstallSnapshotReply> {
+        let data = RequestMessage::from(
+            bincode::serialize(&request)
+                .expect("Serialization of requests should not fail"),
+        );
+
+        let reply = self
+            .0
+            .call_rpc(INSTALL_SNAPSHOT_RPC.to_owned(), data)
+            .await?;
+
+        Ok(bincode::deserialize(reply.as_ref())
+            .expect("Deserialization of reply should not fail"))
+    }
 }
 
 pub fn register_server<
@@ -103,11 +137,19 @@ pub fn register_server<
         }),
     )?;
 
-    let raft_clone = raft;
+    let raft_clone = raft.clone();
     server.register_rpc_handler(
         APPEND_ENTRIES_RPC.to_owned(),
         Box::new(move |request| {
             proxy_append_entries(raft_clone.as_ref(), request)
+        }),
+    )?;
+
+    let raft_clone = raft;
+    server.register_rpc_handler(
+        INSTALL_SNAPSHOT_RPC.to_owned(),
+        Box::new(move |request| {
+            proxy_install_snapshot(raft_clone.as_ref(), request)
         }),
     )?;
 
@@ -123,6 +165,7 @@ mod tests {
     use crate::{Peer, Term};
 
     use super::*;
+    use crate::snapshot::Snapshot;
 
     type DoNothingPersister = ();
     impl crate::Persister for DoNothingPersister {
@@ -131,6 +174,12 @@ mod tests {
         }
 
         fn save_state(&self, _bytes: Bytes) {}
+
+        fn state_size(&self) -> usize {
+            0
+        }
+
+        fn save_snapshot_and_state(&self, _: Bytes, _: &[u8]) {}
     }
 
     #[test]
@@ -148,6 +197,11 @@ mod tests {
                 0,
                 Arc::new(()),
                 |_, _: i32| {},
+                None,
+                |index| Snapshot {
+                    last_included_index: index,
+                    data: vec![],
+                },
             ));
             register_server(raft, name, network.as_ref())?;
 

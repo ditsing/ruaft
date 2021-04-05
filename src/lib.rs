@@ -16,18 +16,23 @@ use crossbeam_utils::sync::WaitGroup;
 use parking_lot::{Condvar, Mutex};
 use rand::{thread_rng, Rng};
 
+use crate::install_snapshot::InstallSnapshotArgs;
 use crate::persister::PersistedRaftState;
 pub use crate::persister::Persister;
 pub(crate) use crate::raft_state::RaftState;
 pub(crate) use crate::raft_state::State;
 pub use crate::rpcs::RpcClient;
+pub use crate::snapshot::Snapshot;
+use crate::snapshot::SnapshotDaemon;
 use crate::utils::retry_rpc;
 
 mod index_term;
+mod install_snapshot;
 mod log_array;
 mod persister;
 mod raft_state;
 pub mod rpcs;
+mod snapshot;
 pub mod utils;
 
 #[derive(
@@ -66,6 +71,7 @@ pub struct Raft<Command> {
     apply_command_signal: Arc<Condvar>,
     keep_running: Arc<AtomicBool>,
     election: Arc<ElectionState>,
+    snapshot_daemon: SnapshotDaemon,
 
     thread_pool: Arc<tokio::runtime::Runtime>,
 
@@ -125,14 +131,17 @@ where
     ///
     /// Each instance will create at least 3 + (number of peers) threads. The
     /// extensive usage of threads is to minimize latency.
-    pub fn new<Func>(
+    pub fn new<ApplyCommandFunc, RequestSnapshotFunc>(
         peers: Vec<RpcClient>,
         me: usize,
         persister: Arc<dyn Persister>,
-        apply_command: Func,
+        apply_command: ApplyCommandFunc,
+        max_state_size_bytes: Option<usize>,
+        request_snapshot: RequestSnapshotFunc,
     ) -> Self
     where
-        Func: 'static + Send + FnMut(Index, Command),
+        ApplyCommandFunc: 'static + Send + FnMut(Index, Command),
+        RequestSnapshotFunc: 'static + Send + FnMut(Index) -> Snapshot,
     {
         let peer_size = peers.len();
         let mut state = RaftState {
@@ -179,6 +188,7 @@ where
             apply_command_signal: Arc::new(Default::default()),
             keep_running: Arc::new(Default::default()),
             election: Arc::new(election),
+            snapshot_daemon: Default::default(),
             thread_pool: Arc::new(thread_pool),
             stop_wait_group: WaitGroup::new(),
         };
@@ -195,6 +205,7 @@ where
         ));
         // The last step is to start running election timer.
         this.run_election_timer();
+        this.run_snapshot_daemon(max_state_size_bytes, request_snapshot);
         this
     }
 }
@@ -316,6 +327,12 @@ where
             success: true,
         }
     }
+}
+
+enum SyncLogEntryOperation<Command> {
+    AppendEntries(AppendEntriesArgs<Command>),
+    InstallSnapshot(InstallSnapshotArgs),
+    None,
 }
 
 // Command must be
@@ -683,13 +700,26 @@ where
             return;
         }
 
-        let args = match Self::build_append_entries(&rf, peer_index) {
-            Some(args) => args,
-            None => return,
+        let operation = Self::build_sync_log_entry(&rf, peer_index);
+        let (term, match_index, succeeded) = match operation {
+            SyncLogEntryOperation::AppendEntries(args) => {
+                let term = args.term;
+                let match_index = args.prev_log_index + args.entries.len();
+                let succeeded = Self::append_entries(&rpc_client, args).await;
+
+                (term, match_index, succeeded)
+            }
+            SyncLogEntryOperation::InstallSnapshot(args) => {
+                let term = args.term;
+                let match_index = args.last_included_index;
+                let succeeded =
+                    Self::send_install_snapshot(&rpc_client, args).await;
+
+                (term, match_index, succeeded)
+            }
+            SyncLogEntryOperation::None => return,
         };
-        let term = args.term;
-        let match_index = args.prev_log_index + args.entries.len();
-        let succeeded = Self::append_entries(&rpc_client, args).await;
+
         match succeeded {
             Ok(Some(true)) => {
                 let mut rf = rf.lock();
@@ -748,24 +778,43 @@ where
         };
     }
 
-    fn build_append_entries(
+    fn build_sync_log_entry(
         rf: &Mutex<RaftState<Command>>,
         peer_index: usize,
-    ) -> Option<AppendEntriesArgs<Command>> {
+    ) -> SyncLogEntryOperation<Command> {
         let rf = rf.lock();
         if !rf.is_leader() {
-            return None;
+            return SyncLogEntryOperation::None;
         }
+
+        // To send AppendEntries request, next_index must be strictly larger
+        // than start(). Otherwise we won't be able to know the log term of the
+        // entry right before next_index.
+        return if rf.next_index[peer_index] > rf.log.start() {
+            SyncLogEntryOperation::AppendEntries(Self::build_append_entries(
+                &rf, peer_index,
+            ))
+        } else {
+            SyncLogEntryOperation::InstallSnapshot(
+                Self::build_install_snapshot(&rf),
+            )
+        };
+    }
+
+    fn build_append_entries(
+        rf: &RaftState<Command>,
+        peer_index: usize,
+    ) -> AppendEntriesArgs<Command> {
         let prev_log_index = rf.next_index[peer_index] - 1;
         let prev_log_term = rf.log[prev_log_index].term;
-        Some(AppendEntriesArgs {
+        AppendEntriesArgs {
             term: rf.current_term,
             leader_id: rf.leader_id,
             prev_log_index,
             prev_log_term,
             entries: rf.log.after(rf.next_index[peer_index]).to_vec(),
             leader_commit: rf.commit_index,
-        })
+        }
     }
 
     const APPEND_ENTRIES_RETRY: usize = 1;
@@ -797,6 +846,7 @@ where
         let keep_running = self.keep_running.clone();
         let rf = self.inner_state.clone();
         let condvar = self.apply_command_signal.clone();
+        let snapshot_daemon = self.snapshot_daemon.clone();
         let stop_wait_group = self.stop_wait_group.clone();
         std::thread::spawn(move || {
             while keep_running.load(Ordering::SeqCst) {
@@ -827,6 +877,7 @@ where
                 // Release the lock while calling external functions.
                 for command in commands {
                     apply_command(index, command);
+                    snapshot_daemon.trigger();
                     index += 1;
                 }
             }
@@ -855,6 +906,7 @@ where
         self.election.stop_election_timer();
         self.new_log_entry.take().map(|n| n.send(None));
         self.apply_command_signal.notify_all();
+        self.snapshot_daemon.trigger();
         self.stop_wait_group.wait();
         std::sync::Arc::try_unwrap(self.thread_pool)
             .expect(

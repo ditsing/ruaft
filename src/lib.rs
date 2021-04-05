@@ -22,7 +22,8 @@ pub use crate::persister::Persister;
 pub(crate) use crate::raft_state::RaftState;
 pub(crate) use crate::raft_state::State;
 pub use crate::rpcs::RpcClient;
-use crate::snapshot::{Snapshot, SnapshotDaemon};
+pub use crate::snapshot::Snapshot;
+use crate::snapshot::SnapshotDaemon;
 use crate::utils::retry_rpc;
 
 mod index_term;
@@ -131,14 +132,17 @@ where
     ///
     /// Each instance will create at least 3 + (number of peers) threads. The
     /// extensive usage of threads is to minimize latency.
-    pub fn new<Func>(
+    pub fn new<ApplyCommandFunc, RequestSnapshotFunc>(
         peers: Vec<RpcClient>,
         me: usize,
         persister: Arc<dyn Persister>,
-        apply_command: Func,
+        apply_command: ApplyCommandFunc,
+        max_state_size_bytes: Option<usize>,
+        request_snapshot: RequestSnapshotFunc,
     ) -> Self
     where
-        Func: 'static + Send + FnMut(Index, Command),
+        ApplyCommandFunc: 'static + Send + FnMut(Index, Command),
+        RequestSnapshotFunc: 'static + Send + FnMut(Index) -> Snapshot,
     {
         let peer_size = peers.len();
         let mut state = RaftState {
@@ -202,10 +206,7 @@ where
         ));
         // The last step is to start running election timer.
         this.run_election_timer();
-        this.run_snapshot_daemon(Some(1 << 20), |index| Snapshot {
-            last_included_index: index,
-            data: vec![],
-        });
+        this.run_snapshot_daemon(max_state_size_bytes, request_snapshot);
         this
     }
 }

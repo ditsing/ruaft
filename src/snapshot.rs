@@ -57,18 +57,24 @@ impl<C: 'static + Clone + Default + Send + serde::Serialize> Raft<C> {
                 let snapshot = request_snapshot(log_start.index + 1);
 
                 let mut rf = rf.lock();
-                if rf.current_term != term
-                    || rf.log.first_index_term() != log_start
-                {
-                    // Term has changed, or another snapshot was installed.
+                if rf.log.first_index_term() != log_start {
+                    // Another snapshot was installed, let's try again.
                     unparker.unpark();
                     continue;
                 }
-                if snapshot.last_included_index <= rf.log.start()
-                    || snapshot.last_included_index >= rf.log.end()
-                {
-                    // TODO(ditsing): Something happened.
+                if snapshot.last_included_index <= rf.log.start() {
+                    // It seems the request_snapshot callback is misbehaving,
+                    // let's try again.
                     unparker.unpark();
+                    continue;
+                }
+
+                if snapshot.last_included_index >= rf.log.end() {
+                    // We recently rolled back some of the committed logs. This
+                    // can happen but usually the same exact log entries will be
+                    // installed in the next AppendEntries request.
+                    // There is no need to retry, because when the log entries
+                    // are re-committed, we will be notified again.
                     continue;
                 }
 

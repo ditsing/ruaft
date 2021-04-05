@@ -9,7 +9,7 @@ pub(crate) struct InstallSnapshotArgs {
     leader_id: Peer,
     pub(crate) last_included_index: Index,
     last_included_term: Term,
-    // TODO(ditsing): this seems less efficient.
+    // TODO(ditsing): Serde cannot handle Vec<u8> as efficient as expected.
     data: Vec<u8>,
     offset: usize,
     done: bool,
@@ -48,6 +48,7 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
         self.election.reset_election_timer();
 
         // The above code is exactly the same as AppendEntries.
+
         if args.last_included_index < rf.log.end()
             && args.last_included_index >= rf.log.start()
             && args.last_included_term == rf.log[args.last_included_index].term
@@ -65,7 +66,10 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
         if rf.commit_index > last_log_index {
             rf.commit_index = last_log_index;
         }
-        self.persister.save_state(bytes::Bytes::new()); // TODO(ditsing)
+        self.persister.save_snapshot_and_state(
+            rf.persisted_state().into(),
+            rf.log.snapshot().1,
+        );
 
         self.apply_command_signal.notify_one();
         InstallSnapshotReply { term: args.term }

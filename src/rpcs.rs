@@ -10,7 +10,7 @@ use crate::{
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-fn proxy_request_vote<Command: Clone + Serialize>(
+fn proxy_request_vote<Command: Clone + Serialize + Default>(
     raft: &Raft<Command>,
     data: RequestMessage,
 ) -> ReplyMessage {
@@ -25,7 +25,9 @@ fn proxy_request_vote<Command: Clone + Serialize>(
     )
 }
 
-fn proxy_append_entries<Command: Clone + Serialize + DeserializeOwned>(
+fn proxy_append_entries<
+    Command: Clone + Serialize + DeserializeOwned + Default,
+>(
     raft: &Raft<Command>,
     data: RequestMessage,
 ) -> ReplyMessage {
@@ -82,7 +84,7 @@ impl RpcClient {
 }
 
 pub fn register_server<
-    Command: 'static + Clone + Serialize + DeserializeOwned,
+    Command: 'static + Clone + Serialize + DeserializeOwned + Default,
     S: AsRef<str>,
 >(
     raft: Arc<Raft<Command>>,

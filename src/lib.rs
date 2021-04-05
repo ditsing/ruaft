@@ -23,6 +23,8 @@ pub(crate) use crate::raft_state::State;
 pub use crate::rpcs::RpcClient;
 use crate::utils::retry_rpc;
 
+mod index_term;
+mod log_array;
 mod persister;
 mod raft_state;
 pub mod rpcs;
@@ -136,11 +138,7 @@ where
         let mut state = RaftState {
             current_term: Term(0),
             voted_for: None,
-            log: vec![LogEntry {
-                term: Term(0),
-                index: 0,
-                command: Command::default(),
-            }],
+            log: log_array::LogArray::create(),
             commit_index: 0,
             last_applied: 0,
             next_index: vec![1; peer_size],
@@ -155,7 +153,8 @@ where
         {
             state.current_term = persisted_state.current_term;
             state.voted_for = persisted_state.voted_for;
-            state.log = persisted_state.log;
+            state.log =
+                log_array::LogArray::restore(persisted_state.log).unwrap();
         }
 
         let election = ElectionState {
@@ -203,9 +202,10 @@ where
 // Command must be
 // 1. clone: they are copied to the persister.
 // 2. serialize: they are converted to bytes to persist.
+// 3. default: a default value is used as the first element of the log.
 impl<Command> Raft<Command>
 where
-    Command: Clone + serde::Serialize,
+    Command: Clone + serde::Serialize + Default,
 {
     pub(crate) fn process_request_vote(
         &self,
@@ -230,11 +230,11 @@ where
         }
 
         let voted_for = rf.voted_for;
-        let (last_log_index, last_log_term) = rf.last_log_index_and_term();
+        let last_log = rf.log.last_index_term();
         if (voted_for.is_none() || voted_for == Some(args.candidate_id))
-            && (args.last_log_term > last_log_term
-                || (args.last_log_term == last_log_term
-                    && args.last_log_index >= last_log_index))
+            && (args.last_log_term > last_log.term
+                || (args.last_log_term == last_log.term
+                    && args.last_log_index >= last_log.index))
         {
             rf.voted_for = Some(args.candidate_id);
 
@@ -279,7 +279,7 @@ where
 
         self.election.reset_election_timer();
 
-        if rf.log.len() <= args.prev_log_index
+        if rf.log.end() <= args.prev_log_index
             || rf.log[args.prev_log_index].term != args.prev_log_term
         {
             return AppendEntriesReply {
@@ -290,7 +290,7 @@ where
 
         for (i, entry) in args.entries.iter().enumerate() {
             let index = i + args.prev_log_index + 1;
-            if rf.log.len() > index {
+            if rf.log.end() > index {
                 if rf.log[index].term != entry.term {
                     rf.log.truncate(index);
                     rf.log.push(entry.clone());
@@ -303,10 +303,10 @@ where
         self.persister.save_state(rf.persisted_state().into());
 
         if args.leader_commit > rf.commit_index {
-            rf.commit_index = if args.leader_commit < rf.log.len() {
+            rf.commit_index = if args.leader_commit < rf.log.end() {
                 args.leader_commit
             } else {
-                rf.log.len() - 1
+                rf.log.last_index_term().index
             };
             self.apply_command_signal.notify_one();
         }
@@ -323,9 +323,10 @@ where
 // 1. clone: they are copied to the persister.
 // 2. send: Arc<Mutex<Vec<LogEntry<Command>>>> must be send, it is moved to another thread.
 // 3. serialize: they are converted to bytes to persist.
+// 4. default: a default value is used as the first element of log.
 impl<Command> Raft<Command>
 where
-    Command: 'static + Clone + Send + serde::Serialize,
+    Command: 'static + Clone + Send + serde::Serialize + Default,
 {
     fn run_election_timer(&self) -> std::thread::JoinHandle<()> {
         let this = self.clone();
@@ -425,7 +426,8 @@ where
             self.persister.save_state(rf.persisted_state().into());
 
             let term = rf.current_term;
-            let (last_log_index, last_log_term) = rf.last_log_index_and_term();
+            let (last_log_index, last_log_term) =
+                rf.log.last_index_term().unpack();
 
             (
                 term,
@@ -535,7 +537,7 @@ where
 
             rf.state = State::Leader;
             rf.leader_id = me;
-            let log_len = rf.log.len();
+            let log_len = rf.log.end();
             for item in rf.next_index.iter_mut() {
                 *item = log_len;
             }
@@ -584,12 +586,12 @@ where
             return None;
         }
 
-        let (last_log_index, last_log_term) = rf.last_log_index_and_term();
+        let last_log = rf.log.last_index_term();
         let args = AppendEntriesArgs {
             term: rf.current_term,
             leader_id: rf.leader_id,
-            prev_log_index: last_log_index,
-            prev_log_term: last_log_term,
+            prev_log_index: last_log.index,
+            prev_log_term: last_log.term,
             entries: vec![],
             leader_commit: rf.commit_index,
         };
@@ -761,7 +763,7 @@ where
             leader_id: rf.leader_id,
             prev_log_index,
             prev_log_term,
-            entries: rf.log[rf.next_index[peer_index]..].to_vec(),
+            entries: rf.log.after(rf.next_index[peer_index]).to_vec(),
             leader_commit: rf.commit_index,
         })
     }
@@ -809,7 +811,9 @@ where
                     if rf.last_applied < rf.commit_index {
                         let index = rf.last_applied + 1;
                         let last_one = rf.commit_index + 1;
-                        let commands: Vec<Command> = rf.log[index..last_one]
+                        let commands: Vec<Command> = rf
+                            .log
+                            .between(index, last_one)
                             .iter()
                             .map(|entry| entry.command.clone())
                             .collect();
@@ -838,12 +842,7 @@ where
             return None;
         }
 
-        let index = rf.log.len();
-        rf.log.push(LogEntry {
-            term,
-            index,
-            command,
-        });
+        let index = rf.log.add_command(term, command);
         self.persister.save_state(rf.persisted_state().into());
 
         let _ = self.new_log_entry.clone().unwrap().send(None);

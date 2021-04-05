@@ -22,7 +22,7 @@ pub use crate::persister::Persister;
 pub(crate) use crate::raft_state::RaftState;
 pub(crate) use crate::raft_state::State;
 pub use crate::rpcs::RpcClient;
-use crate::snapshot::SnapshotDaemon;
+use crate::snapshot::{Snapshot, SnapshotDaemon};
 use crate::utils::retry_rpc;
 
 mod index_term;
@@ -202,6 +202,10 @@ where
         ));
         // The last step is to start running election timer.
         this.run_election_timer();
+        this.run_snapshot_daemon(Some(1 << 20), |index| Snapshot {
+            last_included_index: index,
+            data: vec![],
+        });
         this
     }
 }
@@ -900,6 +904,7 @@ where
         self.election.stop_election_timer();
         self.new_log_entry.take().map(|n| n.send(None));
         self.apply_command_signal.notify_all();
+        self.snapshot_daemon.trigger();
         self.stop_wait_group.wait();
         std::sync::Arc::try_unwrap(self.thread_pool)
             .expect(

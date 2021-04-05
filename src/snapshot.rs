@@ -1,5 +1,6 @@
 use crate::{Index, Raft};
 use crossbeam_utils::sync::{Parker, Unparker};
+use std::sync::atomic::Ordering;
 
 pub struct Snapshot {
     pub last_included_index: Index,
@@ -37,11 +38,17 @@ impl<C: 'static + Clone + Default + Send + serde::Serialize> Raft<C> {
         let unparker = parker.unparker().clone();
         self.snapshot_daemon.unparker.replace(unparker.clone());
 
+        let keep_running = self.keep_running.clone();
         let rf = self.inner_state.clone();
         let persister = self.persister.clone();
+        let stop_wait_group = self.stop_wait_group.clone();
 
         std::thread::spawn(move || loop {
             parker.park();
+            if !keep_running.load(Ordering::SeqCst) {
+                drop(stop_wait_group);
+                break;
+            }
             if persister.state_size() >= max_state_size {
                 let (term, log_start) = {
                     let rf = rf.lock();

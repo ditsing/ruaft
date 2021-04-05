@@ -1,4 +1,3 @@
-use bytes::Bytes;
 use parking_lot::Mutex;
 
 struct State {
@@ -34,7 +33,7 @@ impl ruaft::Persister for Persister {
         self.state.lock().bytes.len()
     }
 
-    fn save_snapshot_and_state(&self, state: Bytes, snapshot: &[u8]) {
+    fn save_snapshot_and_state(&self, state: bytes::Bytes, snapshot: &[u8]) {
         let mut this = self.state.lock();
         this.bytes = state;
         this.snapshot = snapshot.to_vec();

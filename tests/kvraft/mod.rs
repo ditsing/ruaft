@@ -1,3 +1,3 @@
-extern crate rand;
-
+mod client;
 mod common;
+mod server;

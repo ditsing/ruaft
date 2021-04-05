@@ -71,7 +71,7 @@ pub struct Raft<Command> {
     apply_command_signal: Arc<Condvar>,
     keep_running: Arc<AtomicBool>,
     election: Arc<ElectionState>,
-    snapshot_daemon: Arc<SnapshotDaemon>,
+    snapshot_daemon: SnapshotDaemon,
 
     thread_pool: Arc<tokio::runtime::Runtime>,
 

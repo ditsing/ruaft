@@ -41,7 +41,6 @@ pub type Index = usize;
 struct LogEntry<Command> {
     term: Term,
     index: Index,
-    // TODO: Allow sending of arbitrary information.
     command: Command,
 }
 

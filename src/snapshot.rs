@@ -50,10 +50,7 @@ impl<C: 'static + Clone + Default + Send + serde::Serialize> Raft<C> {
                 break;
             }
             if persister.state_size() >= max_state_size {
-                let (term, log_start) = {
-                    let rf = rf.lock();
-                    (rf.current_term, rf.log.first_index_term())
-                };
+                let log_start = rf.lock().log.first_index_term();
                 let snapshot = request_snapshot(log_start.index + 1);
 
                 let mut rf = rf.lock();

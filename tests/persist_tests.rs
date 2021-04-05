@@ -12,7 +12,8 @@ use std::sync::Arc;
 
 use rand::{thread_rng, Rng};
 
-mod config;
+// This is to remove the annoying "unused code in config" warnings.
+pub mod config;
 
 #[test]
 fn persist() -> config::Result<()> {

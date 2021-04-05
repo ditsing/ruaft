@@ -6,7 +6,8 @@ extern crate ruaft;
 #[macro_use]
 extern crate scopeguard;
 
-mod config;
+// This is to remove the annoying "unused code in config" warnings.
+pub mod config;
 
 #[test]
 fn initial_election() -> config::Result<()> {

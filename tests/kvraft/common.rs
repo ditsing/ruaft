@@ -1,7 +1,4 @@
-use labrpc::{Client, RequestMessage};
 use rand::{thread_rng, RngCore};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 #[derive(
@@ -84,18 +81,7 @@ pub struct GetReply {
     pub is_retry: bool,
 }
 
-pub async fn call_rpc<M: AsRef<str>, A: Serialize, R: DeserializeOwned>(
-    client: &Client,
-    method: M,
-    args: A,
-) -> labrpc::Result<R> {
-    let data = RequestMessage::from(
-        bincode::serialize(&args)
-            .expect("Serialization of requests should not fail"),
-    );
-
-    let reply = client.call_rpc(method.as_ref().to_owned(), data).await?;
-
-    Ok(bincode::deserialize(reply.as_ref())
-        .expect("Deserialization of reply should not fail"))
+#[derive(Clone, Debug, Default)]
+pub struct KVRaftOptions {
+    pub max_retry: Option<usize>,
 }

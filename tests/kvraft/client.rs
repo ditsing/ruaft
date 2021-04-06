@@ -7,8 +7,51 @@ use labrpc::{Client, RequestMessage};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Once;
 
-struct Clerk {
+pub struct Clerk {
+    init: Once,
+    pub inner: ClerkInner,
+}
+
+impl Clerk {
+    pub fn new(servers: Vec<Client>) -> Self {
+        Self {
+            init: Once::new(),
+            inner: ClerkInner::new(servers),
+        }
+    }
+
+    pub fn get(&mut self, key: String) -> Option<String> {
+        let (init, inner) = (&self.init, &mut self.inner);
+        init.call_once(|| inner.commit_sentinel());
+        inner.get(key, Default::default())
+    }
+
+    pub fn put(
+        &mut self,
+        key: String,
+        value: String,
+        options: KVRaftOptions,
+    ) -> Option<()> {
+        let (init, inner) = (&self.init, &mut self.inner);
+        init.call_once(|| inner.commit_sentinel());
+        inner.put(key, value, options)
+    }
+
+    pub fn append(
+        &mut self,
+        key: String,
+        value: String,
+        options: KVRaftOptions,
+    ) -> Option<()> {
+        let (init, inner) = (&self.init, &mut self.inner);
+        init.call_once(|| inner.commit_sentinel());
+        inner.append(key, value, options)
+    }
+}
+
+pub struct ClerkInner {
     servers: Vec<Client>,
 
     last_server_index: AtomicUsize,
@@ -17,7 +60,7 @@ struct Clerk {
     executor: tokio::runtime::Runtime,
 }
 
-impl Clerk {
+impl ClerkInner {
     pub fn new(servers: Vec<Client>) -> Self {
         Self {
             servers,

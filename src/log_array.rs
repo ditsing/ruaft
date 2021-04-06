@@ -251,6 +251,7 @@ impl<C> LogArray<C> {
         self.offset(index)
     }
 
+    #[allow(clippy::len_zero)]
     fn check_one_element(&self) {
         assert!(
             self.inner.len() >= 1,

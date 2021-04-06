@@ -15,6 +15,7 @@ where
             tokio::time::sleep(Duration::from_millis((1 << i) * 10)).await;
         }
         // Not timed-out.
+        #[allow(clippy::collapsible_match)]
         if let Ok(reply) = tokio::time::timeout(deadline, task_gen(i)).await {
             // And no error
             if let Ok(reply) = reply {

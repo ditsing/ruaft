@@ -790,7 +790,7 @@ where
         // To send AppendEntries request, next_index must be strictly larger
         // than start(). Otherwise we won't be able to know the log term of the
         // entry right before next_index.
-        return if rf.next_index[peer_index] > rf.log.start() {
+        if rf.next_index[peer_index] > rf.log.start() {
             SyncLogEntryOperation::AppendEntries(Self::build_append_entries(
                 &rf, peer_index,
             ))
@@ -798,7 +798,7 @@ where
             SyncLogEntryOperation::InstallSnapshot(
                 Self::build_install_snapshot(&rf),
             )
-        };
+        }
     }
 
     fn build_append_entries(

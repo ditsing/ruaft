@@ -165,7 +165,6 @@ mod tests {
     use crate::{Peer, Term};
 
     use super::*;
-    use crate::snapshot::Snapshot;
 
     type DoNothingPersister = ();
     impl crate::Persister for DoNothingPersister {
@@ -198,10 +197,7 @@ mod tests {
                 Arc::new(()),
                 |_, _: i32| {},
                 None,
-                |index| Snapshot {
-                    last_included_index: index,
-                    data: vec![],
-                },
+                Raft::<i32>::NO_SNAPSHOT,
             ));
             register_server(raft, name, network.as_ref())?;
 

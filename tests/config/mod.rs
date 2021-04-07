@@ -8,7 +8,7 @@ use rand::{thread_rng, Rng};
 use tokio::time::Duration;
 
 use ruaft::rpcs::register_server;
-use ruaft::{Persister, Raft, RpcClient, Snapshot};
+use ruaft::{Persister, Raft, RpcClient};
 
 pub mod persister;
 
@@ -315,10 +315,7 @@ impl Config {
                 Self::apply_command(log_clone.clone(), index, cmd_index, cmd)
             },
             None,
-            |index| Snapshot {
-                last_included_index: index,
-                data: vec![],
-            },
+            Raft::<i32>::NO_SNAPSHOT,
         );
         self.state.lock().rafts[index].replace(raft.clone());
 

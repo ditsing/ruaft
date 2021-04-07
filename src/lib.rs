@@ -962,3 +962,10 @@ impl ElectionState {
         self.signal.notify_one();
     }
 }
+
+impl<C> Raft<C> {
+    pub const NO_SNAPSHOT: fn(Index) -> Snapshot = |index| Snapshot {
+        last_included_index: index,
+        data: vec![],
+    };
+}

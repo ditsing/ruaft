@@ -1,5 +1,5 @@
 use super::common::{
-    GetArgs, GetReply, KVRaftOptions, KvError, PutAppendArgs, PutAppendReply,
+    GetArgs, GetReply, KVError, KVRaftOptions, PutAppendArgs, PutAppendReply,
     UniqueIdSequence, GET, PUT_APPEND,
 };
 use crate::kvraft::common::PutAppendEnum;
@@ -143,8 +143,7 @@ impl ClerkInner {
         };
         let reply: GetReply = self.call_rpc(GET, args, options.max_retry)?;
         match reply.result {
-            Ok(val) => Some(val),
-            Err(KvError::NoKey) => Some(Default::default()),
+            Ok(val) => val,
             _ => None,
         }
     }

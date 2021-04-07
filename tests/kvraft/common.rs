@@ -68,14 +68,16 @@ pub struct PutAppendArgs {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum KvError {
-    NoKey,
-    Other(String),
+pub enum KVError {
+    NotLeader,
+    Expired,
+    TimedOut,
+    Conflict,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PutAppendReply {
-    pub result: Result<(), KvError>,
+    pub result: Result<(), KVError>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -87,7 +89,7 @@ pub struct GetArgs {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GetReply {
-    pub result: Result<String, KvError>,
+    pub result: Result<Option<String>, KVError>,
     pub is_retry: bool,
 }
 

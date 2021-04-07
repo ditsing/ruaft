@@ -1,4 +1,5 @@
 use super::common::{ClerkId, UniqueId};
+use crate::kvraft::common::{GetArgs, GetReply, KVError};
 use parking_lot::{Condvar, Mutex};
 use ruaft::{Persister, Raft, RpcClient};
 use std::collections::HashMap;
@@ -64,19 +65,32 @@ enum KVOpStep {
     Done(CommitResult),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 enum CommitResult {
-    Get(String),
+    Get(Option<String>),
     Put,
     Append,
 }
 
+#[derive(Debug)]
 enum CommitError {
     NotLeader,
     Expired(UniqueId),
-    Timeout,
+    TimedOut,
     Conflict,
     Duplicate(CommitResult),
+}
+
+impl From<CommitError> for KVError {
+    fn from(err: CommitError) -> Self {
+        match err {
+            CommitError::NotLeader => KVError::NotLeader,
+            CommitError::Expired(_) => KVError::Expired,
+            CommitError::TimedOut => KVError::TimedOut,
+            CommitError::Conflict => KVError::Conflict,
+            CommitError::Duplicate(_) => panic!("Duplicate is not a KVError"),
+        }
+    }
 }
 
 impl KVServer {
@@ -194,8 +208,33 @@ impl KVServer {
                 Err(CommitError::Duplicate(result.clone()))
             }
         } else {
-            Err(CommitError::Timeout)
+            Err(CommitError::TimedOut)
         };
+    }
+
+    const DEFAULT_TIMEOUT: Duration = Duration::from_secs(2);
+
+    pub fn get(&self, args: GetArgs) -> GetReply {
+        let (is_retry, result) = match self.block_for_commit(
+            args.unique_id,
+            KVOp::Get(GetOp { key: args.key }),
+            Self::DEFAULT_TIMEOUT,
+        ) {
+            Ok(result) => (false, result),
+            Err(CommitError::Duplicate(result)) => (true, result),
+            Err(e) => {
+                return GetReply {
+                    result: Err(e.into()),
+                    is_retry: false,
+                }
+            }
+        };
+        let result = match result {
+            CommitResult::Get(result) => Ok(result),
+            CommitResult::Put => Err(KVError::Conflict),
+            CommitResult::Append => Err(KVError::Conflict),
+        };
+        GetReply { result, is_retry }
     }
 
     pub fn kill(self) {

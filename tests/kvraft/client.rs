@@ -1,5 +1,5 @@
 use super::common::{
-    GetArgs, GetReply, KVError, KVRaftOptions, PutAppendArgs, PutAppendReply,
+    GetArgs, GetReply, KVRaftOptions, PutAppendArgs, PutAppendReply,
     UniqueIdSequence, GET, PUT_APPEND,
 };
 use crate::kvraft::common::PutAppendEnum;

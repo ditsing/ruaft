@@ -1,5 +1,7 @@
 use super::common::{ClerkId, UniqueId};
-use crate::kvraft::common::{GetArgs, GetReply, KVError};
+use crate::kvraft::common::{
+    GetArgs, GetReply, KVError, PutAppendArgs, PutAppendEnum, PutAppendReply,
+};
 use parking_lot::{Condvar, Mutex};
 use ruaft::{Persister, Raft, RpcClient};
 use std::collections::HashMap;
@@ -235,6 +237,49 @@ impl KVServer {
             CommitResult::Append => Err(KVError::Conflict),
         };
         GetReply { result, is_retry }
+    }
+
+    pub fn put_append(&self, args: PutAppendArgs) -> PutAppendReply {
+        let op = PutAppendOp {
+            key: args.key,
+            value: args.value,
+        };
+        let op = match args.op {
+            PutAppendEnum::Put => KVOp::Put(op),
+            PutAppendEnum::Append => KVOp::Append(op),
+        };
+        let result = match self.block_for_commit(
+            args.unique_id,
+            op,
+            Self::DEFAULT_TIMEOUT,
+        ) {
+            Ok(result) => result,
+            Err(CommitError::Duplicate(result)) => result,
+            Err(e) => {
+                return PutAppendReply {
+                    result: Err(e.into()),
+                }
+            }
+        };
+        let result = match result {
+            CommitResult::Put => {
+                if args.op == PutAppendEnum::Put {
+                    Ok(())
+                } else {
+                    Err(KVError::Conflict)
+                }
+            }
+            CommitResult::Append => {
+                if args.op == PutAppendEnum::Append {
+                    Ok(())
+                } else {
+                    Err(KVError::Conflict)
+                }
+            }
+            CommitResult::Get(_) => Err(KVError::Conflict),
+        };
+
+        PutAppendReply { result }
     }
 
     pub fn kill(self) {

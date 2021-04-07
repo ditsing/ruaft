@@ -2,7 +2,15 @@ use rand::{thread_rng, RngCore};
 use std::sync::atomic::{AtomicU64, Ordering};
 
 #[derive(
-    Clone, Debug, Ord, PartialOrd, Eq, PartialEq, Serialize, Deserialize,
+    Clone,
+    Debug,
+    Default,
+    Ord,
+    PartialOrd,
+    Eq,
+    PartialEq,
+    Serialize,
+    Deserialize,
 )]
 pub struct UniqueId {
     clerk_id: u64,

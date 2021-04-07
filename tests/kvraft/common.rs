@@ -1,8 +1,10 @@
 use rand::{thread_rng, RngCore};
 use std::sync::atomic::{AtomicU64, Ordering};
 
+pub type ClerkId = u64;
 #[derive(
     Clone,
+    Copy,
     Debug,
     Default,
     Ord,
@@ -13,8 +15,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
     Deserialize,
 )]
 pub struct UniqueId {
-    clerk_id: u64,
-    sequence_id: u64,
+    pub clerk_id: ClerkId,
+    pub sequence_id: u64,
 }
 
 #[derive(Debug)]

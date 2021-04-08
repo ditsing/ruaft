@@ -94,6 +94,25 @@ impl From<CommitError> for KVError {
     }
 }
 
+impl KVServerState {
+    fn find_op_or_unseen(
+        &mut self,
+        unique_id: UniqueId,
+    ) -> &mut UniqueKVOpStep {
+        self.applied_op
+            .entry(unique_id.clerk_id)
+            .and_modify(|e| {
+                if e.step == KVOpStep::Unseen {
+                    panic!("Unseen op should never been here.")
+                }
+            })
+            .or_insert_with(|| UniqueKVOpStep {
+                step: KVOpStep::Unseen,
+                unique_id,
+            })
+    }
+}
+
 impl KVServer {
     pub fn new(
         servers: Vec<RpcClient>,
@@ -139,16 +158,13 @@ impl KVServer {
                 CommitResult::Append
             }
         };
-        if let Some(step) = state.applied_op.get_mut(&unique_id.clerk_id) {
-            match &step.step {
-                KVOpStep::Pending(condvar) => {
-                    condvar.notify_all();
-                }
-                _ => panic!(),
-            }
-            if unique_id == step.unique_id {
-                step.step = KVOpStep::Done(result);
-            }
+        let last_result = state.find_op_or_unseen(unique_id);
+        if unique_id > last_result.unique_id {
+            last_result.unique_id = unique_id
+        }
+        let last_step = std::mem::replace(&mut last_result.step, KVOpStep::Done(result);
+        if let KVOpStep::Pending(condvar) = last_step {
+            condvar.notify_all();
         }
     }
 
@@ -171,13 +187,7 @@ impl KVServer {
     ) -> Result<CommitResult, CommitError> {
         let (unseen, condvar) = {
             let mut state = self.state.lock();
-            let last_result = state
-                .applied_op
-                .entry(unique_id.clerk_id)
-                .or_insert_with(|| UniqueKVOpStep {
-                    step: KVOpStep::Unseen,
-                    unique_id,
-                });
+            let last_result = state.find_op_or_unseen(unique_id);
 
             // We know that the two unique_ids must come from the same clerk,
             // because they are found in the same entry of applied_op.

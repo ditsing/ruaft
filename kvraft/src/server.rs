@@ -1,6 +1,6 @@
-use super::common::{ClerkId, UniqueId};
-use crate::kvraft::common::{
-    GetArgs, GetReply, KVError, PutAppendArgs, PutAppendEnum, PutAppendReply,
+use super::common::{
+    ClerkId, GetArgs, GetReply, KVError, PutAppendArgs, PutAppendEnum,
+    PutAppendReply, UniqueId,
 };
 use parking_lot::{Condvar, Mutex};
 use ruaft::{Persister, Raft, RpcClient};

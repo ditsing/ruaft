@@ -1,8 +1,7 @@
 use super::common::{
-    GetArgs, GetReply, KVRaftOptions, PutAppendArgs, PutAppendReply,
-    UniqueIdSequence, GET, PUT_APPEND,
+    GetArgs, GetReply, KVRaftOptions, PutAppendArgs, PutAppendEnum,
+    PutAppendReply, UniqueIdSequence, GET, PUT_APPEND,
 };
-use crate::kvraft::common::PutAppendEnum;
 use labrpc::{Client, RequestMessage};
 use serde::de::DeserializeOwned;
 use serde::Serialize;

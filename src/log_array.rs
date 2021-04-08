@@ -75,20 +75,20 @@ impl<C> LogArray<C> {
 
     /// The log entry at the given index.
     pub fn at(&self, index: Index) -> &LogEntry<C> {
-        let index = self.check_start_index(index);
+        let index = self.check_at_index(index);
         &self.inner[index]
     }
 
     /// All log entries after the given index.
     pub fn after(&self, index: Index) -> &[LogEntry<C>] {
-        let index = self.check_start_index(index);
+        let index = self.check_range_index(index);
         &self.inner[index..]
     }
 
     /// All log entries in range [start, end).
     pub fn between(&self, start: Index, end: Index) -> &[LogEntry<C>] {
-        let start = self.check_start_index(start);
-        let end = self.check_end_index(end);
+        let start = self.check_range_index(start);
+        let end = self.check_range_index(end);
         &self.inner[start..end]
     }
 
@@ -215,7 +215,7 @@ impl<C> LogArray<C> {
         index - self.start()
     }
 
-    fn check_start_index(&self, index: Index) -> usize {
+    fn check_at_index(&self, index: Index) -> usize {
         assert!(
             index >= self.start() && index < self.end(),
             "Accessing start log index {} out of range [{}, {})",
@@ -227,9 +227,9 @@ impl<C> LogArray<C> {
         self.offset(index)
     }
 
-    fn check_end_index(&self, index: Index) -> usize {
+    fn check_range_index(&self, index: Index) -> usize {
         assert!(
-            index > self.start() && index <= self.end(),
+            index >= self.start() && index <= self.end(),
             "Accessing end log index {} out of range ({}, {}]",
             index,
             self.start(),
@@ -410,7 +410,7 @@ mod tests {
 
         assert!(catch_unwind(|| log.after(start - 1)).is_err());
         assert!(catch_unwind(|| log.after(start)).is_ok());
-        assert!(catch_unwind(|| log.after(end)).is_err());
+        assert!(catch_unwind(|| log.after(end)).is_ok());
         assert!(catch_unwind(|| log.after(end + 1)).is_err());
     }
 
@@ -599,35 +599,35 @@ mod tests {
     }
 
     #[test]
-    fn test_checks_start_index() {
+    fn test_check_start_index() {
         let (start, end, log) = default_log_array();
         assert!(start < end);
-        assert!(catch_unwind(|| log.check_start_index(start - 8)).is_err());
-        assert!(catch_unwind(|| log.check_start_index(start - 1)).is_err());
-        assert!(catch_unwind(|| log.check_start_index(start)).is_ok());
-        assert!(catch_unwind(|| log.check_start_index(start + 1)).is_ok());
-        assert!(catch_unwind(|| log.check_start_index(end - 1)).is_ok());
-        assert!(catch_unwind(|| log.check_start_index(end)).is_err());
-        assert!(catch_unwind(|| log.check_start_index(end + 1)).is_err());
-        assert!(catch_unwind(|| log.check_start_index(end + 5)).is_err());
+        assert!(catch_unwind(|| log.check_at_index(start - 8)).is_err());
+        assert!(catch_unwind(|| log.check_at_index(start - 1)).is_err());
+        assert!(catch_unwind(|| log.check_at_index(start)).is_ok());
+        assert!(catch_unwind(|| log.check_at_index(start + 1)).is_ok());
+        assert!(catch_unwind(|| log.check_at_index(end - 1)).is_ok());
+        assert!(catch_unwind(|| log.check_at_index(end)).is_err());
+        assert!(catch_unwind(|| log.check_at_index(end + 1)).is_err());
+        assert!(catch_unwind(|| log.check_at_index(end + 5)).is_err());
     }
 
     #[test]
-    fn test_checks_end_index() {
+    fn test_check_range_index() {
         let (start, end, log) = default_log_array();
         assert!(start < end);
-        assert!(catch_unwind(|| log.check_end_index(start - 8)).is_err());
-        assert!(catch_unwind(|| log.check_end_index(start - 1)).is_err());
-        assert!(catch_unwind(|| log.check_end_index(start)).is_err());
-        assert!(catch_unwind(|| log.check_end_index(start + 1)).is_ok());
-        assert!(catch_unwind(|| log.check_end_index(end - 1)).is_ok());
-        assert!(catch_unwind(|| log.check_end_index(end)).is_ok());
-        assert!(catch_unwind(|| log.check_end_index(end + 1)).is_err());
-        assert!(catch_unwind(|| log.check_end_index(end + 5)).is_err());
+        assert!(catch_unwind(|| log.check_range_index(start - 8)).is_err());
+        assert!(catch_unwind(|| log.check_range_index(start - 1)).is_err());
+        assert!(catch_unwind(|| log.check_range_index(start)).is_ok());
+        assert!(catch_unwind(|| log.check_range_index(start + 1)).is_ok());
+        assert!(catch_unwind(|| log.check_range_index(end - 1)).is_ok());
+        assert!(catch_unwind(|| log.check_range_index(end)).is_ok());
+        assert!(catch_unwind(|| log.check_range_index(end + 1)).is_err());
+        assert!(catch_unwind(|| log.check_range_index(end + 5)).is_err());
     }
 
     #[test]
-    fn test_checks_middle_index() {
+    fn test_check_middle_index() {
         let (start, end, log) = default_log_array();
         assert!(start < end);
         assert!(catch_unwind(|| log.check_middle_index(start - 8)).is_err());
@@ -641,7 +641,7 @@ mod tests {
     }
 
     #[test]
-    fn test_checks_one_element() {
+    fn test_check_one_element() {
         let log = make_log_array(0);
         assert!(catch_unwind(|| log.check_one_element()).is_err());
     }

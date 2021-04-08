@@ -16,7 +16,7 @@ use rand::{thread_rng, Rng};
 pub mod config;
 
 #[test]
-fn persist() -> config::Result<()> {
+fn persist1() -> config::Result<()> {
     const SERVERS: usize = 5;
     let cfg = config::make_config(SERVERS, false);
     defer!(cfg.cleanup());

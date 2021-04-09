@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use labrpc::{Client, Network, ReplyMessage, RequestMessage, Server};
 use parking_lot::Mutex;
 
@@ -119,9 +117,10 @@ impl RpcClient {
 
 pub fn register_server<
     Command: 'static + Clone + Serialize + DeserializeOwned + Default,
+    R: 'static + AsRef<Raft<Command>> + Clone,
     S: AsRef<str>,
 >(
-    raft: Arc<Raft<Command>>,
+    raft: R,
     name: S,
     network: &Mutex<Network>,
 ) -> std::io::Result<()> {
@@ -160,6 +159,8 @@ pub fn register_server<
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use bytes::Bytes;
 
     use crate::{Peer, Term};

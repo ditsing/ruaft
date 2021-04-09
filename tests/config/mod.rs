@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -319,7 +320,7 @@ impl Config {
         );
         self.state.lock().rafts[index].replace(raft.clone());
 
-        let raft = Arc::new(raft);
+        let raft = Rc::new(raft);
         register_server(raft, Self::server_name(index), self.network.as_ref())?;
         Ok(())
     }

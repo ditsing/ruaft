@@ -99,25 +99,6 @@ impl From<CommitError> for KVError {
     }
 }
 
-impl KVServerState {
-    fn find_op_or_unseen(
-        &mut self,
-        unique_id: UniqueId,
-    ) -> &mut UniqueKVOpStep {
-        self.applied_op
-            .entry(unique_id.clerk_id)
-            .and_modify(|e| {
-                if let KVOpStep::Unseen = e.step {
-                    panic!("Unseen op should never been here.")
-                }
-            })
-            .or_insert_with(|| UniqueKVOpStep {
-                step: KVOpStep::Unseen,
-                unique_id,
-            })
-    }
-}
-
 impl KVServer {
     pub fn new(
         servers: Vec<RpcClient>,
@@ -144,41 +125,59 @@ impl KVServer {
         ret
     }
 
+    fn find_op_or_unseen(
+        applied_op: &mut HashMap<ClerkId, UniqueKVOpStep>,
+        unique_id: UniqueId,
+    ) -> &mut UniqueKVOpStep {
+        applied_op
+            .entry(unique_id.clerk_id)
+            .and_modify(|e| {
+                if let KVOpStep::Unseen = e.step {
+                    panic!("Unseen op should never been here.")
+                }
+            })
+            .or_insert_with(|| UniqueKVOpStep {
+                step: KVOpStep::Unseen,
+                unique_id,
+            })
+    }
+
     fn apply_op(&self, unique_id: UniqueId, op: KVOp) {
-        let mut state = self.state.lock();
-        {
-            let curr_op = state.find_op_or_unseen(unique_id);
-            if unique_id < curr_op.unique_id {
+        // The borrow checker does not allow borrowing two fields of an instance
+        // inside a MutexGuard. But it does allow borrowing two fields of the
+        // instance itself. Calling deref_mut() on the MutexGuard works, too!
+        let state = &mut *self.state.lock();
+        let (applied_op, kv) = (&mut state.applied_op, &mut state.kv);
+        let curr_op = Self::find_op_or_unseen(applied_op, unique_id);
+        if unique_id < curr_op.unique_id {
+            // Redelivered.
+            return;
+        }
+        if unique_id == curr_op.unique_id {
+            if let KVOpStep::Done(_) = curr_op.step {
                 // Redelivered.
                 return;
             }
-            if unique_id == curr_op.unique_id {
-                if let KVOpStep::Done(_) = curr_op.step {
-                    // Redelivered.
-                    return;
-                }
-            }
         }
+        assert!(unique_id >= curr_op.unique_id);
 
         let result = match op {
             KVOp::NoOp => return,
-            KVOp::Get(op) => CommitResult::Get(state.kv.get(&op.key).cloned()),
+            KVOp::Get(op) => CommitResult::Get(kv.get(&op.key).cloned()),
             KVOp::Put(op) => {
-                state.kv.insert(op.key, op.value);
+                kv.insert(op.key, op.value);
                 CommitResult::Put
             }
             KVOp::Append(op) => {
                 let (key, value) = (op.key, op.value);
-                state
-                    .kv
-                    .entry(key)
+                kv.entry(key)
                     .and_modify(|str| str.push_str(&value))
                     .or_insert(value);
                 CommitResult::Append
             }
         };
         let last_op = std::mem::replace(
-            state.applied_op.get_mut(&unique_id.clerk_id).expect(""),
+            curr_op,
             UniqueKVOpStep {
                 step: KVOpStep::Done(result.clone()),
                 unique_id,
@@ -214,7 +213,8 @@ impl KVServer {
     ) -> Result<CommitResult, CommitError> {
         let (unseen, result_holder) = {
             let mut state = self.state.lock();
-            let last_result = state.find_op_or_unseen(unique_id);
+            let last_result =
+                Self::find_op_or_unseen(&mut state.applied_op, unique_id);
 
             // We know that the two unique_ids must come from the same clerk,
             // because they are found in the same entry of applied_op.

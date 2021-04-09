@@ -33,26 +33,15 @@ struct KVServerState {
 #[derive(Clone, Serialize, Deserialize)]
 enum KVOp {
     NoOp,
-    Get(GetOp),
-    Put(PutAppendOp),
-    Append(PutAppendOp),
+    Get(String),
+    Put(String, String),
+    Append(String, String),
 }
 
 impl Default for KVOp {
     fn default() -> Self {
         KVOp::NoOp
     }
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-struct GetOp {
-    key: String,
-}
-
-#[derive(Clone, Serialize, Deserialize)]
-struct PutAppendOp {
-    key: String,
-    value: String,
 }
 
 struct UniqueKVOpStep {
@@ -163,13 +152,12 @@ impl KVServer {
 
         let result = match op {
             KVOp::NoOp => return,
-            KVOp::Get(op) => CommitResult::Get(kv.get(&op.key).cloned()),
-            KVOp::Put(op) => {
-                kv.insert(op.key, op.value);
+            KVOp::Get(key) => CommitResult::Get(kv.get(&key).cloned()),
+            KVOp::Put(key, value) => {
+                kv.insert(key, value);
                 CommitResult::Put
             }
-            KVOp::Append(op) => {
-                let (key, value) = (op.key, op.value);
+            KVOp::Append(key, value) => {
                 kv.entry(key)
                     .and_modify(|str| str.push_str(&value))
                     .or_insert(value);
@@ -296,7 +284,7 @@ impl KVServer {
     pub fn get(&self, args: GetArgs) -> GetReply {
         let (is_retry, result) = match self.block_for_commit(
             args.unique_id,
-            KVOp::Get(GetOp { key: args.key }),
+            KVOp::Get(args.key),
             Self::DEFAULT_TIMEOUT,
         ) {
             Ok(result) => (false, result),
@@ -317,13 +305,9 @@ impl KVServer {
     }
 
     pub fn put_append(&self, args: PutAppendArgs) -> PutAppendReply {
-        let op = PutAppendOp {
-            key: args.key,
-            value: args.value,
-        };
         let op = match args.op {
-            PutAppendEnum::Put => KVOp::Put(op),
-            PutAppendEnum::Append => KVOp::Append(op),
+            PutAppendEnum::Put => KVOp::Put(args.key, args.value),
+            PutAppendEnum::Append => KVOp::Append(args.key, args.value),
         };
         let result = match self.block_for_commit(
             args.unique_id,

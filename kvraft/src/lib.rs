@@ -1,3 +1,4 @@
+extern crate anyhow;
 extern crate labrpc;
 extern crate parking_lot;
 extern crate rand;
@@ -9,3 +10,5 @@ extern crate serde_derive;
 mod client;
 mod common;
 mod server;
+
+mod testing_utils;

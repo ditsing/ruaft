@@ -9,7 +9,7 @@ use std::sync::mpsc::{channel, Receiver};
 use std::sync::Arc;
 use std::time::Duration;
 
-struct KVServer {
+pub struct KVServer {
     state: Mutex<KVServerState>,
     rf: Mutex<Raft<UniqueKVOp>>,
     // snapshot
@@ -18,7 +18,7 @@ struct KVServer {
 type IndexedCommand = (usize, UniqueKVOp);
 
 #[derive(Clone, Default, Serialize, Deserialize)]
-struct UniqueKVOp {
+pub struct UniqueKVOp {
     op: KVOp,
     unique_id: UniqueId,
 }
@@ -350,6 +350,10 @@ impl KVServer {
         };
 
         PutAppendReply { result }
+    }
+
+    pub fn raft(&self) -> Raft<UniqueKVOp> {
+        self.rf.lock().clone()
     }
 
     pub fn kill(self) {

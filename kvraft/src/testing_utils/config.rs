@@ -6,6 +6,7 @@ use ruaft::RpcClient;
 use server::KVServer;
 use std::sync::Arc;
 use testing_utils::memory_persister::MemoryStorage;
+use testing_utils::rpcs::register_kv_server;
 
 struct ConfigState {
     kv_servers: Vec<Option<Arc<KVServer>>>,
@@ -21,6 +22,10 @@ pub struct Config {
 }
 
 impl Config {
+    fn kv_server_name(i: usize) -> String {
+        format!("kv-server-{}", i)
+    }
+
     fn server_name(i: usize) -> String {
         format!("kvraft-server-{}", i)
     }
@@ -47,7 +52,14 @@ impl Config {
         self.state.lock().kv_servers[index].replace(kv.clone());
 
         let raft = std::rc::Rc::new(kv.raft());
+
         register_server(raft, Self::server_name(index), self.network.as_ref())?;
+
+        register_kv_server(
+            kv,
+            Self::kv_server_name(index),
+            self.network.as_ref(),
+        )?;
         Ok(())
     }
 }

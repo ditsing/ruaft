@@ -1,29 +1,8 @@
 use common::{GET, PUT_APPEND};
-use labrpc::{Network, ReplyMessage, RequestMessage, Server};
+use labrpc::{Network, Server};
 use parking_lot::Mutex;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
+use ruaft::rpcs::make_rpc_handler;
 use server::KVServer;
-
-fn make_rpc_handler<Request, Reply, F>(
-    func: F,
-) -> Box<dyn Fn(RequestMessage) -> ReplyMessage>
-where
-    Request: DeserializeOwned,
-    Reply: Serialize,
-    F: 'static + Fn(Request) -> Reply,
-{
-    Box::new(move |request| {
-        let reply = func(
-            bincode::deserialize(&request)
-                .expect("Deserialization should not fail"),
-        );
-
-        ReplyMessage::from(
-            bincode::serialize(&reply).expect("Serialization should not fail"),
-        )
-    })
-}
 
 pub fn register_kv_server<
     KV: 'static + AsRef<KVServer> + Clone,

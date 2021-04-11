@@ -1,19 +1,21 @@
+use std::sync::Arc;
+
 pub use anyhow::Result;
-use client::Clerk;
 use labrpc::Network;
 use parking_lot::Mutex;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
+
+use client::Clerk;
 use ruaft::rpcs::register_server;
 use ruaft::RpcClient;
 use server::KVServer;
-use std::sync::Arc;
 use testing_utils::memory_persister::MemoryStorage;
 use testing_utils::rpcs::register_kv_server;
 
 struct ConfigState {
     kv_servers: Vec<Option<Arc<KVServer>>>,
-    clerks: Vec<Option<Clerk>>,
+    next_clerk: usize,
 }
 
 pub struct Config {
@@ -25,6 +27,10 @@ pub struct Config {
 }
 
 impl Config {
+    fn kv_clerk_name(i: usize, server: usize) -> String {
+        format!("kvraft-clerk-client-{}-to-{}", i, server)
+    }
+
     fn kv_server_name(i: usize) -> String {
         format!("kv-server-{}", i)
     }
@@ -105,6 +111,52 @@ impl Config {
         Self::set_connect(&mut network, part_one, part_one, true);
         Self::set_connect(&mut network, part_two, part_two, true);
     }
+
+    fn set_clerk_connect(
+        network: &mut Network,
+        clerk_index: usize,
+        to: &[usize],
+        yes: bool,
+    ) {
+        for j in to {
+            network.set_enable_client(Self::kv_clerk_name(clerk_index, *j), yes)
+        }
+    }
+
+    pub fn make_limited_clerk(&self, to: &[usize]) -> Clerk {
+        let mut clients = vec![];
+        let clerk_index = {
+            let mut state = self.state.lock();
+            state.next_clerk += 1;
+            state.next_clerk
+        };
+
+        {
+            let mut network = self.network.lock();
+            for j in 0..self.server_count {
+                clients.push(network.make_client(
+                    Self::kv_clerk_name(clerk_index, j),
+                    Self::kv_server_name(j),
+                ));
+            }
+            // Disable clerk connection to all kv servers.
+            Self::set_clerk_connect(
+                &mut network,
+                clerk_index,
+                &(0..self.server_count).collect::<Vec<usize>>(),
+                false,
+            );
+            // Enable clerk connection to some servers.
+            Self::set_clerk_connect(&mut network, clerk_index, to, true);
+        }
+
+        clients.shuffle(&mut thread_rng());
+        Clerk::new(clients)
+    }
+
+    pub fn make_clerk(&self) -> Clerk {
+        self.make_limited_clerk(&(0..self.server_count).collect::<Vec<usize>>())
+    }
 }
 
 pub fn make_config(
@@ -121,7 +173,7 @@ pub fn make_config(
 
     let state = Mutex::new(ConfigState {
         kv_servers: vec![None; server_count],
-        clerks: vec![],
+        next_clerk: 0,
     });
 
     let mut storage = MemoryStorage::default();

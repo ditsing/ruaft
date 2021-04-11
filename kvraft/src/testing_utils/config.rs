@@ -1,6 +1,9 @@
 pub use anyhow::Result;
 use client::Clerk;
+use labrpc::Network;
 use parking_lot::Mutex;
+use rand::seq::SliceRandom;
+use rand::thread_rng;
 use ruaft::rpcs::register_server;
 use ruaft::RpcClient;
 use server::KVServer;
@@ -61,6 +64,46 @@ impl Config {
             self.network.as_ref(),
         )?;
         Ok(())
+    }
+
+    fn make_partition(&self) -> (Vec<usize>, Vec<usize>) {
+        let state = self.state.lock();
+        let mut indexes: Vec<usize> = (0..state.kv_servers.len()).collect();
+        indexes.shuffle(&mut thread_rng());
+
+        // Swap leader to position 0.
+        let leader_position = indexes
+            .iter()
+            .position(|index| {
+                state.kv_servers[*index]
+                    .as_ref()
+                    .map_or(false, |kv| kv.raft().get_state().1)
+            })
+            .unwrap_or(0);
+        indexes.swap(0, leader_position);
+
+        (indexes.split_off(state.kv_servers.len() / 2), indexes)
+    }
+
+    fn set_connect(
+        network: &mut Network,
+        from: &[usize],
+        to: &[usize],
+        yes: bool,
+    ) {
+        for i in from {
+            for j in to {
+                network.set_enable_client(Self::client_name(*i, *j), yes)
+            }
+        }
+    }
+
+    pub fn partition(&self, part_one: &[usize], part_two: &[usize]) {
+        let mut network = self.network.lock();
+        Self::set_connect(&mut network, part_one, part_two, false);
+        Self::set_connect(&mut network, part_two, part_one, false);
+        Self::set_connect(&mut network, part_one, part_one, true);
+        Self::set_connect(&mut network, part_two, part_two, true);
     }
 }
 

@@ -27,26 +27,16 @@ impl Clerk {
         inner.get(key, Default::default())
     }
 
-    pub fn put(
-        &mut self,
-        key: String,
-        value: String,
-        options: KVRaftOptions,
-    ) -> Option<()> {
+    pub fn put(&mut self, key: String, value: String) -> Option<()> {
         let (init, inner) = (&self.init, &mut self.inner);
         init.call_once(|| inner.commit_sentinel());
-        inner.put(key, value, options)
+        inner.put(key, value, Default::default())
     }
 
-    pub fn append(
-        &mut self,
-        key: String,
-        value: String,
-        options: KVRaftOptions,
-    ) -> Option<()> {
+    pub fn append(&mut self, key: String, value: String) -> Option<()> {
         let (init, inner) = (&self.init, &mut self.inner);
         init.call_once(|| inner.commit_sentinel());
-        inner.append(key, value, options)
+        inner.append(key, value, Default::default())
     }
 }
 

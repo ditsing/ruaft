@@ -72,6 +72,10 @@ impl Config {
         Ok(())
     }
 
+    pub fn begin<S: std::fmt::Display>(&self, msg: S) {
+        eprintln!("{}", msg);
+    }
+
     fn make_partition(&self) -> (Vec<usize>, Vec<usize>) {
         let state = self.state.lock();
         let mut indexes: Vec<usize> = (0..state.kv_servers.len()).collect();
@@ -156,6 +160,28 @@ impl Config {
 
     pub fn make_clerk(&self) -> Clerk {
         self.make_limited_clerk(&(0..self.server_count).collect::<Vec<usize>>())
+    }
+
+    pub fn end(&self) {}
+
+    pub fn clean_up(&self) {
+        let mut network = self.network.lock();
+        for i in 0..self.server_count {
+            network.remove_server(Self::server_name(i));
+            network.remove_server(Self::kv_server_name(i));
+        }
+        network.stop();
+        drop(network);
+        for kv_server in &mut self.state.lock().kv_servers {
+            if let Some(kv) = kv_server.take() {
+                match Arc::try_unwrap(kv) {
+                    Ok(kv) => kv.kill(),
+                    Err(_) => panic!(
+                        "All references to KVServer should have been dropped"
+                    ),
+                }
+            }
+        }
     }
 }
 

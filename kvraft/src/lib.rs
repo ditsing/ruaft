@@ -11,4 +11,7 @@ mod client;
 mod common;
 mod server;
 
-mod testing_utils;
+pub mod testing_utils;
+
+pub use client::Clerk;
+pub use server::KVServer;

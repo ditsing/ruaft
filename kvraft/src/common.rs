@@ -97,3 +97,25 @@ pub struct GetReply {
 pub struct KVRaftOptions {
     pub max_retry: Option<usize>,
 }
+
+pub trait ValidReply {
+    fn is_reply_valid(&self) -> bool;
+}
+
+impl ValidReply for PutAppendReply {
+    fn is_reply_valid(&self) -> bool {
+        if let Err(KVError::NotLeader) = &self.result {
+            return false;
+        }
+        return true;
+    }
+}
+
+impl ValidReply for GetReply {
+    fn is_reply_valid(&self) -> bool {
+        if let Err(KVError::NotLeader) = &self.result {
+            return false;
+        }
+        return true;
+    }
+}

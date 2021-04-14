@@ -122,3 +122,13 @@ fn generic_test(clients: usize, unreliable: bool, maxraftstate: usize) {
 fn basic_service() {
     generic_test(1, false, 0);
 }
+
+#[test]
+fn concurrent_client() {
+    generic_test(5, false, 0);
+}
+
+#[test]
+fn unreliable() {
+    generic_test(5, true, 0);
+}

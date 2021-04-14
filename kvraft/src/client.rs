@@ -2,7 +2,7 @@ use super::common::{
     GetArgs, GetReply, KVRaftOptions, PutAppendArgs, PutAppendEnum,
     PutAppendReply, UniqueIdSequence, GET, PUT_APPEND,
 };
-use common::ValidReply;
+use common::{KVError, ValidReply};
 use labrpc::{Client, RequestMessage};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -86,6 +86,12 @@ impl ClerkInner {
                             // that clerk_id.
                             self.unique_id = UniqueIdSequence::new();
                         }
+                    }
+                    Err(KVError::Expired) | Err(KVError::Conflict) => {
+                        // The client ID happens to be re-used. The request does
+                        // not fail as "Duplicate", because another client has
+                        // committed more than just the sentinel.
+                        self.unique_id = UniqueIdSequence::new();
                     }
                     Err(_) => {}
                 };

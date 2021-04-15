@@ -25,7 +25,12 @@ impl Clerk {
     pub fn get(&mut self, key: String) -> Option<String> {
         let (init, inner) = (&self.init, &mut self.inner);
         init.call_once(|| inner.commit_sentinel());
-        inner.get(key, Default::default())
+        loop {
+            match inner.get(key.clone(), Default::default()) {
+                Some(val) => return val,
+                None => {}
+            }
+        }
     }
 
     pub fn put(&mut self, key: String, value: String) -> Option<()> {
@@ -140,18 +145,28 @@ impl ClerkInner {
         None
     }
 
+    /// This function returns None when
+    /// 1. No KVServer can be reached, or
+    /// 2. No KVServer claimed to be the leader, or
+    /// 3. When the KVServer committed the request but it was not passed
+    /// back to the clerk. We must retry with a new unique_id.
+    ///
+    /// In all 3 cases the request can be retried.
+    ///
+    /// This function do not expect a Conflict request with the same unique_id.
     pub fn get(
         &mut self,
         key: String,
         options: KVRaftOptions,
-    ) -> Option<String> {
+    ) -> Option<Option<String>> {
         let args = GetArgs {
             key,
             unique_id: self.unique_id.inc(),
         };
         let reply: GetReply = self.call_rpc(GET, args, options.max_retry)?;
         match reply.result {
-            Ok(val) => val,
+            Ok(val) => Some(val),
+            Err(KVError::Conflict) => panic!("We should never see a conflict."),
             _ => None,
         }
     }

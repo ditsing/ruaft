@@ -120,6 +120,16 @@ impl KVServer {
             let (applied_unique_id, _) = curr.get();
             if *applied_unique_id >= unique_id {
                 // Redelivered.
+                // It is guaranteed that we have no pending queries with the
+                // same unique_id, because
+                // 1. When inserting into queries, we first check the unique_id
+                // is strictly larger than the one in applied_op.
+                // 2. When modifying entries in applied_op, the unique_id can
+                // only grow larger. And we make sure there is no entries with
+                // the same unique_id in queries.
+                // TODO(ditsing): in case 2), make sure there is no entries in
+                // queries that have a smaller unique_id.
+                assert!(!state.queries.contains_key(&unique_id));
                 return;
             }
         }

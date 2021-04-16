@@ -23,8 +23,8 @@ impl Clerk {
     }
 
     pub fn get<K: AsRef<str>>(&mut self, key: K) -> Option<String> {
-        let (init, inner) = (&self.init, &mut self.inner);
-        init.call_once(|| inner.commit_sentinel());
+        let inner = self.init_once();
+
         let key = key.as_ref();
         loop {
             match inner.get(key.to_owned(), Default::default()) {
@@ -39,8 +39,8 @@ impl Clerk {
         key: K,
         value: V,
     ) -> Option<()> {
-        let (init, inner) = (&self.init, &mut self.inner);
-        init.call_once(|| inner.commit_sentinel());
+        let inner = self.init_once();
+
         let key = key.as_ref();
         let value = value.as_ref();
         inner.put(key.to_owned(), value.to_owned(), Default::default())
@@ -51,11 +51,17 @@ impl Clerk {
         key: K,
         value: V,
     ) -> Option<()> {
-        let (init, inner) = (&self.init, &mut self.inner);
-        init.call_once(|| inner.commit_sentinel());
+        let inner = self.init_once();
+
         let key = key.as_ref();
         let value = value.as_ref();
         inner.append(key.to_owned(), value.to_owned(), Default::default())
+    }
+
+    pub fn init_once(&mut self) -> &mut ClerkInner {
+        let (init, inner) = (&self.init, &mut self.inner);
+        init.call_once(|| inner.commit_sentinel());
+        &mut self.inner
     }
 }
 

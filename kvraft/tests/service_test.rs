@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate anyhow;
 extern crate kvraft;
 extern crate rand;
 #[macro_use]
@@ -10,6 +12,7 @@ use std::time::Duration;
 
 use rand::{thread_rng, Rng};
 
+use anyhow::Context;
 use kvraft::testing_utils::config::{make_config, Config};
 use kvraft::Clerk;
 
@@ -43,7 +46,7 @@ fn appending_client(
     let mut last = String::new();
     let mut rng = thread_rng();
 
-    clerk.put(key.clone(), last.clone());
+    clerk.put(&key, &last);
 
     while !stop.load(Ordering::Acquire) {
         eprintln!("client {} starting {}.", index, op_count);
@@ -51,12 +54,12 @@ fn appending_client(
             let value = format!("({}, {}), ", index, op_count);
 
             last.push_str(&value);
-            clerk.append(key.clone(), value);
+            clerk.append(&key, &value);
 
             op_count += 1;
         } else {
             let value = clerk
-                .get(key.clone())
+                .get(&key)
                 .expect(&format!("Key {} should exist.", index));
             assert_eq!(value, last);
         }
@@ -118,6 +121,52 @@ fn generic_test(clients: usize, unreliable: bool, maxraftstate: usize) {
     cfg.end();
 }
 
+fn check_concurrent_results(
+    value: String,
+    clients: usize,
+    expected: Vec<usize>,
+) -> anyhow::Result<()> {
+    if !value.starts_with('(') || !value.ends_with(')') {
+        bail!("Malformed value string {}", value)
+    }
+    let inner_value = &value[1..value.len() - 1];
+    let mut progress = vec![0; clients];
+    for pair_str in inner_value.split(")(") {
+        let mut nums = vec![];
+        for num_str in pair_str.split(", ") {
+            let num: usize = num_str.parse().context(format!(
+                "Parsing '{:?}' failed within '{:?}'",
+                num_str, value,
+            ))?;
+            nums.push(num);
+        }
+        if nums.len() != 2 {
+            bail!(
+                concat!(
+                    "More than two numbers in the same group when",
+                    " parsing '{:?}' failed within '{:?}'",
+                ),
+                pair_str,
+                value,
+            );
+        }
+        let (client, curr) = (nums[0], nums[1]);
+        if progress[client] != curr {
+            bail!(
+                "Client {} failed, expecting {}, got {}, others are {:?} in {}",
+                client,
+                progress[client],
+                curr,
+                progress,
+                value,
+            )
+        }
+        progress[client] = curr + 1;
+    }
+    assert_eq!(progress, expected, "Expecting progress in {}", value);
+    Ok(())
+}
+
 #[test]
 fn basic_service() {
     generic_test(1, false, 0);
@@ -131,4 +180,30 @@ fn concurrent_client() {
 #[test]
 fn unreliable() {
     generic_test(5, true, 0);
+}
+
+#[test]
+fn unreliable_one_key() -> anyhow::Result<()> {
+    const SERVERS: usize = 5;
+    let cfg = Arc::new(make_config(SERVERS, true, 0));
+    let mut clerk = cfg.make_clerk();
+
+    cfg.begin("Test: concurrent append to same key, unreliable (3A)");
+
+    clerk.put("k", "");
+
+    const CLIENTS: usize = 5;
+    const ATTEMPTS: usize = 10;
+    let client_results = spawn_clients(cfg, CLIENTS, |index, mut clerk| {
+        for i in 0..ATTEMPTS {
+            clerk.append("k", format!("({}, {})", index, i));
+        }
+    });
+    for client_result in client_results {
+        client_result.join().expect("Client should never fail");
+    }
+
+    let value = clerk.get("k").expect("Key should exist");
+
+    check_concurrent_results(value, CLIENTS, vec![ATTEMPTS; CLIENTS])
 }

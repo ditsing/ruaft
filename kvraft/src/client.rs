@@ -22,27 +22,40 @@ impl Clerk {
         }
     }
 
-    pub fn get(&mut self, key: String) -> Option<String> {
+    pub fn get<K: AsRef<str>>(&mut self, key: K) -> Option<String> {
         let (init, inner) = (&self.init, &mut self.inner);
         init.call_once(|| inner.commit_sentinel());
+        let key = key.as_ref();
         loop {
-            match inner.get(key.clone(), Default::default()) {
+            match inner.get(key.to_owned(), Default::default()) {
                 Some(val) => return val,
                 None => {}
             }
         }
     }
 
-    pub fn put(&mut self, key: String, value: String) -> Option<()> {
+    pub fn put<K: AsRef<str>, V: AsRef<str>>(
+        &mut self,
+        key: K,
+        value: V,
+    ) -> Option<()> {
         let (init, inner) = (&self.init, &mut self.inner);
         init.call_once(|| inner.commit_sentinel());
-        inner.put(key, value, Default::default())
+        let key = key.as_ref();
+        let value = value.as_ref();
+        inner.put(key.to_owned(), value.to_owned(), Default::default())
     }
 
-    pub fn append(&mut self, key: String, value: String) -> Option<()> {
+    pub fn append<K: AsRef<str>, V: AsRef<str>>(
+        &mut self,
+        key: K,
+        value: V,
+    ) -> Option<()> {
         let (init, inner) = (&self.init, &mut self.inner);
         init.call_once(|| inner.commit_sentinel());
-        inner.append(key, value, Default::default())
+        let key = key.as_ref();
+        let value = value.as_ref();
+        inner.append(key.to_owned(), value.to_owned(), Default::default())
     }
 }
 

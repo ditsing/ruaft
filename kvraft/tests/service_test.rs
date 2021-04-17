@@ -5,7 +5,7 @@ extern crate rand;
 #[macro_use]
 extern crate scopeguard;
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -13,7 +13,9 @@ use std::time::Duration;
 use rand::{thread_rng, Rng};
 
 use anyhow::Context;
-use kvraft::testing_utils::config::{make_config, Config};
+use kvraft::testing_utils::config::{
+    make_config, sleep_election_timeouts, sleep_millis, Config,
+};
 use kvraft::Clerk;
 
 fn spawn_clients<T, Func>(
@@ -206,4 +208,68 @@ fn unreliable_one_key_many_clients() -> anyhow::Result<()> {
     let value = clerk.get("k").expect("Key should exist");
 
     check_concurrent_results(value, CLIENTS, vec![ATTEMPTS; CLIENTS])
+}
+
+#[test]
+fn one_partition() -> anyhow::Result<()> {
+    const SERVERS: usize = 5;
+    let cfg = Arc::new(make_config(SERVERS, false, 0));
+
+    cfg.begin("Test: progress in majority (3A)");
+
+    const KEY: &str = "1";
+    let mut clerk = cfg.make_clerk();
+    clerk.put(KEY, "13");
+
+    let (majority, minority) = cfg.make_partition();
+
+    assert!(minority.len() < majority.len());
+    assert_eq!(minority.len() + majority.len(), SERVERS);
+    cfg.partition(&majority, &minority);
+
+    let mut clerk_majority = cfg.make_limited_clerk(&majority);
+    let mut clerk_minority1 = cfg.make_limited_clerk(&minority);
+    let mut clerk_minority2 = cfg.make_limited_clerk(&minority);
+
+    clerk_majority.put(KEY, "14");
+    assert_eq!(clerk_majority.get(KEY), Some("14".to_owned()));
+
+    cfg.begin("Test: no progress in minority (3A)");
+    let counter = Arc::new(AtomicUsize::new(0));
+    let counter1 = counter.clone();
+    std::thread::spawn(move || {
+        clerk_minority1.put(KEY, "15");
+        counter1.fetch_or(1, Ordering::SeqCst);
+    });
+    let counter2 = counter.clone();
+    std::thread::spawn(move || {
+        clerk_minority2.get(KEY);
+        counter2.fetch_or(2, Ordering::SeqCst);
+    });
+
+    sleep_millis(1000);
+
+    assert_eq!(counter.load(Ordering::SeqCst), 0);
+
+    assert_eq!(clerk_majority.get(KEY), Some("14".to_owned()));
+    clerk_majority.put(KEY, "16");
+    assert_eq!(clerk_majority.get(KEY), Some("16".to_owned()));
+
+    cfg.begin("Test: completion after heal (3A)");
+
+    cfg.connect_all();
+    cfg.connect_all_clerks();
+
+    sleep_election_timeouts(1);
+    for _ in 0..100 {
+        sleep_millis(60);
+        if counter.load(Ordering::SeqCst) == 3 {
+            break;
+        }
+    }
+
+    assert_eq!(counter.load(Ordering::SeqCst), 3);
+    assert_eq!(clerk.get(KEY), Some("15".to_owned()));
+
+    Ok(())
 }

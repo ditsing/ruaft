@@ -76,7 +76,7 @@ impl Config {
         eprintln!("{}", msg);
     }
 
-    fn make_partition(&self) -> (Vec<usize>, Vec<usize>) {
+    pub fn make_partition(&self) -> (Vec<usize>, Vec<usize>) {
         let state = self.state.lock();
         let mut indexes: Vec<usize> = (0..state.kv_servers.len()).collect();
         indexes.shuffle(&mut thread_rng());
@@ -114,6 +114,12 @@ impl Config {
         Self::set_connect(&mut network, part_two, part_one, false);
         Self::set_connect(&mut network, part_one, part_one, true);
         Self::set_connect(&mut network, part_two, part_two, true);
+    }
+
+    pub fn connect_all(&self) {
+        let all: Vec<usize> = (0..self.state.lock().kv_servers.len()).collect();
+        let mut network = self.network.lock();
+        Self::set_connect(&mut network, &all, &all, true);
     }
 
     fn set_clerk_connect(
@@ -160,6 +166,14 @@ impl Config {
 
     pub fn make_clerk(&self) -> Clerk {
         self.make_limited_clerk(&(0..self.server_count).collect::<Vec<usize>>())
+    }
+
+    pub fn connect_all_clerks(&self) {
+        let mut network = self.network.lock();
+        let all = &(0..self.server_count).collect::<Vec<usize>>();
+        for clerk_index in 0..self.state.lock().next_clerk {
+            Self::set_clerk_connect(&mut network, clerk_index + 1, all, true);
+        }
     }
 
     pub fn end(&self) {}
@@ -221,4 +235,13 @@ pub fn make_config(
     }
 
     cfg
+}
+
+pub fn sleep_millis(mills: u64) {
+    std::thread::sleep(std::time::Duration::from_millis(mills))
+}
+
+pub const LONG_ELECTION_TIMEOUT_MILLIS: u64 = 1000;
+pub fn sleep_election_timeouts(count: u64) {
+    sleep_millis(LONG_ELECTION_TIMEOUT_MILLIS * count)
 }

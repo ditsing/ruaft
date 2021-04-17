@@ -180,7 +180,7 @@ fn concurrent_client() {
 }
 
 #[test]
-fn unreliable() {
+fn unreliable_many_clients() {
     generic_test(5, true, 0);
 }
 

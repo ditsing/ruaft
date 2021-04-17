@@ -6,12 +6,13 @@ use parking_lot::Mutex;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
-use client::Clerk;
 use ruaft::rpcs::register_server;
 use ruaft::RpcClient;
-use server::KVServer;
-use testing_utils::memory_persister::MemoryStorage;
-use testing_utils::rpcs::register_kv_server;
+
+use crate::client::Clerk;
+use crate::server::KVServer;
+use crate::testing_utils::memory_persister::MemoryStorage;
+use crate::testing_utils::rpcs::register_kv_server;
 
 struct ConfigState {
     kv_servers: Vec<Option<Arc<KVServer>>>,

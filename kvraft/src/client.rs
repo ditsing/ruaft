@@ -1,13 +1,15 @@
-use super::common::{
-    GetArgs, GetReply, KVRaftOptions, PutAppendArgs, PutAppendEnum,
-    PutAppendReply, UniqueIdSequence, GET, PUT_APPEND,
-};
-use common::{KVError, ValidReply};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Once;
+
 use labrpc::{Client, RequestMessage};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Once;
+
+use crate::common::{
+    GetArgs, GetReply, KVRaftOptions, PutAppendArgs, PutAppendEnum,
+    PutAppendReply, UniqueIdSequence, GET, PUT_APPEND,
+};
+use crate::common::{KVError, ValidReply};
 
 pub struct Clerk {
     init: Once,

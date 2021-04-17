@@ -1,15 +1,18 @@
-use super::common::{
-    ClerkId, GetArgs, GetReply, KVError, PutAppendArgs, PutAppendEnum,
-    PutAppendReply, UniqueId,
-};
-use parking_lot::{Condvar, Mutex};
-use ruaft::{Persister, Raft, RpcClient, Term};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver};
 use std::sync::Arc;
 use std::time::Duration;
+
+use parking_lot::{Condvar, Mutex};
+
+use ruaft::{Persister, Raft, RpcClient, Term};
+
+use crate::common::{
+    ClerkId, GetArgs, GetReply, KVError, PutAppendArgs, PutAppendEnum,
+    PutAppendReply, UniqueId,
+};
 
 pub struct KVServer {
     me: AtomicUsize,

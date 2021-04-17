@@ -10,9 +10,9 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
+use anyhow::Context;
 use rand::{thread_rng, Rng};
 
-use anyhow::Context;
 use kvraft::testing_utils::config::{
     make_config, sleep_election_timeouts, sleep_millis, Config,
 };

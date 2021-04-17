@@ -1,8 +1,10 @@
-use common::{GET, PUT_APPEND};
 use labrpc::{Network, Server};
 use parking_lot::Mutex;
+
 use ruaft::rpcs::make_rpc_handler;
-use server::KVServer;
+
+use crate::common::{GET, PUT_APPEND};
+use crate::server::KVServer;
 
 pub fn register_kv_server<
     KV: 'static + AsRef<KVServer> + Clone,

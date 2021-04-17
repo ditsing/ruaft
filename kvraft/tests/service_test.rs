@@ -183,7 +183,7 @@ fn unreliable() {
 }
 
 #[test]
-fn unreliable_one_key() -> anyhow::Result<()> {
+fn unreliable_one_key_many_clients() -> anyhow::Result<()> {
     const SERVERS: usize = 5;
     let cfg = Arc::new(make_config(SERVERS, true, 0));
     let mut clerk = cfg.make_clerk();

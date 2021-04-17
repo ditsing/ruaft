@@ -11,7 +11,7 @@ use std::sync::Once;
 
 pub struct Clerk {
     init: Once,
-    pub inner: ClerkInner,
+    inner: ClerkInner,
 }
 
 impl Clerk {

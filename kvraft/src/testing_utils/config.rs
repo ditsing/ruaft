@@ -77,10 +77,15 @@ impl Config {
         eprintln!("{}", msg);
     }
 
+    pub fn shuffled_indexes(&self) -> Vec<usize> {
+        let mut indexes: Vec<usize> = (0..self.server_count).collect();
+        indexes.shuffle(&mut thread_rng());
+        indexes
+    }
+
     pub fn make_partition(&self) -> (Vec<usize>, Vec<usize>) {
         let state = self.state.lock();
-        let mut indexes: Vec<usize> = (0..state.kv_servers.len()).collect();
-        indexes.shuffle(&mut thread_rng());
+        let mut indexes = self.shuffled_indexes();
 
         // Swap leader to position 0.
         let leader_position = indexes

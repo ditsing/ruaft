@@ -15,6 +15,7 @@ use rand::{thread_rng, Rng};
 
 use kvraft::testing_utils::config::{
     make_config, sleep_election_timeouts, sleep_millis, Config,
+    LONG_ELECTION_TIMEOUT_MILLIS,
 };
 use kvraft::Clerk;
 
@@ -71,7 +72,36 @@ fn appending_client(
     (op_count, last)
 }
 
-fn generic_test(clients: usize, unreliable: bool, maxraftstate: usize) {
+const PARTITION_MAX_DELAY_MILLIS: u64 = 200;
+fn run_partition(cfg: Arc<Config>, stop: Arc<AtomicBool>) {
+    while !stop.load(Ordering::Acquire) {
+        let mut indexes = cfg.shuffled_indexes();
+        let len = indexes.len();
+        cfg.partition(&(indexes.split_off(len / 2)), &indexes);
+        let delay = thread_rng().gen_range(
+            LONG_ELECTION_TIMEOUT_MILLIS
+                ..LONG_ELECTION_TIMEOUT_MILLIS + PARTITION_MAX_DELAY_MILLIS,
+        );
+        std::thread::sleep(Duration::from_millis(delay));
+    }
+}
+
+#[derive(Default)]
+struct GenericTestParams {
+    clients: usize,
+    unreliable: bool,
+    partition: bool,
+    maxraftstate: Option<usize>,
+}
+
+fn generic_test(test_params: GenericTestParams) {
+    let GenericTestParams {
+        clients,
+        unreliable,
+        partition,
+        maxraftstate,
+    } = test_params;
+    let maxraftstate = maxraftstate.unwrap_or(usize::MAX);
     const SERVERS: usize = 5;
     let cfg = Arc::new(make_config(SERVERS, unreliable, maxraftstate));
     // TODO(ditsing): add `defer!(cfg.clean_up());`
@@ -94,10 +124,25 @@ fn generic_test(clients: usize, unreliable: bool, maxraftstate: usize) {
             })
         });
 
+        let partition_result = if partition {
+            let config = cfg.clone();
+            let partition_stop_clone = partition_stop.clone();
+            Some(std::thread::spawn(|| {
+                run_partition(config, partition_stop_clone)
+            }))
+        } else {
+            None
+        };
+
         std::thread::sleep(Duration::from_secs(5));
 
         // Stop partitions.
         partition_stop.store(true, Ordering::Release);
+        partition_result.map(|result| {
+            result.join().expect("Partition thread should never fail");
+            cfg.connect_all();
+            sleep_election_timeouts(1);
+        });
 
         // Tell all clients to stop.
         clients_stop.store(true, Ordering::Release);
@@ -171,17 +216,27 @@ fn check_concurrent_results(
 
 #[test]
 fn basic_service() {
-    generic_test(1, false, 0);
+    generic_test(GenericTestParams {
+        clients: 1,
+        ..Default::default()
+    });
 }
 
 #[test]
 fn concurrent_client() {
-    generic_test(5, false, 0);
+    generic_test(GenericTestParams {
+        clients: 5,
+        ..Default::default()
+    });
 }
 
 #[test]
 fn unreliable_many_clients() {
-    generic_test(5, true, 0);
+    generic_test(GenericTestParams {
+        clients: 5,
+        unreliable: true,
+        ..Default::default()
+    });
 }
 
 #[test]
@@ -272,4 +327,13 @@ fn one_partition() -> anyhow::Result<()> {
     assert_eq!(clerk.get(KEY), Some("15".to_owned()));
 
     Ok(())
+}
+
+#[test]
+fn many_partitions_one_client() {
+    generic_test(GenericTestParams {
+        clients: 1,
+        partition: true,
+        ..Default::default()
+    });
 }

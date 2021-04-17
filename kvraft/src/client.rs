@@ -85,9 +85,7 @@ impl ClerkInner {
             last_server_index: AtomicUsize::new(0),
             unique_id: UniqueIdSequence::new(),
 
-            executor: tokio::runtime::Builder::new_multi_thread()
-                .thread_name("kvraft-clerk")
-                .worker_threads(1)
+            executor: tokio::runtime::Builder::new_current_thread()
                 .enable_time()
                 .build()
                 .expect("Creating thread pool should not fail"),

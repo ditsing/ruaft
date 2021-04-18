@@ -71,6 +71,7 @@ enum CommitError {
     Expired(UniqueId),
     TimedOut,
     Conflict,
+    NotMe(CommitResult),
     Duplicate(CommitResult),
 }
 
@@ -81,6 +82,7 @@ impl From<CommitError> for KVError {
             CommitError::Expired(_) => KVError::Expired,
             CommitError::TimedOut => KVError::TimedOut,
             CommitError::Conflict => KVError::Conflict,
+            CommitError::NotMe(_) => panic!("NotMe is not a KVError"),
             CommitError::Duplicate(_) => panic!("Duplicate is not a KVError"),
         }
     }
@@ -169,7 +171,7 @@ impl KVServer {
             *result_holder.result.lock() = if leader == self.me() {
                 Ok(result)
             } else {
-                Err(CommitError::Conflict)
+                Err(CommitError::NotMe(result))
             };
             result_holder.condvar.notify_all();
         };
@@ -298,6 +300,7 @@ impl KVServer {
         ) {
             Ok(result) => (false, result),
             Err(CommitError::Duplicate(result)) => (true, result),
+            Err(CommitError::NotMe(result)) => (true, result),
             Err(e) => {
                 return GetReply {
                     result: Err(e.into()),
@@ -325,6 +328,7 @@ impl KVServer {
         ) {
             Ok(result) => result,
             Err(CommitError::Duplicate(result)) => result,
+            Err(CommitError::NotMe(result)) => result,
             Err(e) => {
                 return PutAppendReply {
                     result: Err(e.into()),

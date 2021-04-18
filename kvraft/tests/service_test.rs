@@ -337,3 +337,12 @@ fn many_partitions_one_client() {
         ..Default::default()
     });
 }
+
+#[test]
+fn many_partitions_many_client() {
+    generic_test(GenericTestParams {
+        clients: 5,
+        partition: true,
+        ..Default::default()
+    });
+}

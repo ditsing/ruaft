@@ -104,7 +104,7 @@ fn generic_test(test_params: GenericTestParams) {
     let maxraftstate = maxraftstate.unwrap_or(usize::MAX);
     const SERVERS: usize = 5;
     let cfg = Arc::new(make_config(SERVERS, unreliable, maxraftstate));
-    // TODO(ditsing): add `defer!(cfg.clean_up());`
+    defer!(cfg.clean_up());
 
     cfg.begin("");
     let mut clerk = cfg.make_clerk();
@@ -243,6 +243,8 @@ fn unreliable_many_clients() {
 fn unreliable_one_key_many_clients() -> anyhow::Result<()> {
     const SERVERS: usize = 5;
     let cfg = Arc::new(make_config(SERVERS, true, 0));
+    defer!(cfg.clean_up());
+
     let mut clerk = cfg.make_clerk();
 
     cfg.begin("Test: concurrent append to same key, unreliable (3A)");
@@ -269,6 +271,7 @@ fn unreliable_one_key_many_clients() -> anyhow::Result<()> {
 fn one_partition() -> anyhow::Result<()> {
     const SERVERS: usize = 5;
     let cfg = Arc::new(make_config(SERVERS, false, 0));
+    defer!(cfg.clean_up());
 
     cfg.begin("Test: progress in majority (3A)");
 

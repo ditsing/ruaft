@@ -111,7 +111,7 @@ impl KVServer {
                 Raft::<UniqueKVOp>::NO_SNAPSHOT,
             )),
         });
-        ret.clone().process_command(rx);
+        ret.process_command(rx);
         ret
     }
 
@@ -178,12 +178,17 @@ impl KVServer {
     }
 
     fn process_command(
-        self: Arc<Self>,
+        self: &Arc<Self>,
         command_channel: Receiver<IndexedCommand>,
     ) {
+        let this = Arc::downgrade(self);
         std::thread::spawn(move || {
             while let Ok((_, command)) = command_channel.recv() {
-                self.apply_op(command.unique_id, command.me, command.op);
+                if let Some(this) = this.upgrade() {
+                    this.apply_op(command.unique_id, command.me, command.op);
+                } else {
+                    break;
+                }
             }
         });
     }

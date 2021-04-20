@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 
+#[derive(Clone)]
 pub struct State {
     bytes: bytes::Bytes,
     snapshot: Vec<u8>,
@@ -42,6 +43,16 @@ impl ruaft::Persister for MemoryPersister {
     }
 }
 
+impl MemoryPersister {
+    pub fn read(&self) -> State {
+        self.state.lock().clone()
+    }
+
+    pub fn restore(&self, state: State) {
+        *self.state.lock() = state;
+    }
+}
+
 #[derive(Default)]
 pub struct MemoryStorage {
     state_vec: Vec<Arc<MemoryPersister>>,
@@ -56,5 +67,11 @@ impl MemoryStorage {
 
     pub fn at(&self, index: usize) -> Arc<MemoryPersister> {
         self.state_vec[index].clone()
+    }
+
+    pub fn replace(&mut self, index: usize) -> Arc<MemoryPersister> {
+        let persister = Arc::new(MemoryPersister::new());
+        self.state_vec[index] = persister.clone();
+        persister
     }
 }

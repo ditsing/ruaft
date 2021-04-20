@@ -91,6 +91,7 @@ struct GenericTestParams {
     clients: usize,
     unreliable: bool,
     partition: bool,
+    crash: bool,
     maxraftstate: Option<usize>,
 }
 
@@ -99,6 +100,7 @@ fn generic_test(test_params: GenericTestParams) {
         clients,
         unreliable,
         partition,
+        crash,
         maxraftstate,
     } = test_params;
     let maxraftstate = maxraftstate.unwrap_or(usize::MAX);
@@ -133,6 +135,12 @@ fn generic_test(test_params: GenericTestParams) {
         } else {
             None
         };
+
+        if crash {
+            cfg.crash_all();
+            sleep_election_timeouts(1);
+            cfg.restart_all();
+        }
 
         std::thread::sleep(Duration::from_secs(5));
 
@@ -347,6 +355,15 @@ fn many_partitions_many_client() {
     generic_test(GenericTestParams {
         clients: 5,
         partition: true,
+        ..Default::default()
+    });
+}
+
+#[test]
+fn persist_one_client() {
+    generic_test(GenericTestParams {
+        clients: 1,
+        crash: true,
         ..Default::default()
     });
 }

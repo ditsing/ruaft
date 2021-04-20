@@ -128,6 +128,41 @@ impl Config {
         Self::set_connect(&mut network, &all, &all, true);
     }
 
+    fn crash_server(&self, index: usize) {
+        {
+            let all: Vec<usize> = (0..self.server_count).collect();
+
+            let mut network = self.network.lock();
+            Self::set_connect(&mut network, &all, &[index], false);
+            Self::set_connect(&mut network, &[index], &all, false);
+
+            network.remove_server(Self::server_name(index));
+            network.remove_server(Self::kv_server_name(index));
+        }
+
+        let data = self.storage.lock().at(index).read();
+
+        let persister = self.storage.lock().replace(index);
+        persister.restore(data);
+
+        if let Some(kv_server) = self.state.lock().kv_servers[index].take() {
+            kv_server.kill();
+        }
+    }
+
+    pub fn crash_all(&self) {
+        for i in 0..self.server_count {
+            self.crash_server(i);
+        }
+    }
+
+    pub fn restart_all(&self) {
+        for index in 0..self.server_count {
+            self.start_server(index)
+                .expect("Start server should never fail");
+        }
+    }
+
     fn set_clerk_connect(
         network: &mut Network,
         clerk_index: usize,

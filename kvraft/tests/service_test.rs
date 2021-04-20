@@ -253,11 +253,12 @@ fn unreliable_one_key_many_clients() -> anyhow::Result<()> {
 
     const CLIENTS: usize = 5;
     const ATTEMPTS: usize = 10;
-    let client_results = spawn_clients(cfg, CLIENTS, |index, mut clerk| {
-        for i in 0..ATTEMPTS {
-            clerk.append("k", format!("({}, {})", index, i));
-        }
-    });
+    let client_results =
+        spawn_clients(cfg.clone(), CLIENTS, |index, mut clerk| {
+            for i in 0..ATTEMPTS {
+                clerk.append("k", format!("({}, {})", index, i));
+            }
+        });
     for client_result in client_results {
         client_result.join().expect("Client should never fail");
     }

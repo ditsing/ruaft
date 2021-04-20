@@ -369,8 +369,12 @@ impl KVServer {
         self.rf.lock().clone()
     }
 
-    pub fn kill(self) {
-        self.rf.into_inner().kill()
+    pub fn kill(self: Arc<Self>) {
+        let rf = self.raft();
+        // We must drop self to remove the only clone of raft, so that
+        // `rf.kill()` does not block.
+        drop(self);
+        rf.kill();
         // The process_command thread will exit, after Raft drops the reference
         // to the sender.
     }

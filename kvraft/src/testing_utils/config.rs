@@ -23,7 +23,7 @@ pub struct Config {
     network: Arc<Mutex<labrpc::Network>>,
     server_count: usize,
     state: Mutex<ConfigState>,
-    storage: MemoryStorage,
+    storage: Mutex<MemoryStorage>,
     maxraftstate: usize,
 }
 
@@ -56,7 +56,7 @@ impl Config {
             }
         }
 
-        let persister = self.storage.at(index);
+        let persister = self.storage.lock().at(index);
 
         let kv = KVServer::new(clients, index, persister);
         self.state.lock().kv_servers[index].replace(kv.clone());
@@ -192,14 +192,10 @@ impl Config {
         }
         network.stop();
         drop(network);
+
         for kv_server in &mut self.state.lock().kv_servers {
-            if let Some(kv) = kv_server.take() {
-                match Arc::try_unwrap(kv) {
-                    Ok(kv) => kv.kill(),
-                    Err(_) => panic!(
-                        "All references to KVServer should have been dropped"
-                    ),
-                }
+            if let Some(kv_server) = kv_server.take() {
+                kv_server.kill();
             }
         }
     }
@@ -226,6 +222,7 @@ pub fn make_config(
     for _ in 0..server_count {
         storage.make();
     }
+    let storage = Mutex::new(storage);
 
     let cfg = Config {
         network,

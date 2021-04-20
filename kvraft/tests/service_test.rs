@@ -367,3 +367,43 @@ fn persist_one_client() {
         ..Default::default()
     });
 }
+
+#[test]
+fn persist_concurrent() {
+    generic_test(GenericTestParams {
+        clients: 5,
+        crash: true,
+        ..Default::default()
+    });
+}
+
+#[test]
+fn persist_concurrent_unreliable() {
+    generic_test(GenericTestParams {
+        clients: 5,
+        unreliable: true,
+        crash: true,
+        ..Default::default()
+    });
+}
+
+#[test]
+fn persist_partition() {
+    generic_test(GenericTestParams {
+        clients: 5,
+        partition: true,
+        crash: true,
+        ..Default::default()
+    });
+}
+
+#[test]
+fn persist_partition_unreliable() {
+    generic_test(GenericTestParams {
+        clients: 5,
+        unreliable: true,
+        partition: true,
+        crash: true,
+        ..Default::default()
+    });
+}

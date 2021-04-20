@@ -127,6 +127,8 @@ fn generic_test(test_params: GenericTestParams) {
         });
 
         let partition_result = if partition {
+            // Let the clients perform some operations without interruption.
+            sleep_millis(1000);
             let config = cfg.clone();
             let partition_stop_clone = partition_stop.clone();
             Some(std::thread::spawn(|| {

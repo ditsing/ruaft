@@ -167,11 +167,8 @@ fn generic_test(test_params: GenericTestParams) {
                 .get(index.to_string())
                 .expect(&format!("Key {} should exist.", index));
             assert_eq!(real_result, last_result);
-            assert!(
-                op_count > 10,
-                "Client committed only {} operations",
-                op_count
-            );
+            eprintln!("Client {} committed {} operations", index, op_count);
+            assert!(op_count > 10, "Client committed less than 10 operations");
         }
     }
 

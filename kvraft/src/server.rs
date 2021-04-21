@@ -295,7 +295,7 @@ impl KVServer {
         );
     }
 
-    const DEFAULT_TIMEOUT: Duration = Duration::from_secs(2);
+    const DEFAULT_TIMEOUT: Duration = Duration::from_secs(1);
 
     pub fn get(&self, args: GetArgs) -> GetReply {
         let (is_retry, result) = match self.block_for_commit(

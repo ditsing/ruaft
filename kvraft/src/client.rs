@@ -125,6 +125,8 @@ impl ClerkInner {
         }
     }
 
+    const DEFAULT_TIMEOUT: Duration = Duration::from_secs(1);
+
     fn call_rpc<M, A, R>(
         &mut self,
         method: M,
@@ -150,7 +152,7 @@ impl ClerkInner {
             let client = &self.servers[index];
             let rpc_response = self.executor.block_on(async {
                 tokio::time::timeout(
-                    Duration::from_secs(1),
+                    Self::DEFAULT_TIMEOUT,
                     client.call_rpc(method.clone(), data.clone()),
                 )
                 .await

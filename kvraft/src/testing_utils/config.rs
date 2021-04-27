@@ -77,13 +77,13 @@ impl Config {
         eprintln!("{}", msg);
     }
 
-    pub fn shuffled_indexes(&self) -> Vec<usize> {
+    fn shuffled_indexes(&self) -> Vec<usize> {
         let mut indexes: Vec<usize> = (0..self.server_count).collect();
         indexes.shuffle(&mut thread_rng());
         indexes
     }
 
-    pub fn make_partition(&self) -> (Vec<usize>, Vec<usize>) {
+    pub fn partition(&self) -> (Vec<usize>, Vec<usize>) {
         let state = self.state.lock();
         let mut indexes = self.shuffled_indexes();
 
@@ -98,7 +98,20 @@ impl Config {
             .unwrap_or(0);
         indexes.swap(0, leader_position);
 
-        (indexes.split_off(state.kv_servers.len() / 2), indexes)
+        let part_one = indexes.split_off(indexes.len() / 2);
+        let part_two = indexes;
+        self.network_partition(&part_one, &part_two);
+
+        (part_one, part_two)
+    }
+
+    pub fn random_partition(&self) -> (Vec<usize>, Vec<usize>) {
+        let mut indexes = self.shuffled_indexes();
+        let part_one = indexes.split_off(indexes.len() / 2);
+        let part_two = indexes;
+        self.network_partition(&part_one, &part_two);
+
+        (part_one, part_two)
     }
 
     fn set_connect(
@@ -114,7 +127,7 @@ impl Config {
         }
     }
 
-    pub fn partition(&self, part_one: &[usize], part_two: &[usize]) {
+    fn network_partition(&self, part_one: &[usize], part_two: &[usize]) {
         let mut network = self.network.lock();
         Self::set_connect(&mut network, part_one, part_two, false);
         Self::set_connect(&mut network, part_two, part_one, false);

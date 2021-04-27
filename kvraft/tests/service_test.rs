@@ -75,9 +75,7 @@ fn appending_client(
 const PARTITION_MAX_DELAY_MILLIS: u64 = 200;
 fn run_partition(cfg: Arc<Config>, stop: Arc<AtomicBool>) {
     while !stop.load(Ordering::Acquire) {
-        let mut indexes = cfg.shuffled_indexes();
-        let len = indexes.len();
-        cfg.partition(&(indexes.split_off(len / 2)), &indexes);
+        cfg.random_partition();
         let delay = thread_rng().gen_range(
             LONG_ELECTION_TIMEOUT_MILLIS
                 ..LONG_ELECTION_TIMEOUT_MILLIS + PARTITION_MAX_DELAY_MILLIS,
@@ -287,11 +285,10 @@ fn one_partition() -> anyhow::Result<()> {
     let mut clerk = cfg.make_clerk();
     clerk.put(KEY, "13");
 
-    let (majority, minority) = cfg.make_partition();
+    let (majority, minority) = cfg.partition();
 
     assert!(minority.len() < majority.len());
     assert_eq!(minority.len() + majority.len(), SERVERS);
-    cfg.partition(&majority, &minority);
 
     let mut clerk_majority = cfg.make_limited_clerk(&majority);
     let mut clerk_minority1 = cfg.make_limited_clerk(&minority);

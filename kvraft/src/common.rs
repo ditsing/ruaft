@@ -103,20 +103,23 @@ pub trait ValidReply {
     fn is_reply_valid(&self) -> bool;
 }
 
+impl<T> ValidReply for Result<T, KVError> {
+    fn is_reply_valid(&self) -> bool {
+        return match self.as_ref().err() {
+            Some(KVError::TimedOut) | Some(KVError::NotLeader) => false,
+            _ => true,
+        };
+    }
+}
+
 impl ValidReply for PutAppendReply {
     fn is_reply_valid(&self) -> bool {
-        if let Err(KVError::NotLeader) = &self.result {
-            return false;
-        }
-        return true;
+        self.result.is_reply_valid()
     }
 }
 
 impl ValidReply for GetReply {
     fn is_reply_valid(&self) -> bool {
-        if let Err(KVError::NotLeader) = &self.result {
-            return false;
-        }
-        return true;
+        self.result.is_reply_valid()
     }
 }

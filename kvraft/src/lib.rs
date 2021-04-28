@@ -12,6 +12,7 @@ mod client;
 mod common;
 mod server;
 
+mod snapshot_holder;
 pub mod testing_utils;
 
 pub use client::Clerk;

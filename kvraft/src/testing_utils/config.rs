@@ -58,7 +58,8 @@ impl Config {
 
         let persister = self.storage.lock().at(index);
 
-        let kv = KVServer::new(clients, index, persister);
+        let kv =
+            KVServer::new(clients, index, persister, Some(self.maxraftstate));
         self.state.lock().kv_servers[index].replace(kv.clone());
 
         let raft = std::rc::Rc::new(kv.raft());

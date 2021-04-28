@@ -13,6 +13,7 @@ use crate::common::{
     ClerkId, GetArgs, GetReply, KVError, PutAppendArgs, PutAppendEnum,
     PutAppendReply, UniqueId,
 };
+use crate::snapshot_holder::SnapshotHolder;
 
 pub struct KVServer {
     me: AtomicUsize,
@@ -30,11 +31,12 @@ pub struct UniqueKVOp {
     unique_id: UniqueId,
 }
 
-#[derive(Default)]
+#[derive(Default, Serialize, Deserialize)]
 struct KVServerState {
     kv: HashMap<String, String>,
     debug_kv: HashMap<String, String>,
     applied_op: HashMap<ClerkId, (UniqueId, CommitResult)>,
+    #[serde(skip)]
     queries: HashMap<UniqueId, Arc<ResultHolder>>,
 }
 
@@ -58,7 +60,7 @@ struct ResultHolder {
     condvar: Condvar,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 enum CommitResult {
     Get(Option<String>),
     Put,
@@ -93,12 +95,15 @@ impl KVServer {
         servers: Vec<RpcClient>,
         me: usize,
         persister: Arc<dyn Persister>,
+        max_state_size_bytes: Option<usize>,
     ) -> Arc<Self> {
         let (tx, rx) = channel();
         let apply_command = move |index, command| {
             tx.send((index, command))
                 .expect("The receiving end of apply command channel should have not been dropped");
         };
+        let snapshot_holder = Arc::new(SnapshotHolder::default());
+        let snapshot_holder_clone = snapshot_holder.clone();
         let ret = Arc::new(Self {
             me: AtomicUsize::new(me),
             state: Default::default(),
@@ -107,11 +112,11 @@ impl KVServer {
                 me,
                 persister,
                 apply_command,
-                None,
-                Raft::<UniqueKVOp>::NO_SNAPSHOT,
+                max_state_size_bytes,
+                move |index| snapshot_holder_clone.request_snapshot(index),
             )),
         });
-        ret.process_command(rx);
+        ret.process_command(snapshot_holder, rx);
         ret
     }
 
@@ -179,13 +184,16 @@ impl KVServer {
 
     fn process_command(
         self: &Arc<Self>,
+        snapshot_holder: Arc<SnapshotHolder<KVServerState>>,
         command_channel: Receiver<IndexedCommand>,
     ) {
         let this = Arc::downgrade(self);
         std::thread::spawn(move || {
-            while let Ok((_, command)) = command_channel.recv() {
+            while let Ok((index, command)) = command_channel.recv() {
                 if let Some(this) = this.upgrade() {
                     this.apply_op(command.unique_id, command.me, command.op);
+                    snapshot_holder.take_snapshot(&this.state.lock(), index);
+                    snapshot_holder.unblock_response();
                 } else {
                     break;
                 }

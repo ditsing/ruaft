@@ -9,7 +9,7 @@ use rand::{thread_rng, Rng};
 use tokio::time::Duration;
 
 use ruaft::rpcs::register_server;
-use ruaft::{Persister, Raft, RpcClient};
+use ruaft::{ApplyCommandMessage, Persister, Raft, RpcClient};
 
 pub mod persister;
 
@@ -312,8 +312,8 @@ impl Config {
             clients,
             index,
             persister,
-            move |cmd_index, cmd| {
-                Self::apply_command(log_clone.clone(), index, cmd_index, cmd)
+            move |message| {
+                Self::apply_command(log_clone.clone(), index, message)
             },
             None,
             Raft::<i32>::NO_SNAPSHOT,
@@ -380,9 +380,15 @@ impl Config {
     fn apply_command(
         log_state: Arc<Mutex<LogState>>,
         server_index: usize,
-        index: usize,
-        command: i32,
+        message: ApplyCommandMessage<i32>,
     ) {
+        let (index, command) =
+            if let ApplyCommandMessage::Command(index, command) = message {
+                (index, command)
+            } else {
+                // Ignore snapshots.
+                return;
+            };
         let mut log_state = log_state.lock();
         let committed_logs = &mut log_state.committed_logs;
         let mut err = None;

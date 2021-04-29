@@ -98,7 +98,6 @@ impl<C> LogArray<C> {
     }
 
     /// The snapshot before and including `start()`.
-    #[allow(dead_code)]
     pub fn snapshot(&self) -> (IndexTerm, &[u8]) {
         (self.first_index_term(), &self.snapshot)
     }

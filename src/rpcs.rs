@@ -131,7 +131,7 @@ mod tests {
 
     use bytes::Bytes;
 
-    use crate::{Peer, Term};
+    use crate::{ApplyCommandMessage, Peer, Term};
 
     use super::*;
 
@@ -164,7 +164,7 @@ mod tests {
                 vec![RpcClient(client)],
                 0,
                 Arc::new(()),
-                |_, _: i32| {},
+                |_: ApplyCommandMessage<i32>| {},
                 None,
                 Raft::<i32>::NO_SNAPSHOT,
             ));

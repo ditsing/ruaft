@@ -17,6 +17,7 @@ use parking_lot::{Condvar, Mutex};
 use rand::{thread_rng, Rng};
 
 use crate::apply_command::ApplyCommandFnMut;
+pub use crate::apply_command::ApplyCommandMessage;
 use crate::install_snapshot::InstallSnapshotArgs;
 use crate::persister::PersistedRaftState;
 pub use crate::persister::Persister;

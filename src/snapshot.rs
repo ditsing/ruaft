@@ -12,6 +12,13 @@ pub(crate) struct SnapshotDaemon {
     unparker: Option<Unparker>,
 }
 
+pub trait RequestSnapshotFnMut:
+    'static + Send + FnMut(Index) -> Snapshot
+{
+}
+
+impl<T: 'static + Send + FnMut(Index) -> Snapshot> RequestSnapshotFnMut for T {}
+
 impl SnapshotDaemon {
     pub(crate) fn trigger(&self) {
         match &self.unparker {
@@ -22,13 +29,11 @@ impl SnapshotDaemon {
 }
 
 impl<C: 'static + Clone + Default + Send + serde::Serialize> Raft<C> {
-    pub(crate) fn run_snapshot_daemon<Func>(
+    pub(crate) fn run_snapshot_daemon(
         &mut self,
         max_state_size: Option<usize>,
-        mut request_snapshot: Func,
-    ) where
-        Func: 'static + Send + FnMut(Index) -> Snapshot,
-    {
+        mut request_snapshot: impl RequestSnapshotFnMut,
+    ) {
         let max_state_size = match max_state_size {
             Some(max_state_size) => max_state_size,
             None => return,

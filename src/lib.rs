@@ -24,7 +24,7 @@ pub(crate) use crate::raft_state::RaftState;
 pub(crate) use crate::raft_state::State;
 pub use crate::rpcs::RpcClient;
 pub use crate::snapshot::Snapshot;
-use crate::snapshot::SnapshotDaemon;
+use crate::snapshot::{RequestSnapshotFnMut, SnapshotDaemon};
 use crate::utils::retry_rpc;
 
 mod apply_command;
@@ -133,17 +133,14 @@ where
     ///
     /// Each instance will create at least 3 + (number of peers) threads. The
     /// extensive usage of threads is to minimize latency.
-    pub fn new<RequestSnapshotFunc>(
+    pub fn new(
         peers: Vec<RpcClient>,
         me: usize,
         persister: Arc<dyn Persister>,
         apply_command: impl ApplyCommandFnMut<Command>,
         max_state_size_bytes: Option<usize>,
-        request_snapshot: RequestSnapshotFunc,
-    ) -> Self
-    where
-        RequestSnapshotFunc: 'static + Send + FnMut(Index) -> Snapshot,
-    {
+        request_snapshot: impl RequestSnapshotFnMut,
+    ) -> Self {
         let peer_size = peers.len();
         let mut state = RaftState {
             current_term: Term(0),

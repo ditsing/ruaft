@@ -10,7 +10,7 @@ fn install_snapshot_rpc() {
     const SERVERS: usize = 3;
     const MAX_RAFT_STATE: usize = 1000;
     const KEY: &str = "a";
-    let cfg = Arc::new(make_config(SERVERS, true, MAX_RAFT_STATE));
+    let cfg = Arc::new(make_config(SERVERS, false, MAX_RAFT_STATE));
     defer!(cfg.clean_up());
 
     let mut clerk = cfg.make_clerk();

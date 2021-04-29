@@ -5,6 +5,7 @@ use parking_lot::{Condvar, Mutex};
 use serde::Serialize;
 
 use ruaft::Snapshot;
+use serde::de::DeserializeOwned;
 
 #[derive(Default)]
 pub(crate) struct SnapshotHolder<T> {
@@ -81,5 +82,15 @@ impl<T: Serialize> SnapshotHolder<T> {
             }
         }
         requests.drain(0..processed);
+    }
+}
+
+impl<T: DeserializeOwned> SnapshotHolder<T> {
+    pub fn load_snapshot(&self, snapshot: Snapshot) -> T {
+        let state = bincode::deserialize(&snapshot.data)
+            .expect("Deserialization should never fail");
+        *self.current_snapshot.lock() = snapshot;
+
+        state
     }
 }

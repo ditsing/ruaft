@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use parking_lot::{Condvar, Mutex};
 
-use ruaft::{Persister, Raft, RpcClient, Term};
+use ruaft::{ApplyCommandMessage, Persister, Raft, RpcClient, Term};
 
 use crate::common::{
     ClerkId, GetArgs, GetReply, KVError, PutAppendArgs, PutAppendEnum,
@@ -21,8 +21,6 @@ pub struct KVServer {
     rf: Mutex<Raft<UniqueKVOp>>,
     // snapshot
 }
-
-type IndexedCommand = (usize, UniqueKVOp);
 
 #[derive(Clone, Default, Serialize, Deserialize)]
 pub struct UniqueKVOp {
@@ -98,8 +96,8 @@ impl KVServer {
         max_state_size_bytes: Option<usize>,
     ) -> Arc<Self> {
         let (tx, rx) = channel();
-        let apply_command = move |index, command| {
-            tx.send((index, command))
+        let apply_command = move |message| {
+            tx.send(message)
                 .expect("The receiving end of apply command channel should have not been dropped");
         };
         let snapshot_holder = Arc::new(SnapshotHolder::default());
@@ -182,18 +180,41 @@ impl KVServer {
         };
     }
 
+    fn restore_state(&self, mut new_state: KVServerState) {
+        let mut state = self.state.lock();
+        std::mem::swap(&mut new_state, &mut *state);
+
+        for result_holder in new_state.queries.values() {
+            *result_holder.result.lock() = Err(CommitError::NotLeader);
+            result_holder.condvar.notify_all();
+        }
+    }
+
     fn process_command(
         self: &Arc<Self>,
         snapshot_holder: Arc<SnapshotHolder<KVServerState>>,
-        command_channel: Receiver<IndexedCommand>,
+        command_channel: Receiver<ApplyCommandMessage<UniqueKVOp>>,
     ) {
         let this = Arc::downgrade(self);
         std::thread::spawn(move || {
-            while let Ok((index, command)) = command_channel.recv() {
+            while let Ok(message) = command_channel.recv() {
                 if let Some(this) = this.upgrade() {
-                    this.apply_op(command.unique_id, command.me, command.op);
-                    snapshot_holder.take_snapshot(&this.state.lock(), index);
-                    snapshot_holder.unblock_response();
+                    match message {
+                        ApplyCommandMessage::Snapshot(snapshot) => {
+                            let state = snapshot_holder.load_snapshot(snapshot);
+                            this.restore_state(state);
+                        }
+                        ApplyCommandMessage::Command(index, command) => {
+                            this.apply_op(
+                                command.unique_id,
+                                command.me,
+                                command.op,
+                            );
+                            snapshot_holder
+                                .take_snapshot(&this.state.lock(), index);
+                            snapshot_holder.unblock_response();
+                        }
+                    }
                 } else {
                     break;
                 }

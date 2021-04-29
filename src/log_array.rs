@@ -155,7 +155,6 @@ impl<C> LogArray<C> {
 impl<C: Default> LogArray<C> {
     /// Shift the start of the array to `index`, and store a new snapshot that
     /// covers all commands before and at `index`.
-    #[allow(dead_code)]
     pub fn shift(&mut self, index: Index, snapshot: Vec<u8>) {
         // Discard everything before index and store the snapshot.
         let offset = self.check_middle_index(index);
@@ -179,7 +178,6 @@ impl<C: Default> LogArray<C> {
 
     /// Reset the array to contain only one snapshot at the given `index` with
     /// the given `term`.
-    #[allow(dead_code)]
     pub fn reset(
         &mut self,
         index: Index,

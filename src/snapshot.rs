@@ -2,6 +2,7 @@ use crate::{Index, Raft};
 use crossbeam_utils::sync::{Parker, Unparker};
 use std::sync::atomic::Ordering;
 
+#[derive(Clone, Debug, Default)]
 pub struct Snapshot {
     pub last_included_index: Index,
     pub data: Vec<u8>,

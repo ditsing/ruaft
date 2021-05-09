@@ -194,6 +194,8 @@ where
 
         this.keep_running.store(true, Ordering::SeqCst);
         // Running in a standalone thread.
+        this.run_snapshot_daemon(max_state_size_bytes, request_snapshot);
+        // Running in a standalone thread.
         this.run_log_entry_daemon();
         // Running in a standalone thread.
         this.run_apply_command_daemon(apply_command);
@@ -204,7 +206,6 @@ where
         ));
         // The last step is to start running election timer.
         this.run_election_timer();
-        this.run_snapshot_daemon(max_state_size_bytes, request_snapshot);
         this
     }
 }

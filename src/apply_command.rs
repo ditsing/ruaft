@@ -42,6 +42,7 @@ where
                         );
                     }
                     if rf.last_applied < rf.log.start() {
+                        rf.last_applied = rf.log.start();
                         let (index_term, data) = rf.log.snapshot();
                         vec![ApplyCommandMessage::Snapshot(Snapshot {
                             last_included_index: index_term.index,

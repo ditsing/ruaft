@@ -52,6 +52,10 @@ impl<C: 'static + Clone + Default + Send + serde::Serialize> Raft<C> {
         std::thread::spawn(move || loop {
             parker.park();
             if !keep_running.load(Ordering::SeqCst) {
+                // Explicitly drop every thing.
+                drop(keep_running);
+                drop(rf);
+                drop(persister);
                 drop(stop_wait_group);
                 break;
             }

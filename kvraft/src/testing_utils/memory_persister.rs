@@ -74,4 +74,8 @@ impl MemoryStorage {
         self.state_vec[index] = persister.clone();
         persister
     }
+
+    pub fn all(&self) -> &Vec<Arc<MemoryPersister>> {
+        &self.state_vec
+    }
 }

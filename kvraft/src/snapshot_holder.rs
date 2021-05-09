@@ -25,7 +25,7 @@ impl<T> SnapshotHolder<T> {
                 Err(pos) => {
                     assert!(pos == 0 || requests[pos - 1].0 < min_index);
                     assert!(
-                        pos == requests.len() - 1
+                        pos + 1 >= requests.len()
                             || requests[pos + 1].0 > min_index
                     );
                     let condvar = Arc::new(Condvar::new());

@@ -29,4 +29,36 @@ fn install_snapshot_rpc() {
         sleep_election_timeouts(1);
         clerk.put("b", "B");
     }
+
+    cfg.check_log_size(MAX_RAFT_STATE * 2).expect("Hi");
+
+    // Swap majority and minority.
+    let (mut majority, mut minority) = (minority, majority);
+    majority.push(
+        minority
+            .pop()
+            .expect("There should be at least one server in the majority."),
+    );
+    cfg.network_partition(&majority, &minority);
+
+    {
+        let mut clerk = cfg.make_limited_clerk(&majority);
+        clerk.put("c", "C");
+        clerk.put("d", "D");
+        assert_eq!(clerk.get(KEY), Some("A".to_owned()));
+        assert_eq!(clerk.get("b"), Some("B".to_owned()));
+        assert_eq!(clerk.get("c"), Some("C".to_owned()));
+        assert_eq!(clerk.get("d"), Some("D".to_owned()));
+        assert_eq!(clerk.get("1"), Some("1".to_owned()));
+        assert_eq!(clerk.get("49"), Some("49".to_owned()));
+    }
+
+    cfg.connect_all();
+    clerk.put("e", "E");
+    assert_eq!(clerk.get("c"), Some("C".to_owned()));
+    assert_eq!(clerk.get("e"), Some("E".to_owned()));
+    assert_eq!(clerk.get("1"), Some("1".to_owned()));
+    assert_eq!(clerk.get("49"), Some("49".to_owned()));
+
+    cfg.end();
 }

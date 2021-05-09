@@ -7,7 +7,7 @@ use rand::seq::SliceRandom;
 use rand::thread_rng;
 
 use ruaft::rpcs::register_server;
-use ruaft::RpcClient;
+use ruaft::{Persister, RpcClient};
 
 use crate::client::Clerk;
 use crate::server::KVServer;
@@ -128,7 +128,7 @@ impl Config {
         }
     }
 
-    fn network_partition(&self, part_one: &[usize], part_two: &[usize]) {
+    pub fn network_partition(&self, part_one: &[usize], part_two: &[usize]) {
         let mut network = self.network.lock();
         Self::set_connect(&mut network, part_one, part_two, false);
         Self::set_connect(&mut network, part_two, part_one, false);
@@ -247,6 +247,27 @@ impl Config {
                 kv_server.kill();
             }
         }
+    }
+}
+
+impl Config {
+    pub fn check_log_size(&self, upper: usize) -> Result<()> {
+        let mut over_limits = String::new();
+        for (index, p) in self.storage.lock().all().iter().enumerate() {
+            if p.state_size() > upper {
+                let str =
+                    format!(" (index {}, size {})", index, p.state_size());
+                over_limits.push_str(&str);
+            }
+        }
+        if over_limits.len() != 0 {
+            anyhow::bail!(
+                "logs were not trimmed to {}: {}",
+                upper,
+                over_limits
+            );
+        }
+        Ok(())
     }
 }
 

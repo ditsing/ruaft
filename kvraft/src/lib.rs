@@ -3,6 +3,8 @@ extern crate labrpc;
 extern crate parking_lot;
 extern crate rand;
 extern crate ruaft;
+#[macro_use]
+extern crate scopeguard;
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;

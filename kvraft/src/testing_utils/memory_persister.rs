@@ -51,6 +51,10 @@ impl MemoryPersister {
     pub fn restore(&self, state: State) {
         *self.state.lock() = state;
     }
+
+    pub fn snapshot_size(&self) -> usize {
+        self.state.lock().snapshot.len()
+    }
 }
 
 #[derive(Default)]

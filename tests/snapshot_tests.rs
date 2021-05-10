@@ -30,7 +30,8 @@ fn install_snapshot_rpc() {
         clerk.put("b", "B");
     }
 
-    cfg.check_log_size(MAX_RAFT_STATE * 2).expect("Hi");
+    cfg.check_log_size(MAX_RAFT_STATE * 2)
+        .expect("Log does not seem to be trimmed:");
 
     // Swap majority and minority.
     let (mut majority, mut minority) = (minority, majority);
@@ -59,6 +60,33 @@ fn install_snapshot_rpc() {
     assert_eq!(clerk.get("e"), Some("E".to_owned()));
     assert_eq!(clerk.get("1"), Some("1".to_owned()));
     assert_eq!(clerk.get("49"), Some("49".to_owned()));
+
+    cfg.end();
+}
+
+#[test]
+fn snapshot_size() {
+    const SERVERS: usize = 3;
+    const MAX_RAFT_STATE: usize = 1000;
+    const MAX_SNAPSHOT_STATE: usize = 500;
+    let cfg = Arc::new(make_config(SERVERS, false, MAX_RAFT_STATE));
+    defer!(cfg.clean_up());
+
+    let mut clerk = cfg.make_clerk();
+
+    cfg.begin("Test: snapshot size is reasonable (3B)");
+
+    for _ in 0..200 {
+        clerk.put("x", "0");
+        assert_eq!(clerk.get("x"), Some("0".to_owned()));
+        clerk.put("x", "1");
+        assert_eq!(clerk.get("x"), Some("1".to_owned()));
+    }
+
+    cfg.check_log_size(MAX_RAFT_STATE * 2)
+        .expect("Log does not seem to be trimmed:");
+    cfg.check_snapshot_size(MAX_SNAPSHOT_STATE)
+        .expect("Snapshot size is too big:");
 
     cfg.end();
 }

@@ -11,7 +11,7 @@ use ruaft::{Persister, RpcClient};
 
 use crate::client::Clerk;
 use crate::server::KVServer;
-use crate::testing_utils::memory_persister::MemoryStorage;
+use crate::testing_utils::memory_persister::{MemoryPersister, MemoryStorage};
 use crate::testing_utils::rpcs::register_kv_server;
 
 struct ConfigState {
@@ -251,23 +251,31 @@ impl Config {
 }
 
 impl Config {
-    pub fn check_log_size(&self, upper: usize) -> Result<()> {
+    fn check_size(
+        &self,
+        upper: usize,
+        size_fn: impl Fn(&MemoryPersister) -> usize,
+    ) -> Result<()> {
         let mut over_limits = String::new();
         for (index, p) in self.storage.lock().all().iter().enumerate() {
-            if p.state_size() > upper {
-                let str =
-                    format!(" (index {}, size {})", index, p.state_size());
+            let size = size_fn(p);
+            if size > upper {
+                let str = format!(" (index {}, size {})", index, size);
                 over_limits.push_str(&str);
             }
         }
         if over_limits.len() != 0 {
-            anyhow::bail!(
-                "logs were not trimmed to {}: {}",
-                upper,
-                over_limits
-            );
+            anyhow::bail!("logs were not trimmed to {}:{}", upper, over_limits);
         }
         Ok(())
+    }
+
+    pub fn check_log_size(&self, upper: usize) -> Result<()> {
+        self.check_size(upper, MemoryPersister::state_size)
+    }
+
+    pub fn check_snapshot_size(&self, upper: usize) -> Result<()> {
+        self.check_size(upper, MemoryPersister::snapshot_size)
     }
 }
 

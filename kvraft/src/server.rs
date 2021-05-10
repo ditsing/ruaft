@@ -70,6 +70,7 @@ enum CommitError {
     NotLeader,
     Expired(UniqueId),
     TimedOut,
+    #[allow(dead_code)]
     Conflict,
     NotMe(CommitResult),
     Duplicate(CommitResult),

@@ -53,7 +53,10 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
             && args.last_included_index >= rf.log.start()
             && args.last_included_term == rf.log[args.last_included_index].term
         {
-            rf.log.shift(args.last_included_index, args.data);
+            // Do nothing if the index and term match the current snapshot.
+            if args.last_included_index != rf.log.start() {
+                rf.log.shift(args.last_included_index, args.data);
+            }
         } else {
             rf.log.reset(
                 args.last_included_index,

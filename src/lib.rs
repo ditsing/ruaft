@@ -290,7 +290,8 @@ where
 
         self.election.reset_election_timer();
 
-        if rf.log.end() <= args.prev_log_index
+        if rf.log.start() > args.prev_log_index
+            || rf.log.end() <= args.prev_log_index
             || rf.log[args.prev_log_index].term != args.prev_log_term
         {
             return AppendEntriesReply {

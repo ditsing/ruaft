@@ -243,6 +243,7 @@ fn persist_partition_unreliable() {
         unreliable: true,
         partition: true,
         crash: true,
+        min_ops: Some(5),
         ..Default::default()
     });
 }

@@ -84,6 +84,7 @@ pub struct GenericTestParams {
     pub partition: bool,
     pub crash: bool,
     pub maxraftstate: Option<usize>,
+    pub min_ops: Option<usize>,
 }
 
 pub fn generic_test(test_params: GenericTestParams) {
@@ -93,8 +94,10 @@ pub fn generic_test(test_params: GenericTestParams) {
         partition,
         crash,
         maxraftstate,
+        min_ops,
     } = test_params;
     let maxraftstate = maxraftstate.unwrap_or(usize::MAX);
+    let min_ops = min_ops.unwrap_or(10);
     const SERVERS: usize = 5;
     let cfg = Arc::new(make_config(SERVERS, unreliable, maxraftstate));
     defer!(cfg.clean_up());
@@ -159,7 +162,11 @@ pub fn generic_test(test_params: GenericTestParams) {
                 .expect(&format!("Key {} should exist.", index));
             assert_eq!(real_result, last_result);
             eprintln!("Client {} committed {} operations", index, op_count);
-            assert!(op_count > 10, "Client committed less than 10 operations");
+            assert!(
+                op_count >= min_ops,
+                "Client committed less than {} operations",
+                min_ops
+            );
         }
     }
 

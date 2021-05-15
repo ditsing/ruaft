@@ -49,8 +49,8 @@ pub type Index = usize;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct LogEntry<Command> {
-    term: Term,
     index: Index,
+    term: Term,
     command: Command,
 }
 

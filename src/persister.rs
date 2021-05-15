@@ -48,9 +48,9 @@ impl<Command: DeserializeOwned> TryFrom<Bytes> for PersistedRaftState<Command> {
     }
 }
 
-impl<Command: Serialize> Into<Bytes> for PersistedRaftState<Command> {
-    fn into(self) -> Bytes {
-        bincode::serialize(&self)
+impl<Command: Serialize> From<PersistedRaftState<Command>> for Bytes {
+    fn from(value: PersistedRaftState<Command>) -> Bytes {
+        bincode::serialize(&value)
             .expect("Serialization should not fail")
             .into()
     }

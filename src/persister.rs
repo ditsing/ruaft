@@ -1,10 +1,11 @@
 use std::convert::TryFrom;
 
 use bytes::Bytes;
-
-use crate::{LogEntry, Peer, RaftState, Term};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+
+use crate::log_array::LogArray;
+use crate::{Peer, RaftState, Term};
 
 pub trait Persister: Send + Sync {
     fn read_state(&self) -> Bytes;
@@ -18,7 +19,7 @@ pub trait Persister: Send + Sync {
 pub(crate) struct PersistedRaftState<Command> {
     pub current_term: Term,
     pub voted_for: Option<Peer>,
-    pub log: Vec<LogEntry<Command>>,
+    pub log: LogArray<Command>,
 }
 
 impl<Command: Clone, T: AsRef<RaftState<Command>>> From<T>
@@ -34,7 +35,7 @@ impl<Command: Clone> From<&RaftState<Command>> for PersistedRaftState<Command> {
         Self {
             current_term: raft_state.current_term,
             voted_for: raft_state.voted_for,
-            log: raft_state.log.all().to_vec(),
+            log: raft_state.log.clone(),
         }
     }
 }

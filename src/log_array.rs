@@ -26,6 +26,7 @@ use crate::{Index, LogEntry, Term};
 /// All APIs **will** panic if the given index(es) are out of bound.
 ///
 /// NOT THREAD SAFE.
+#[derive(Clone, Serialize, Deserialize)]
 pub(crate) struct LogArray<C> {
     inner: Vec<LogEntry<C>>,
     snapshot: Vec<u8>,
@@ -40,13 +41,6 @@ impl<C: Default> LogArray<C> {
         };
         ret.check_one_element();
         ret
-    }
-
-    pub fn restore(inner: Vec<LogEntry<C>>) -> std::io::Result<Self> {
-        Ok(LogArray {
-            inner,
-            snapshot: vec![],
-        })
     }
 }
 
@@ -93,6 +87,7 @@ impl<C> LogArray<C> {
     }
 
     /// All log entries stored in the array.
+    #[allow(dead_code)]
     pub fn all(&self) -> &[LogEntry<C>] {
         &self.inner[..]
     }

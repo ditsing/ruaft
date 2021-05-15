@@ -161,8 +161,7 @@ where
         {
             state.current_term = persisted_state.current_term;
             state.voted_for = persisted_state.voted_for;
-            state.log =
-                log_array::LogArray::restore(persisted_state.log).unwrap();
+            state.log = persisted_state.log;
         }
 
         let election = ElectionState {

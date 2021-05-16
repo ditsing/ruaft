@@ -220,6 +220,7 @@ impl KVServer {
                     break;
                 }
             }
+            snapshot_holder.shutdown();
         });
     }
 

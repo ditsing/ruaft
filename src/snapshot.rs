@@ -1,6 +1,8 @@
-use crate::{Index, Raft};
-use crossbeam_utils::sync::{Parker, Unparker};
 use std::sync::atomic::Ordering;
+
+use crossbeam_utils::sync::{Parker, Unparker};
+
+use crate::{Index, Raft};
 
 #[derive(Clone, Debug, Default)]
 pub struct Snapshot {
@@ -26,6 +28,10 @@ impl SnapshotDaemon {
             Some(unparker) => unparker.unpark(),
             None => {}
         }
+    }
+
+    pub(crate) fn kill(&self) {
+        self.trigger();
     }
 }
 

@@ -3,6 +3,7 @@ extern crate kvraft;
 extern crate scopeguard;
 
 use kvraft::testing_utils::config::{make_config, sleep_election_timeouts};
+use kvraft::testing_utils::generic_test::{generic_test, GenericTestParams};
 use std::sync::Arc;
 
 #[test]
@@ -89,4 +90,14 @@ fn snapshot_size() {
         .expect("Snapshot size is too big:");
 
     cfg.end();
+}
+
+#[test]
+fn snapshot_recover() {
+    generic_test(GenericTestParams {
+        clients: 1,
+        crash: true,
+        maxraftstate: Some(1000),
+        ..Default::default()
+    })
 }

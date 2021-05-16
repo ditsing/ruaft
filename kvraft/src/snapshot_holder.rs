@@ -6,16 +6,22 @@ use serde::Serialize;
 
 use ruaft::Snapshot;
 use serde::de::DeserializeOwned;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 #[derive(Default)]
 pub(crate) struct SnapshotHolder<T> {
     snapshot_requests: Mutex<Vec<(usize, Arc<Condvar>)>>,
     current_snapshot: Mutex<Snapshot>,
+    shutdown: AtomicBool,
     phantom: PhantomData<T>,
 }
 
 impl<T> SnapshotHolder<T> {
     pub fn request_snapshot(&self, min_index: usize) -> Snapshot {
+        if self.shutdown.load(Ordering::SeqCst) {
+            return self.current_snapshot.lock().clone();
+        }
+
         let condvar = {
             let mut requests = self.snapshot_requests.lock();
             let pos =
@@ -37,7 +43,9 @@ impl<T> SnapshotHolder<T> {
 
         // Now wait for the snapshot
         let mut current_snapshot = self.current_snapshot.lock();
-        while current_snapshot.last_included_index < min_index {
+        while current_snapshot.last_included_index < min_index
+            && !self.shutdown.load(Ordering::SeqCst)
+        {
             condvar.wait(&mut current_snapshot);
         }
 
@@ -82,6 +90,13 @@ impl<T: Serialize> SnapshotHolder<T> {
             }
         }
         requests.drain(0..processed);
+    }
+
+    pub fn shutdown(&self) {
+        self.shutdown.store(true, Ordering::SeqCst);
+        for (_, condvar) in self.snapshot_requests.lock().iter() {
+            condvar.notify_all();
+        }
     }
 }
 

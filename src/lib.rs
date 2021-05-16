@@ -929,7 +929,7 @@ where
         self.election.stop_election_timer();
         self.new_log_entry.take().map(|n| n.send(None));
         self.apply_command_signal.notify_all();
-        self.snapshot_daemon.trigger();
+        self.snapshot_daemon.kill();
         self.stop_wait_group.wait();
         std::sync::Arc::try_unwrap(self.thread_pool)
             .expect(

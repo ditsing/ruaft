@@ -211,16 +211,18 @@ impl KVServer {
                                 command.me,
                                 command.op,
                             );
-                            snapshot_holder
-                                .take_snapshot(&this.state.lock(), index);
-                            snapshot_holder.unblock_response();
+                            if let Some(snapshot) = snapshot_holder
+                                .take_snapshot(&this.state.lock(), index)
+                            {
+                                this.rf.lock().save_snapshot(snapshot);
+                                snapshot_holder.unblock_response(index);
+                            }
                         }
                     }
                 } else {
                     break;
                 }
             }
-            snapshot_holder.shutdown();
         });
     }
 

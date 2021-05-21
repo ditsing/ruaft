@@ -330,6 +330,7 @@ where
             };
             self.apply_command_signal.notify_one();
         }
+        self.snapshot_daemon.log_grow(rf.log.start(), rf.log.end());
 
         AppendEntriesReply {
             term: args.term,
@@ -987,8 +988,5 @@ impl ElectionState {
 }
 
 impl<C> Raft<C> {
-    pub const NO_SNAPSHOT: fn(Index) -> Snapshot = |index| Snapshot {
-        last_included_index: index,
-        data: vec![],
-    };
+    pub const NO_SNAPSHOT: fn(Index) = |_| {};
 }

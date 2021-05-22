@@ -64,11 +64,7 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
                 args.data,
             );
         }
-        // The length of the log might shrink.
-        let last_log_index = rf.log.last_index_term().index;
-        if rf.commit_index > last_log_index {
-            rf.commit_index = last_log_index;
-        }
+
         self.persister.save_snapshot_and_state(
             rf.persisted_state().into(),
             rf.log.snapshot().1,

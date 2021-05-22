@@ -320,6 +320,10 @@ where
                 rf.log.last_index_term().index
             };
             self.apply_command_signal.notify_one();
+        } else if rf.last_applied < rf.commit_index
+            && rf.last_applied < rf.log.end()
+        {
+            self.apply_command_signal.notify_one();
         }
 
         AppendEntriesReply {

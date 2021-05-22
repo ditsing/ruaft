@@ -35,22 +35,35 @@ where
             while keep_running.load(Ordering::SeqCst) {
                 let messages = {
                     let mut rf = rf.lock();
-                    if rf.last_applied >= rf.commit_index {
+                    if rf.last_applied >= rf.commit_index
+                        || rf.last_applied >= rf.log.last_index_term().index
+                    {
                         condvar.wait_for(
                             &mut rf,
                             Duration::from_millis(HEARTBEAT_INTERVAL_MILLIS),
                         );
                     }
                     if rf.last_applied < rf.log.start() {
-                        rf.last_applied = rf.log.start();
                         let (index_term, data) = rf.log.snapshot();
-                        vec![ApplyCommandMessage::Snapshot(Snapshot {
-                            last_included_index: index_term.index,
-                            data: data.to_vec(),
-                        })]
-                    } else if rf.last_applied < rf.commit_index {
+                        let messages =
+                            vec![ApplyCommandMessage::Snapshot(Snapshot {
+                                last_included_index: index_term.index,
+                                data: data.to_vec(),
+                            })];
+                        rf.last_applied = rf.log.start();
+                        messages
+                    } else if rf.last_applied < rf.commit_index
+                        && rf.last_applied < rf.log.last_index_term().index
+                    {
                         let index = rf.last_applied + 1;
-                        let last_one = rf.commit_index + 1;
+                        // The commit index could be larger than the total
+                        // number of log items, when we installed a snapshot
+                        // from the leader and rolled back too far beyond the
+                        // commit index. The missing log items will be appended
+                        // back by the leader, and will be identical to the
+                        // log items before rolling back.
+                        let last_one =
+                            std::cmp::min(rf.log.end(), rf.commit_index + 1);
                         let messages: Vec<ApplyCommandMessage<Command>> = rf
                             .log
                             .between(index, last_one)

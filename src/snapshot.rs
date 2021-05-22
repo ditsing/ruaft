@@ -82,6 +82,12 @@ impl<C: 'static + Clone + Default + Send + serde::Serialize> Raft<C> {
                     // installed in the next AppendEntries request.
                     // There is no need to retry, because when the log entries
                     // are re-committed, we will be notified again.
+
+                    // We will not be notified when the log length changes. Thus
+                    // when the log length grows to passing last_included_index
+                    // the first time, no snapshot will be taken, although
+                    // nothing is preventing it to be done. We will wait until
+                    // at least one more entry is committed.
                     continue;
                 }
 

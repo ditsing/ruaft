@@ -101,3 +101,48 @@ fn snapshot_recover() {
         ..Default::default()
     })
 }
+
+#[test]
+fn snapshot_recover_many_clients() {
+    generic_test(GenericTestParams {
+        clients: 20,
+        crash: true,
+        maxraftstate: Some(1000),
+        min_ops: Some(0),
+        ..Default::default()
+    })
+}
+
+#[test]
+fn snapshot_unreliable() {
+    generic_test(GenericTestParams {
+        clients: 5,
+        unreliable: true,
+        maxraftstate: Some(1000),
+        ..Default::default()
+    })
+}
+
+#[test]
+fn snapshot_unreliable_recover() {
+    generic_test(GenericTestParams {
+        clients: 5,
+        unreliable: true,
+        crash: true,
+        maxraftstate: Some(1000),
+        ..Default::default()
+    })
+}
+
+#[test]
+fn snapshot_unreliable_recover_partition() {
+    generic_test(GenericTestParams {
+        clients: 5,
+        unreliable: true,
+        crash: true,
+        partition: true,
+        maxraftstate: Some(1000),
+        min_ops: Some(0),
+        ..Default::default()
+    })
+}

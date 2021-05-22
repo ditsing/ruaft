@@ -156,7 +156,7 @@ pub fn generic_test(test_params: GenericTestParams) {
             .expect("Spawning clients should never fail.");
         for (index, client_result) in client_results.into_iter().enumerate() {
             let (op_count, last_result) =
-                client_result.join().expect("Client should never fail.");
+                client_result.join().expect("Client should never fail");
             let real_result = clerk
                 .get(index.to_string())
                 .expect(&format!("Key {} should exist.", index));
@@ -164,7 +164,9 @@ pub fn generic_test(test_params: GenericTestParams) {
             eprintln!("Client {} committed {} operations", index, op_count);
             assert!(
                 op_count >= min_ops,
-                "Client committed less than {} operations",
+                "Client {} committed {} operations, less than {}",
+                index,
+                op_count,
                 min_ops
             );
         }

@@ -1,5 +1,5 @@
 use std::collections::HashSet;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use bit_set::BitSet;
 
@@ -14,10 +14,10 @@ mod model;
 mod offset_linked_list;
 
 pub struct Operation<C, R> {
-    call_op: C,
-    call_time: u64,
-    return_op: R,
-    return_time: u64,
+    pub call_op: C,
+    pub call_time: Instant,
+    pub return_op: R,
+    pub return_time: Instant,
 }
 
 enum EntryKind<'a, C, R> {
@@ -28,7 +28,7 @@ enum EntryKind<'a, C, R> {
 struct Entry<'a, C, R> {
     kind: EntryKind<'a, C, R>,
     id: usize,
-    time: u64,
+    time: Instant,
     other: usize,
 }
 
@@ -155,6 +155,7 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{check_operations_timeout, Model, Operation};
+    use std::time::{Duration, Instant};
 
     #[derive(Clone, Eq, PartialEq, Hash)]
     struct CountingModel {
@@ -186,12 +187,13 @@ mod tests {
     #[test]
     fn no_accept() {
         let ops = Box::leak(Box::new(vec![]));
+        let start = Instant::now();
         for i in 0..4 {
             ops.push(Operation {
                 call_op: 0usize,
-                call_time: 0,
+                call_time: start,
                 return_op: i as usize,
-                return_time: i,
+                return_time: start + Duration::from_secs(i),
             });
         }
         assert!(!check_operations_timeout::<CountingModel>(ops, None));
@@ -200,12 +202,13 @@ mod tests {
     #[test]
     fn accept() {
         let mut ops = Box::leak(Box::new(vec![]));
+        let start = Instant::now();
         for i in 0..4 {
             ops.push(Operation {
                 call_op: 1usize,
-                call_time: i * 2,
+                call_time: start + Duration::from_secs(i * 2),
                 return_op: (i + 1) as usize,
-                return_time: i + 4,
+                return_time: start + Duration::from_secs(i + 4),
             });
         }
         assert!(check_operations_timeout::<CountingModel>(ops, None));

@@ -26,9 +26,9 @@ pub enum KvOp {
 
 #[derive(Clone)]
 pub struct KvInput {
-    op: KvOp,
-    key: String,
-    value: String,
+    pub op: KvOp,
+    pub key: String,
+    pub value: String,
 }
 pub type KvOutput = String;
 

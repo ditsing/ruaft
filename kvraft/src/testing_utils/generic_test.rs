@@ -132,6 +132,17 @@ fn run_partition(cfg: Arc<Config>, stop: Arc<AtomicBool>) {
     }
 }
 
+#[derive(Debug)]
+struct Laps {
+    clients_started: Duration,
+    partition_done: Duration,
+    crash_done: Duration,
+    running_time: Duration,
+    partition_stopped: Duration,
+    client_spawn: Duration,
+    client_waits: Duration,
+}
+
 #[derive(Default)]
 pub struct GenericTestParams {
     pub clients: usize,
@@ -163,8 +174,10 @@ pub fn generic_test(test_params: GenericTestParams) {
     let mut clerk = cfg.make_clerk();
     let ops = Arc::new(Mutex::new(vec![]));
 
+    let mut laps = vec![];
     const ROUNDS: usize = 3;
     for _ in 0..ROUNDS {
+        let start = Instant::now();
         // Network partition thread.
         let partition_stop = Arc::new(AtomicBool::new(false));
         // KV server clients.
@@ -188,6 +201,7 @@ pub fn generic_test(test_params: GenericTestParams) {
                 }
             })
         });
+        let clients_started = start.elapsed();
 
         let partition_result = if partition {
             // Let the clients perform some operations without interruption.
@@ -200,14 +214,17 @@ pub fn generic_test(test_params: GenericTestParams) {
         } else {
             None
         };
+        let partition_done = start.elapsed();
 
         if crash {
             cfg.crash_all();
             sleep_election_timeouts(1);
             cfg.restart_all();
         }
+        let crash_done = start.elapsed();
 
         std::thread::sleep(Duration::from_secs(5));
+        let running_time = start.elapsed();
 
         // Stop partitions.
         partition_stop.store(true, Ordering::Release);
@@ -216,6 +233,7 @@ pub fn generic_test(test_params: GenericTestParams) {
             cfg.connect_all();
             sleep_election_timeouts(1);
         });
+        let partition_stopped = start.elapsed();
 
         // Tell all clients to stop.
         clients_stop.store(true, Ordering::Release);
@@ -223,6 +241,7 @@ pub fn generic_test(test_params: GenericTestParams) {
         let client_results = spawn_client_results
             .join()
             .expect("Spawning clients should never fail.");
+        let client_spawn = start.elapsed();
         for (index, client_result) in client_results.into_iter().enumerate() {
             let (op_count, last_result) =
                 client_result.join().expect("Client should never fail");
@@ -241,9 +260,23 @@ pub fn generic_test(test_params: GenericTestParams) {
                 min_ops
             );
         }
+        let client_waits = start.elapsed();
+        laps.push(Laps {
+            clients_started,
+            partition_done,
+            crash_done,
+            running_time,
+            partition_stopped,
+            client_spawn,
+            client_waits,
+        });
     }
 
     cfg.end();
+
+    for (index, laps) in laps.iter().enumerate() {
+        eprintln!("Round {} diagnostics: {:?}", index, laps);
+    }
 
     if test_linearizability {
         let ops: &'static Vec<Operation<KvInput, KvOutput>> =

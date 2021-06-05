@@ -168,7 +168,6 @@ pub fn generic_test(test_params: GenericTestParams) {
     let min_ops = min_ops.unwrap_or(10);
     let servers: usize = if test_linearizability { 7 } else { 5 };
     let cfg = Arc::new(make_config(servers, unreliable, maxraftstate));
-    defer!(cfg.clean_up());
 
     cfg.begin("");
     let mut clerk = cfg.make_clerk();
@@ -273,6 +272,7 @@ pub fn generic_test(test_params: GenericTestParams) {
     }
 
     cfg.end();
+    cfg.clean_up();
 
     for (index, laps) in laps.iter().enumerate() {
         eprintln!("Round {} diagnostics: {:?}", index, laps);

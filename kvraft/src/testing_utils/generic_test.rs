@@ -1,9 +1,12 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread::JoinHandle;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
+use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
+
+use linearizability::{KvInput, KvModel, KvOp, KvOutput, Operation};
 
 use crate::testing_utils::config::{
     make_config, sleep_election_timeouts, sleep_millis, Config,
@@ -64,6 +67,58 @@ fn appending_client(
     (op_count, last)
 }
 
+fn linearizability_client(
+    index: usize,
+    client_count: usize,
+    mut clerk: Clerk,
+    stop: Arc<AtomicBool>,
+    ops: Arc<Mutex<Vec<Operation<KvInput, KvOutput>>>>,
+) -> (usize, String) {
+    let mut op_count = 0usize;
+    while !stop.load(Ordering::Acquire) {
+        let key = thread_rng().gen_range(0..client_count).to_string();
+        let value = format!("({}, {}), ", index, op_count);
+        let call_time = Instant::now();
+        let call_op;
+        let return_op;
+        if thread_rng().gen_ratio(500, 1000) {
+            clerk.append(&key, &value);
+            call_op = KvInput {
+                op: KvOp::Append,
+                key,
+                value,
+            };
+            return_op = KvOutput::default();
+        } else if thread_rng().gen_ratio(100, 1000) {
+            clerk.put(&key, &value);
+            call_op = KvInput {
+                op: KvOp::Put,
+                key,
+                value,
+            };
+            return_op = KvOutput::default();
+        } else {
+            let result = clerk.get(&key).unwrap_or_default();
+            call_op = KvInput {
+                op: KvOp::Get,
+                key,
+                value: Default::default(),
+            };
+            return_op = result;
+        }
+        let return_time = Instant::now();
+        ops.lock().push(Operation {
+            call_op,
+            call_time,
+            return_op,
+            return_time,
+        });
+
+        op_count += 1;
+    }
+    (op_count, String::new())
+}
+
 const PARTITION_MAX_DELAY_MILLIS: u64 = 200;
 
 fn run_partition(cfg: Arc<Config>, stop: Arc<AtomicBool>) {
@@ -85,6 +140,7 @@ pub struct GenericTestParams {
     pub crash: bool,
     pub maxraftstate: Option<usize>,
     pub min_ops: Option<usize>,
+    pub test_linearizability: bool,
 }
 
 pub fn generic_test(test_params: GenericTestParams) {
@@ -95,15 +151,17 @@ pub fn generic_test(test_params: GenericTestParams) {
         crash,
         maxraftstate,
         min_ops,
+        test_linearizability,
     } = test_params;
     let maxraftstate = maxraftstate.unwrap_or(usize::MAX);
     let min_ops = min_ops.unwrap_or(10);
-    const SERVERS: usize = 5;
-    let cfg = Arc::new(make_config(SERVERS, unreliable, maxraftstate));
+    let servers: usize = if test_linearizability { 7 } else { 5 };
+    let cfg = Arc::new(make_config(servers, unreliable, maxraftstate));
     defer!(cfg.clean_up());
 
     cfg.begin("");
     let mut clerk = cfg.make_clerk();
+    let ops = Arc::new(Mutex::new(vec![]));
 
     const ROUNDS: usize = 3;
     for _ in 0..ROUNDS {
@@ -114,9 +172,20 @@ pub fn generic_test(test_params: GenericTestParams) {
 
         let config = cfg.clone();
         let clients_stop_clone = clients_stop.clone();
+        let ops_clone = ops.clone();
         let spawn_client_results = std::thread::spawn(move || {
             spawn_clients(config, clients, move |index: usize, clerk: Clerk| {
-                appending_client(index, clerk, clients_stop_clone.clone())
+                if !test_linearizability {
+                    appending_client(index, clerk, clients_stop_clone.clone())
+                } else {
+                    linearizability_client(
+                        index,
+                        clients,
+                        clerk,
+                        clients_stop_clone.clone(),
+                        ops_clone.clone(),
+                    )
+                }
             })
         });
 
@@ -157,10 +226,12 @@ pub fn generic_test(test_params: GenericTestParams) {
         for (index, client_result) in client_results.into_iter().enumerate() {
             let (op_count, last_result) =
                 client_result.join().expect("Client should never fail");
-            let real_result = clerk
-                .get(index.to_string())
-                .expect(&format!("Key {} should exist.", index));
-            assert_eq!(real_result, last_result);
+            if !last_result.is_empty() {
+                let real_result = clerk
+                    .get(index.to_string())
+                    .expect(&format!("Key {} should exist.", index));
+                assert_eq!(real_result, last_result);
+            }
             eprintln!("Client {} committed {} operations", index, op_count);
             assert!(
                 op_count >= min_ops,
@@ -173,4 +244,24 @@ pub fn generic_test(test_params: GenericTestParams) {
     }
 
     cfg.end();
+
+    if test_linearizability {
+        let ops: &'static Vec<Operation<KvInput, KvOutput>> =
+            Box::leak(Box::new(
+                Arc::try_unwrap(ops)
+                    .expect("No one should be holding ops")
+                    .into_inner(),
+            ));
+        let start = Instant::now();
+        eprintln!("Searching for linearization arrangements ...");
+        assert!(
+            linearizability::check_operations_timeout::<KvModel>(&ops, None),
+            "History {:?} is not linearizable,",
+            ops,
+        );
+        eprintln!(
+            "Searching for linearization arrangements done after {:?}.",
+            start.elapsed()
+        );
+    }
 }

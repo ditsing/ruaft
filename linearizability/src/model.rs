@@ -2,9 +2,11 @@ use std::collections::HashMap;
 
 use crate::Operation;
 
-pub trait Model: std::cmp::Eq + std::clone::Clone + std::hash::Hash {
-    type Input;
-    type Output;
+pub trait Model:
+    std::cmp::Eq + std::clone::Clone + std::hash::Hash + std::fmt::Debug
+{
+    type Input: std::fmt::Debug;
+    type Output: std::fmt::Debug;
 
     fn create() -> Self;
     fn partition(
@@ -17,14 +19,14 @@ pub trait Model: std::cmp::Eq + std::clone::Clone + std::hash::Hash {
     fn step(&mut self, input: &Self::Input, output: &Self::Output) -> bool;
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum KvOp {
     Get,
     Put,
     Append,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct KvInput {
     pub op: KvOp,
     pub key: String,
@@ -34,7 +36,7 @@ pub type KvOutput = String;
 
 unsafe impl Sync for KvInput {}
 
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct KvModel {
     expected_output: String,
 }

@@ -97,6 +97,7 @@ impl<T> OffsetLinkedList<T> {
         unsafe { &*self.nodes[index].data.as_ptr() }
     }
 
+    #[allow(dead_code)]
     pub fn prev(&self, index: NodeRef) -> Option<NodeRef> {
         let index = self.offset_index(index);
         let succ = self.nodes[index].prev;
@@ -112,6 +113,7 @@ impl<T> OffsetLinkedList<T> {
         NodeRef::from_index(self.nodes[Self::HEAD].succ)
     }
 
+    #[allow(dead_code)]
     pub fn last(&self) -> Option<NodeRef> {
         NodeRef::from_index(self.nodes[Self::HEAD].prev)
     }
@@ -124,6 +126,7 @@ impl<T> OffsetLinkedList<T> {
         &self.nodes[index]
     }
 
+    #[allow(dead_code)]
     pub fn iter(&self) -> Iter<'_, T> {
         Iter {
             list: self,

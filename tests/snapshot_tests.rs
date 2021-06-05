@@ -146,3 +146,15 @@ fn snapshot_unreliable_recover_partition() {
         ..Default::default()
     })
 }
+#[test]
+fn linearizability() {
+    generic_test(GenericTestParams {
+        clients: 15,
+        unreliable: true,
+        partition: true,
+        crash: true,
+        maxraftstate: Some(1000),
+        min_ops: Some(0),
+        test_linearizability: true,
+    });
+}

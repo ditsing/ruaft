@@ -1,10 +1,12 @@
 use std::collections::HashSet;
+use std::fmt::Debug;
 use std::time::{Duration, Instant};
 
 use bit_set::BitSet;
 
 pub use model::KvInput;
 pub use model::KvModel;
+pub use model::KvOp;
 pub use model::KvOutput;
 pub use model::Model;
 
@@ -13,26 +15,27 @@ use crate::offset_linked_list::{NodeRef, OffsetLinkedList};
 mod model;
 mod offset_linked_list;
 
-pub struct Operation<C, R> {
+#[derive(Debug)]
+pub struct Operation<C: Debug, R: Debug> {
     pub call_op: C,
     pub call_time: Instant,
     pub return_op: R,
     pub return_time: Instant,
 }
 
-enum EntryKind<'a, C, R> {
+enum EntryKind<'a, C: Debug, R: Debug> {
     Call(&'a Operation<C, R>),
     Return,
 }
 
-struct Entry<'a, C, R> {
+struct Entry<'a, C: Debug, R: Debug> {
     kind: EntryKind<'a, C, R>,
     id: usize,
     time: Instant,
     other: usize,
 }
 
-fn operation_to_entries<'a, C, R>(
+fn operation_to_entries<'a, C: Debug, R: Debug>(
     ops: &[&'a Operation<C, R>],
 ) -> Vec<Entry<'a, C, R>> {
     let mut result = vec![];
@@ -121,7 +124,9 @@ fn check_history<T: Model>(
                 curr = prev;
                 flag = prev_flag;
 
+                list.unlift(NodeRef(list.get(leg).other));
                 list.unlift(leg);
+                leg = list.succ(leg).expect("There should be another element");
             }
         }
     }
@@ -154,10 +159,11 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::{check_operations_timeout, Model, Operation};
     use std::time::{Duration, Instant};
 
-    #[derive(Clone, Eq, PartialEq, Hash)]
+    use crate::{check_operations_timeout, Model, Operation};
+
+    #[derive(Clone, Debug, Eq, PartialEq, Hash)]
     struct CountingModel {
         base: usize,
         cnt: usize,

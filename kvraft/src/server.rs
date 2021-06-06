@@ -169,9 +169,9 @@ impl KVServer {
         }
 
         if let Some(result_holder) = state.queries.remove(&unique_id) {
-            // If this KV server might not be the same leader that committed
-            // this change. We are not sure if it is a duplicate or a conflict.
-            // To tell the difference, the terms and operations must be stored.
+            // This KV server might not be the same leader that committed the
+            // query. We are not sure if it is a duplicate or a conflict. To
+            // tell the difference, terms of all queries must be stored.
             *result_holder.result.lock() = if leader == self.me() {
                 Ok(result)
             } else {
@@ -183,12 +183,13 @@ impl KVServer {
 
     fn restore_state(&self, mut new_state: KVServerState) {
         let mut state = self.state.lock();
-        std::mem::swap(&mut new_state, &mut *state);
-
-        for result_holder in new_state.queries.values() {
+        // Cleanup all existing queries.
+        for result_holder in state.queries.values() {
             *result_holder.result.lock() = Err(CommitError::NotLeader);
             result_holder.condvar.notify_all();
         }
+
+        std::mem::swap(&mut new_state, &mut *state);
     }
 
     fn process_command(

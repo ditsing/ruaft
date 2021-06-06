@@ -274,22 +274,19 @@ impl KVServer {
             Ok(_) => panic!(
                 "compare_exchange should always return the current value 0"
             ),
-            // Somebody has attempted, or is attempting, start().
-            Err(prev_term) => {
-                let start =
-                    prev_term != Self::ATTEMPTING_TERM && prev_term < hold_term;
-                if start {
-                    let set = result_holder.term.compare_exchange(
-                        prev_term,
-                        Self::ATTEMPTING_TERM,
-                        Ordering::SeqCst,
-                        Ordering::SeqCst,
-                    );
-                    set.is_ok()
-                } else {
-                    false
-                }
+            // Somebody is attempting start().
+            Err(Self::ATTEMPTING_TERM) => false,
+            // Somebody has attempted start().
+            Err(prev_term) if prev_term < hold_term => {
+                let set = result_holder.term.compare_exchange(
+                    prev_term,
+                    Self::ATTEMPTING_TERM,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                );
+                set.is_ok()
             }
+            _ => false,
         };
         if start {
             let op = UniqueKVOp {

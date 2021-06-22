@@ -1,4 +1,3 @@
-extern crate anyhow;
 extern crate labrpc;
 extern crate parking_lot;
 extern crate rand;

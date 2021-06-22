@@ -1,6 +1,5 @@
 use std::sync::Arc;
 
-pub use anyhow::Result;
 use labrpc::Network;
 use parking_lot::Mutex;
 use rand::seq::SliceRandom;
@@ -44,7 +43,7 @@ impl Config {
         format!("kvraft-client-{}-to-{}", client, server)
     }
 
-    fn start_server(&self, index: usize) -> Result<()> {
+    fn start_server(&self, index: usize) -> std::io::Result<()> {
         let mut clients = vec![];
         {
             let mut network = self.network.lock();
@@ -255,7 +254,7 @@ impl Config {
         &self,
         upper: usize,
         size_fn: impl Fn(&MemoryPersister) -> usize,
-    ) -> Result<()> {
+    ) -> Result<(), String> {
         let mut over_limits = String::new();
         for (index, p) in self.storage.lock().all().iter().enumerate() {
             let size = size_fn(p);
@@ -265,16 +264,19 @@ impl Config {
             }
         }
         if !over_limits.is_empty() {
-            anyhow::bail!("logs were not trimmed to {}:{}", upper, over_limits);
+            return Err(format!(
+                "logs were not trimmed to {}:{}",
+                upper, over_limits
+            ));
         }
         Ok(())
     }
 
-    pub fn check_log_size(&self, upper: usize) -> Result<()> {
+    pub fn check_log_size(&self, upper: usize) -> Result<(), String> {
         self.check_size(upper, MemoryPersister::state_size)
     }
 
-    pub fn check_snapshot_size(&self, upper: usize) -> Result<()> {
+    pub fn check_snapshot_size(&self, upper: usize) -> Result<(), String> {
         self.check_size(upper, MemoryPersister::snapshot_size)
     }
 }

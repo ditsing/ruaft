@@ -105,10 +105,10 @@ pub trait ValidReply {
 
 impl<T> ValidReply for Result<T, KVError> {
     fn is_reply_valid(&self) -> bool {
-        return match self.as_ref().err() {
-            Some(KVError::TimedOut) | Some(KVError::NotLeader) => false,
-            _ => true,
-        };
+        !matches!(
+            self.as_ref().err(),
+            Some(KVError::TimedOut) | Some(KVError::NotLeader)
+        )
     }
 }
 

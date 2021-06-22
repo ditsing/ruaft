@@ -30,9 +30,8 @@ impl Clerk {
 
         let key = key.as_ref();
         loop {
-            match inner.get(key.to_owned(), Default::default()) {
-                Some(val) => return val,
-                None => {}
+            if let Some(val) = inner.get(key.to_owned(), Default::default()) {
+                return val;
             }
         }
     }

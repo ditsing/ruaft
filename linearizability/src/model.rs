@@ -13,7 +13,7 @@ pub trait Model:
         history: &[Operation<Self::Input, Self::Output>],
     ) -> Vec<Vec<&Operation<Self::Input, Self::Output>>> {
         let history: Vec<&Operation<Self::Input, Self::Output>> =
-            history.iter().map(|e| e).collect();
+            history.iter().collect();
         return vec![history];
     }
     fn step(&mut self, input: &Self::Input, output: &Self::Output) -> bool;
@@ -56,7 +56,7 @@ impl Model for KvModel {
     ) -> Vec<Vec<&Operation<KvInput, KvOutput>>> {
         let mut by_key =
             HashMap::<String, Vec<&Operation<KvInput, KvOutput>>>::new();
-        for op in history.into_iter() {
+        for op in history {
             by_key.entry(op.call_op.key.clone()).or_default().push(op);
         }
         let mut result = vec![];

@@ -58,7 +58,7 @@ fn appending_client(
         } else {
             let value = clerk
                 .get(&key)
-                .expect(&format!("Key {} should exist.", index));
+                .unwrap_or_else(|| panic!("Key {} should exist.", index));
             assert_eq!(value, last);
         }
         eprintln!("client {} done {}.", index, op_count);
@@ -227,11 +227,11 @@ pub fn generic_test(test_params: GenericTestParams) {
 
         // Stop partitions.
         partition_stop.store(true, Ordering::Release);
-        partition_result.map(|result| {
+        if let Some(result) = partition_result {
             result.join().expect("Partition thread should never fail");
             cfg.connect_all();
             sleep_election_timeouts(1);
-        });
+        }
         let partition_stopped = start.elapsed();
 
         // Tell all clients to stop.
@@ -247,7 +247,7 @@ pub fn generic_test(test_params: GenericTestParams) {
             if !last_result.is_empty() {
                 let real_result = clerk
                     .get(index.to_string())
-                    .expect(&format!("Key {} should exist.", index));
+                    .unwrap_or_else(|| panic!("Key {} should exist.", index));
                 assert_eq!(real_result, last_result);
             }
             eprintln!("Client {} committed {} operations", index, op_count);

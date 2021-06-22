@@ -242,6 +242,7 @@ impl KVServer {
             let mut state = self.state.lock();
             let applied = state.applied_op.get(&unique_id.clerk_id);
             if let Some((applied_unique_id, result)) = applied {
+                #[allow(clippy::comparison_chain)]
                 if unique_id < *applied_unique_id {
                     return Err(CommitError::Expired(unique_id));
                 } else if unique_id == *applied_unique_id {
@@ -330,7 +331,7 @@ impl KVServer {
             *guard = Err(CommitError::Duplicate(result))
         }
 
-        return result;
+        result
     }
 
     fn validate_term(term: usize) {

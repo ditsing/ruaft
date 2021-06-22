@@ -36,10 +36,10 @@ impl<T: Serialize> SnapshotHolder<T> {
 
         let data = bincode::serialize(state)
             .expect("Serialization should never fail.");
-        return Some(Snapshot {
+        Some(Snapshot {
             data,
             last_included_index: curr,
-        });
+        })
     }
 }
 

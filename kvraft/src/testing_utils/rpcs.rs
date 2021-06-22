@@ -24,10 +24,9 @@ pub fn register_kv_server<
         make_rpc_handler(move |args| kv_clone.as_ref().get(args)),
     )?;
 
-    let kv_clone = kv.clone();
     server.register_rpc_handler(
         PUT_APPEND.to_owned(),
-        make_rpc_handler(move |args| kv_clone.as_ref().put_append(args)),
+        make_rpc_handler(move |args| kv.as_ref().put_append(args)),
     )?;
 
     network.add_server(server_name, server);

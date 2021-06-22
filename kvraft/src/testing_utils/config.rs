@@ -264,7 +264,7 @@ impl Config {
                 over_limits.push_str(&str);
             }
         }
-        if over_limits.len() != 0 {
+        if !over_limits.is_empty() {
             anyhow::bail!("logs were not trimmed to {}:{}", upper, over_limits);
         }
         Ok(())

@@ -13,7 +13,7 @@ ruaft = { path = "../" }
 linearizability = { path = "../linearizability" }
 serde = "1.0.116"
 serde_derive = "1.0.116"
-tokio = { version = "1.0", features = ["rt-multi-thread", "time", "parking_lot"] }
+tokio = { version = "1.0", features = ["time", "parking_lot"] }
 
 [dev-dependencies]
 scopeguard = "1.1.0"

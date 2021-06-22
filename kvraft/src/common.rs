@@ -81,9 +81,16 @@ pub struct PutAppendReply {
     pub result: Result<(), KVError>,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+pub enum GetEnum {
+    AllowDuplicate,
+    NoDuplicate,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GetArgs {
     pub key: String,
+    pub op: GetEnum,
 
     pub unique_id: UniqueId,
 }
@@ -91,7 +98,6 @@ pub struct GetArgs {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GetReply {
     pub result: Result<Option<String>, KVError>,
-    pub is_retry: bool,
 }
 
 #[derive(Clone, Debug, Default)]

@@ -10,7 +10,7 @@ use parking_lot::{Condvar, Mutex};
 use ruaft::{ApplyCommandMessage, Persister, Raft, RpcClient, Term};
 
 use crate::common::{
-    ClerkId, GetArgs, GetReply, KVError, PutAppendArgs, PutAppendEnum,
+    ClerkId, GetArgs, GetEnum, GetReply, KVError, PutAppendArgs, PutAppendEnum,
     PutAppendReply, UniqueId,
 };
 use crate::snapshot_holder::SnapshotHolder;
@@ -345,27 +345,30 @@ impl KVServer {
     const DEFAULT_TIMEOUT: Duration = Duration::from_secs(1);
 
     pub fn get(&self, args: GetArgs) -> GetReply {
-        let (is_retry, result) = match self.block_for_commit(
+        let map_dup = match args.op {
+            GetEnum::AllowDuplicate => |r| Ok(r),
+            GetEnum::NoDuplicate => |_| Err(KVError::Conflict),
+        };
+        let result = match self.block_for_commit(
             args.unique_id,
             KVOp::Get(args.key),
             Self::DEFAULT_TIMEOUT,
         ) {
-            Ok(result) => (false, result),
-            Err(CommitError::Duplicate(result)) => (true, result),
-            Err(CommitError::NotMe(result)) => (true, result),
-            Err(e) => {
-                return GetReply {
-                    result: Err(e.into()),
-                    is_retry: false,
-                }
-            }
+            Ok(result) => Ok(result),
+            Err(CommitError::Duplicate(result)) => map_dup(result),
+            Err(CommitError::NotMe(result)) => map_dup(result),
+            Err(e) => Err(e.into()),
+        };
+        let result = match result {
+            Ok(result) => result,
+            Err(e) => return GetReply { result: Err(e) },
         };
         let result = match result {
             CommitResult::Get(result) => Ok(result),
             CommitResult::Put => Err(KVError::Conflict),
             CommitResult::Append => Err(KVError::Conflict),
         };
-        GetReply { result, is_retry }
+        GetReply { result }
     }
 
     pub fn put_append(&self, args: PutAppendArgs) -> PutAppendReply {

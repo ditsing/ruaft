@@ -7,7 +7,7 @@ use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use crate::common::{
-    GetArgs, GetReply, KVRaftOptions, PutAppendArgs, PutAppendEnum,
+    GetArgs, GetEnum, GetReply, KVRaftOptions, PutAppendArgs, PutAppendEnum,
     PutAppendReply, UniqueIdSequence, GET, PUT_APPEND,
 };
 use crate::common::{KVError, ValidReply};
@@ -95,22 +95,16 @@ impl ClerkInner {
         loop {
             let args = GetArgs {
                 key: "".to_string(),
+                op: GetEnum::NoDuplicate,
                 unique_id: self.unique_id.zero(),
             };
             let reply: Option<GetReply> = self.call_rpc(GET, args, Some(1));
             if let Some(reply) = reply {
                 match reply.result {
                     Ok(_) => {
-                        if !reply.is_retry {
-                            // Discard the used unique_id.
-                            self.unique_id.inc();
-                            break;
-                        } else {
-                            // The RPC was successful, but the server has had an
-                            // exact same entry, which means someone else has taken
-                            // that clerk_id.
-                            self.unique_id = UniqueIdSequence::new();
-                        }
+                        // Discard the used unique_id.
+                        self.unique_id.inc();
+                        break;
                     }
                     Err(KVError::Expired) | Err(KVError::Conflict) => {
                         // The client ID happens to be re-used. The request does
@@ -190,6 +184,7 @@ impl ClerkInner {
     ) -> Option<Option<String>> {
         let args = GetArgs {
             key,
+            op: GetEnum::AllowDuplicate,
             unique_id: self.unique_id.inc(),
         };
         let reply: GetReply = self.call_rpc(GET, args, options.max_retry)?;

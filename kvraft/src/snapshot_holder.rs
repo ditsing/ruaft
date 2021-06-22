@@ -1,10 +1,10 @@
 use std::marker::PhantomData;
 
 use parking_lot::Mutex;
+use serde::de::DeserializeOwned;
 use serde::Serialize;
 
 use ruaft::Snapshot;
-use serde::de::DeserializeOwned;
 
 #[derive(Default)]
 pub(crate) struct SnapshotHolder<T> {

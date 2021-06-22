@@ -1,5 +1,6 @@
-use rand::{thread_rng, RngCore};
 use std::sync::atomic::{AtomicU64, Ordering};
+
+use rand::{thread_rng, RngCore};
 
 pub type ClerkId = u64;
 #[derive(

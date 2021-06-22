@@ -93,7 +93,7 @@ fn snapshot_size() {
 }
 
 #[test]
-fn snapshot_recover() {
+fn snapshot_recover_test() {
     generic_test(GenericTestParams {
         clients: 1,
         crash: true,
@@ -114,7 +114,7 @@ fn snapshot_recover_many_clients() {
 }
 
 #[test]
-fn snapshot_unreliable() {
+fn snapshot_unreliable_test() {
     generic_test(GenericTestParams {
         clients: 5,
         unreliable: true,
@@ -124,7 +124,7 @@ fn snapshot_unreliable() {
 }
 
 #[test]
-fn snapshot_unreliable_recover() {
+fn snapshot_unreliable_recover_test() {
     generic_test(GenericTestParams {
         clients: 5,
         unreliable: true,

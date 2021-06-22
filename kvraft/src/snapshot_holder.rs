@@ -24,34 +24,22 @@ impl<T> SnapshotHolder<T> {
 
 impl<T: Serialize> SnapshotHolder<T> {
     pub fn take_snapshot(&self, state: &T, curr: usize) -> Option<Snapshot> {
-        let requested = self
-            .snapshot_requests
-            .lock()
-            .first()
-            .map_or(false, |&min_index| min_index <= curr);
-
-        if requested {
-            let data = bincode::serialize(state)
-                .expect("Serialization should never fail.");
-            return Some(Snapshot {
-                data,
-                last_included_index: curr,
-            });
-        }
-        None
-    }
-
-    pub fn unblock_response(&self, curr: usize) {
         let mut requests = self.snapshot_requests.lock();
-        let mut processed = 0;
-        for &index in requests.iter() {
-            if index <= curr {
-                processed += 1;
-            } else {
-                break;
-            }
+
+        let processed = requests.partition_point(|index| *index <= curr);
+        if processed == 0 {
+            return None;
         }
+
         requests.drain(0..processed);
+        drop(requests);
+
+        let data = bincode::serialize(state)
+            .expect("Serialization should never fail.");
+        return Some(Snapshot {
+            data,
+            last_included_index: curr,
+        });
     }
 }
 

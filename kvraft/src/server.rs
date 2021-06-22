@@ -217,7 +217,6 @@ impl KVServer {
                                 .take_snapshot(&this.state.lock(), index)
                             {
                                 this.rf.lock().save_snapshot(snapshot);
-                                snapshot_holder.unblock_response(index);
                             }
                         }
                     }

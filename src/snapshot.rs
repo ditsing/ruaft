@@ -41,11 +41,7 @@ impl SnapshotDaemon {
     const MIN_SNAPSHOT_INDEX_INTERVAL: usize = 100;
 
     pub(crate) fn log_grow(&self, first_index: Index, last_index: Index) {
-        let last_included_index =
-            self.current_snapshot.0.lock().last_included_index;
-        if last_included_index > first_index
-            || last_index - first_index > Self::MIN_SNAPSHOT_INDEX_INTERVAL
-        {
+        if last_index - first_index > Self::MIN_SNAPSHOT_INDEX_INTERVAL {
             self.trigger();
         }
     }

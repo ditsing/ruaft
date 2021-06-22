@@ -69,14 +69,6 @@ pub struct PutAppendArgs {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub enum KVError {
-    NotLeader,
-    Expired,
-    TimedOut,
-    Conflict,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PutAppendReply {
     pub result: Result<(), KVError>,
 }
@@ -103,6 +95,14 @@ pub struct GetReply {
 #[derive(Clone, Debug, Default)]
 pub struct KVRaftOptions {
     pub max_retry: Option<usize>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub enum KVError {
+    NotLeader,
+    Expired,
+    TimedOut,
+    Conflict,
 }
 
 pub trait ValidReply {

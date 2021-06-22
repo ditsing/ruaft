@@ -186,7 +186,7 @@ mod tests {
         };
         let response =
             futures::executor::block_on(rpc_client.call_request_vote(request))?;
-        assert_eq!(true, response.vote_granted);
+        assert!(response.vote_granted);
 
         let request = AppendEntriesArgs::<i32> {
             term: Term(2021),
@@ -200,7 +200,7 @@ mod tests {
             rpc_client.call_append_entries(request),
         )?;
         assert_eq!(2021, response.term.0);
-        assert_eq!(true, response.success);
+        assert!(response.success);
 
         Ok(())
     }

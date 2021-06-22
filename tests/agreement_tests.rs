@@ -1,3 +1,4 @@
+#![allow(clippy::identity_op)]
 #[macro_use]
 extern crate anyhow;
 extern crate bytes;
@@ -244,7 +245,7 @@ fn count() -> config::Result<()> {
     cfg.check_one_leader()?;
     let total = cfg.total_rpcs();
     assert!(
-        total >= 1 && total <= 30,
+        (1..=30).contains(&total),
         "too many or few RPCs ({}) to elect initial leader",
         total
     );

@@ -9,7 +9,7 @@ use rand::{thread_rng, Rng};
 use tokio::time::Duration;
 
 use ruaft::rpcs::register_server;
-use ruaft::{ApplyCommandMessage, Persister, Raft, RpcClient};
+use ruaft::{ApplyCommandMessage, Persister, Raft, RpcClient, Term};
 
 pub mod persister;
 
@@ -57,7 +57,10 @@ impl Config {
                     if let Some(raft) = &state.rafts[i] {
                         let (term, is_leader) = raft.get_state();
                         if is_leader {
-                            leaders.entry(term.0).or_insert(vec![]).push(i)
+                            leaders
+                                .entry(term.0)
+                                .or_insert_with(Vec::new)
+                                .push(i)
                         }
                     }
                 }
@@ -166,12 +169,10 @@ impl Config {
 
             if let Some(at_term) = at_term {
                 let state = self.state.lock();
-                for raft in &state.rafts {
-                    if let Some(raft) = raft {
-                        let (term, _) = raft.get_state();
-                        if term.0 > at_term {
-                            return Ok(None);
-                        }
+                for raft in state.rafts.iter().flatten() {
+                    let (Term(term), _) = raft.get_state();
+                    if term > at_term {
+                        return Ok(None);
                     }
                 }
             }

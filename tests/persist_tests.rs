@@ -1,3 +1,4 @@
+#![allow(clippy::identity_op)]
 #[macro_use]
 extern crate anyhow;
 extern crate bytes;
@@ -162,10 +163,10 @@ fn figure8() -> config::Result<()> {
     for _ in 0..1000 {
         let mut leader = None;
         for i in 0..SERVERS {
-            if cfg.is_server_alive(i) {
-                if let Some(_) = cfg.leader_start(i, thread_rng().gen()) {
-                    leader = Some(i);
-                }
+            if cfg.is_server_alive(i)
+                && cfg.leader_start(i, thread_rng().gen()).is_some()
+            {
+                leader = Some(i);
             }
         }
 
@@ -256,12 +257,11 @@ fn figure8_unreliable() -> config::Result<()> {
 
         let mut leader = None;
         for i in 0..SERVERS {
-            if cfg.is_server_alive(i) {
-                if let Some(_) = cfg.leader_start(i, thread_rng().gen()) {
-                    if cfg.is_connected(i) {
-                        leader = Some(i);
-                    }
-                }
+            if cfg.is_server_alive(i)
+                && cfg.leader_start(i, thread_rng().gen()).is_some()
+                && cfg.is_connected(i)
+            {
+                leader = Some(i);
             }
         }
 
@@ -340,6 +340,7 @@ fn internal_churn(unreliable: bool) -> config::Result<()> {
                                 Ok(t) => t,
                                 Err(e) => return Err(e),
                             };
+                        #[allow(clippy::collapsible_if)]
                         if cmd_index > 0 {
                             if cmd_committed == cmd {
                                 cmds.push(cmd);

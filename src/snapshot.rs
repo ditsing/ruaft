@@ -1,10 +1,10 @@
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 
 use crossbeam_utils::sync::{Parker, Unparker};
+use parking_lot::{Condvar, Mutex};
 
 use crate::{Index, Raft};
-use parking_lot::{Condvar, Mutex};
-use std::sync::Arc;
 
 #[derive(Clone, Debug, Default)]
 pub struct Snapshot {

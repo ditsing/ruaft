@@ -191,6 +191,15 @@ impl ClerkInner {
         }
     }
 
+    /// This function returns None when
+    /// 1. No KVServer can be reached, or
+    /// 2. No KVServer claimed to be the leader.
+    ///
+    /// Some(()) is returned if the request has been committed previously, under
+    /// the assumption is that two different requests with the same unique_id
+    /// must be identical.
+    ///
+    /// This function do not expect a Conflict request with the same unique_id.
     fn put_append(
         &mut self,
         key: String,

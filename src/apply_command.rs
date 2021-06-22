@@ -35,9 +35,7 @@ where
             while keep_running.load(Ordering::SeqCst) {
                 let messages = {
                     let mut rf = rf.lock();
-                    if rf.last_applied >= rf.commit_index
-                        || rf.last_applied >= rf.log.last_index_term().index
-                    {
+                    if rf.last_applied >= rf.commit_index {
                         condvar.wait_for(
                             &mut rf,
                             Duration::from_millis(HEARTBEAT_INTERVAL_MILLIS),
@@ -52,18 +50,9 @@ where
                             })];
                         rf.last_applied = rf.log.start();
                         messages
-                    } else if rf.last_applied < rf.commit_index
-                        && rf.last_applied < rf.log.last_index_term().index
-                    {
+                    } else if rf.last_applied < rf.commit_index {
                         let index = rf.last_applied + 1;
-                        // The commit index could be larger than the total
-                        // number of log items, when we installed a snapshot
-                        // from the leader and rolled back too far beyond the
-                        // commit index. The missing log items will be appended
-                        // back by the leader, and will be identical to the
-                        // log items before rolling back.
-                        let last_one =
-                            std::cmp::min(rf.log.end(), rf.commit_index + 1);
+                        let last_one = rf.commit_index + 1;
                         let messages: Vec<ApplyCommandMessage<Command>> = rf
                             .log
                             .between(index, last_one)

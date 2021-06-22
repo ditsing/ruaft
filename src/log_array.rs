@@ -73,6 +73,15 @@ impl<C> LogArray<C> {
         &self.inner[index]
     }
 
+    /// The first log entry on or after the given index.
+    pub fn first_after(&self, index: Index) -> &LogEntry<C> {
+        if index >= self.start() {
+            self.at(index)
+        } else {
+            self.first_entry()
+        }
+    }
+
     /// All log entries after the given index.
     pub fn after(&self, index: Index) -> &[LogEntry<C>] {
         let index = self.check_range_index(index);
@@ -87,7 +96,7 @@ impl<C> LogArray<C> {
     }
 
     /// All log entries stored in the array.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub fn all(&self) -> &[LogEntry<C>] {
         &self.inner[..]
     }
@@ -370,6 +379,15 @@ mod tests {
             log.at(end);
         });
         assert!(at_after_end.is_err());
+    }
+
+    #[test]
+    fn test_first_after() {
+        let (start, _, log) = default_log_array();
+        assert_eq!(log.first_after(0).index, log.first_entry().index);
+        assert_eq!(log.first_after(start).index, log.at(start).index);
+        assert_eq!(log.first_after(start + 1).index, log.at(start + 1).index);
+        assert_ne!(log.first_after(0).index, log.first_after(start + 1).index);
     }
 
     #[test]

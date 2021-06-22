@@ -18,6 +18,7 @@ use rand::{thread_rng, Rng};
 
 use crate::apply_command::ApplyCommandFnMut;
 pub use crate::apply_command::ApplyCommandMessage;
+use crate::index_term::IndexTerm;
 use crate::install_snapshot::InstallSnapshotArgs;
 use crate::persister::PersistedRaftState;
 pub use crate::persister::Persister;
@@ -109,6 +110,7 @@ struct AppendEntriesArgs<Command> {
 struct AppendEntriesReply {
     term: Term,
     success: bool,
+    committed: Option<IndexTerm>,
 }
 
 #[repr(align(64))]
@@ -162,6 +164,7 @@ where
             state.current_term = persisted_state.current_term;
             state.voted_for = persisted_state.voted_for;
             state.log = persisted_state.log;
+            state.commit_index = state.log.start();
         }
 
         let election = ElectionState {
@@ -275,6 +278,7 @@ where
             return AppendEntriesReply {
                 term: rf.current_term,
                 success: false,
+                committed: Some(rf.log.first_after(rf.commit_index).into()),
             };
         }
 
@@ -295,7 +299,8 @@ where
         {
             return AppendEntriesReply {
                 term: args.term,
-                success: false,
+                success: args.prev_log_index < rf.log.start(),
+                committed: Some(rf.log.first_after(rf.commit_index).into()),
             };
         }
 
@@ -303,6 +308,10 @@ where
             let index = i + args.prev_log_index + 1;
             if rf.log.end() > index {
                 if rf.log[index].term != entry.term {
+                    assert!(
+                        index > rf.commit_index,
+                        "Entries before commit index should never be rolled back"
+                    );
                     rf.log.truncate(index);
                     rf.log.push(entry.clone());
                 }
@@ -320,15 +329,12 @@ where
                 rf.log.last_index_term().index
             };
             self.apply_command_signal.notify_one();
-        } else if rf.last_applied < rf.commit_index
-            && rf.last_applied < rf.log.end()
-        {
-            self.apply_command_signal.notify_one();
         }
 
         AppendEntriesReply {
             term: args.term,
             success: true,
+            committed: None,
         }
     }
 }
@@ -337,6 +343,13 @@ enum SyncLogEntryOperation<Command> {
     AppendEntries(AppendEntriesArgs<Command>),
     InstallSnapshot(InstallSnapshotArgs),
     None,
+}
+
+enum SyncLogEntryResult {
+    TermElapsed(Term),
+    Archived(IndexTerm),
+    Diverged(IndexTerm),
+    Success,
 }
 
 // Command must be
@@ -705,27 +718,30 @@ where
         }
 
         let operation = Self::build_sync_log_entry(&rf, peer_index);
-        let (term, match_index, succeeded) = match operation {
+        let (term, prev_log_index, match_index, succeeded) = match operation {
             SyncLogEntryOperation::AppendEntries(args) => {
                 let term = args.term;
+                let prev_log_index = args.prev_log_index;
                 let match_index = args.prev_log_index + args.entries.len();
                 let succeeded = Self::append_entries(&rpc_client, args).await;
 
-                (term, match_index, succeeded)
+                (term, prev_log_index, match_index, succeeded)
             }
             SyncLogEntryOperation::InstallSnapshot(args) => {
                 let term = args.term;
+                let prev_log_index = args.last_included_index;
                 let match_index = args.last_included_index;
                 let succeeded =
                     Self::send_install_snapshot(&rpc_client, args).await;
 
-                (term, match_index, succeeded)
+                (term, prev_log_index, match_index, succeeded)
             }
             SyncLogEntryOperation::None => return,
         };
 
+        let peer = Peer(peer_index);
         match succeeded {
-            Ok(Some(true)) => {
+            Ok(SyncLogEntryResult::Success) => {
                 let mut rf = rf.lock();
 
                 if rf.current_term != term {
@@ -750,8 +766,32 @@ where
                     }
                 }
             }
-            Ok(Some(false)) => {
+            Ok(SyncLogEntryResult::Archived(committed)) => {
+                if prev_log_index >= committed.index {
+                    eprintln!(
+                        "Peer {} misbehaves: send prev log index {}, got committed {:?}",
+                        peer_index, prev_log_index, committed
+                    );
+                }
+
                 let mut rf = rf.lock();
+                Self::check_committed(&rf, peer, committed.clone());
+
+                rf.current_step[peer_index] = 0;
+                rf.next_index[peer_index] = committed.index;
+
+                // Ignore the error. The log syncing thread must have died.
+                let _ = rerun.send(Some(Peer(peer_index)));
+            }
+            Ok(SyncLogEntryResult::Diverged(committed)) => {
+                if prev_log_index < committed.index {
+                    eprintln!(
+                        "Peer {} misbehaves: diverged at {}, but committed {:?}",
+                        peer_index, prev_log_index, committed
+                    );
+                }
+                let mut rf = rf.lock();
+                Self::check_committed(&rf, peer, committed.clone());
 
                 let step = &mut rf.current_step[peer_index];
                 if *step < 5 {
@@ -766,11 +806,15 @@ where
                     *next_index -= diff;
                 }
 
+                if *next_index < committed.index {
+                    *next_index = committed.index;
+                }
+
                 // Ignore the error. The log syncing thread must have died.
                 let _ = rerun.send(Some(Peer(peer_index)));
             }
             // Do nothing, not our term anymore.
-            Ok(None) => {}
+            Ok(SyncLogEntryResult::TermElapsed(_)) => {}
             Err(_) => {
                 tokio::time::sleep(Duration::from_millis(
                     HEARTBEAT_INTERVAL_MILLIS,
@@ -780,6 +824,23 @@ where
                 let _ = rerun.send(Some(Peer(peer_index)));
             }
         };
+    }
+
+    fn check_committed(
+        rf: &RaftState<Command>,
+        peer: Peer,
+        committed: IndexTerm,
+    ) {
+        if committed.index < rf.log.start() {
+            return;
+        }
+        let local_term = rf.log.at(committed.index).term;
+        if committed.term != local_term {
+            eprintln!(
+                "{:?} committed log diverged at {:?}: {:?} v.s. leader {:?}",
+                peer, committed.index, committed.term, local_term
+            );
+        }
     }
 
     fn build_sync_log_entry(
@@ -825,7 +886,7 @@ where
     async fn append_entries(
         rpc_client: &RpcClient,
         args: AppendEntriesArgs<Command>,
-    ) -> std::io::Result<Option<bool>> {
+    ) -> std::io::Result<SyncLogEntryResult> {
         let term = args.term;
         let reply = retry_rpc(
             Self::APPEND_ENTRIES_RETRY,
@@ -834,9 +895,17 @@ where
         )
         .await?;
         Ok(if reply.term == term {
-            Some(reply.success)
+            if let Some(committed) = reply.committed {
+                if reply.success {
+                    SyncLogEntryResult::Archived(committed)
+                } else {
+                    SyncLogEntryResult::Diverged(committed)
+                }
+            } else {
+                SyncLogEntryResult::Success
+            }
         } else {
-            None
+            SyncLogEntryResult::TermElapsed(reply.term)
         })
     }
 

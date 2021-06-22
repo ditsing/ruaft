@@ -1,6 +1,8 @@
+use crate::index_term::IndexTerm;
 use crate::utils::retry_rpc;
 use crate::{
-    Index, Peer, Raft, RaftState, RpcClient, State, Term, RPC_DEADLINE,
+    Index, Peer, Raft, RaftState, RpcClient, State, SyncLogEntryResult, Term,
+    RPC_DEADLINE,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -18,6 +20,7 @@ pub(crate) struct InstallSnapshotArgs {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub(crate) struct InstallSnapshotReply {
     term: Term,
+    committed: Option<IndexTerm>,
 }
 
 impl<C: Clone + Default + serde::Serialize> Raft<C> {
@@ -33,6 +36,7 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
         if rf.current_term > args.term {
             return InstallSnapshotReply {
                 term: rf.current_term,
+                committed: None,
             };
         }
 
@@ -49,15 +53,36 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
 
         // The above code is exactly the same as AppendEntries.
 
+        // The snapshot could not be verified because the index is beyond log
+        // start. Fail this request and ask leader to send something that we
+        // could verify. We cannot rollback to a point beyond commit index
+        // anyway. Otherwise if the system fails right after the rollback,
+        // committed entries before log start would be lost forever.
+        //
+        // The commit index is sent back to leader. The leader would never need
+        // to rollback beyond that, since it is guaranteed that committed log
+        // entries will never be rolled back.
+        if args.last_included_index < rf.log.start() {
+            return InstallSnapshotReply {
+                term: args.term,
+                committed: Some(rf.log.first_after(rf.commit_index).into()),
+            };
+        }
+
         if args.last_included_index < rf.log.end()
             && args.last_included_index >= rf.log.start()
             && args.last_included_term == rf.log[args.last_included_index].term
         {
             // Do nothing if the index and term match the current snapshot.
             if args.last_included_index != rf.log.start() {
+                if rf.commit_index < args.last_included_index {
+                    rf.commit_index = args.last_included_index;
+                }
                 rf.log.shift(args.last_included_index, args.data);
             }
         } else {
+            assert!(args.last_included_index > rf.commit_index);
+            rf.commit_index = args.last_included_index;
             rf.log.reset(
                 args.last_included_index,
                 args.last_included_term,
@@ -71,7 +96,10 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
         );
 
         self.apply_command_signal.notify_one();
-        InstallSnapshotReply { term: args.term }
+        InstallSnapshotReply {
+            term: args.term,
+            committed: None,
+        }
     }
 
     pub(crate) fn build_install_snapshot(
@@ -93,7 +121,7 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
     pub(crate) async fn send_install_snapshot(
         rpc_client: &RpcClient,
         args: InstallSnapshotArgs,
-    ) -> std::io::Result<Option<bool>> {
+    ) -> std::io::Result<SyncLogEntryResult> {
         let term = args.term;
         let reply = retry_rpc(
             Self::INSTALL_SNAPSHOT_RETRY,
@@ -101,6 +129,14 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
             move |_round| rpc_client.call_install_snapshot(args.clone()),
         )
         .await?;
-        Ok(if reply.term == term { Some(true) } else { None })
+        Ok(if reply.term == term {
+            if let Some(committed) = reply.committed {
+                SyncLogEntryResult::Archived(committed)
+            } else {
+                SyncLogEntryResult::Success
+            }
+        } else {
+            SyncLogEntryResult::TermElapsed(reply.term)
+        })
     }
 }

@@ -1,6 +1,6 @@
 use crate::{Index, LogEntry, Term};
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub(crate) struct IndexTerm {
     pub index: Index,
     pub term: Term,

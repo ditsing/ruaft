@@ -63,7 +63,7 @@ impl RpcClient {
     }
 }
 
-fn make_rpc_handler<Request, Reply, F>(
+pub fn make_rpc_handler<Request, Reply, F>(
     func: F,
 ) -> Box<dyn Fn(RequestMessage) -> ReplyMessage>
 where

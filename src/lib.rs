@@ -330,6 +330,7 @@ where
             };
             self.apply_command_signal.notify_one();
         }
+        self.snapshot_daemon.log_grow(rf.log.start(), rf.log.end());
 
         AppendEntriesReply {
             term: args.term,
@@ -929,7 +930,7 @@ where
         self.election.stop_election_timer();
         self.new_log_entry.take().map(|n| n.send(None));
         self.apply_command_signal.notify_all();
-        self.snapshot_daemon.trigger();
+        self.snapshot_daemon.kill();
         self.stop_wait_group.wait();
         std::sync::Arc::try_unwrap(self.thread_pool)
             .expect(
@@ -987,8 +988,5 @@ impl ElectionState {
 }
 
 impl<C> Raft<C> {
-    pub const NO_SNAPSHOT: fn(Index) -> Snapshot = |index| Snapshot {
-        last_included_index: index,
-        data: vec![],
-    };
+    pub const NO_SNAPSHOT: fn(Index) = |_| {};
 }

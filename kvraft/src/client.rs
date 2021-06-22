@@ -36,28 +36,24 @@ impl Clerk {
         }
     }
 
-    pub fn put<K: AsRef<str>, V: AsRef<str>>(
-        &mut self,
-        key: K,
-        value: V,
-    ) -> Option<()> {
+    pub fn put<K: AsRef<str>, V: AsRef<str>>(&mut self, key: K, value: V) {
         let inner = self.init_once();
 
         let key = key.as_ref();
         let value = value.as_ref();
-        inner.put(key.to_owned(), value.to_owned(), Default::default())
+        inner
+            .put(key.to_owned(), value.to_owned(), Default::default())
+            .expect("Put should never return error with unlimited retry.")
     }
 
-    pub fn append<K: AsRef<str>, V: AsRef<str>>(
-        &mut self,
-        key: K,
-        value: V,
-    ) -> Option<()> {
+    pub fn append<K: AsRef<str>, V: AsRef<str>>(&mut self, key: K, value: V) {
         let inner = self.init_once();
 
         let key = key.as_ref();
         let value = value.as_ref();
-        inner.append(key.to_owned(), value.to_owned(), Default::default())
+        inner
+            .append(key.to_owned(), value.to_owned(), Default::default())
+            .expect("Append should never return error with unlimited retry.")
     }
 
     pub fn init_once(&mut self) -> &mut ClerkInner {
@@ -210,8 +206,12 @@ impl ClerkInner {
         };
         let reply: PutAppendReply =
             self.call_rpc(PUT_APPEND, args, options.max_retry)?;
-        assert!(reply.result.is_ok());
-        Some(())
+        match reply.result {
+            Ok(val) => Some(val),
+            Err(KVError::Expired) => Some(()),
+            Err(KVError::Conflict) => panic!("We should never see a conflict."),
+            _ => None,
+        }
     }
 
     pub fn put(

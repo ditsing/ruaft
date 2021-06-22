@@ -1,13 +1,9 @@
-#[macro_use]
-extern crate anyhow;
 extern crate kvraft;
 #[macro_use]
 extern crate scopeguard;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-
-use anyhow::Context;
 
 use kvraft::testing_utils::config::{
     make_config, sleep_election_timeouts, sleep_millis,
@@ -16,45 +12,41 @@ use kvraft::testing_utils::generic_test::{
     generic_test, spawn_clients, GenericTestParams,
 };
 
+type Result = std::result::Result<(), String>;
+
 fn check_concurrent_results(
     value: String,
     clients: usize,
     expected: Vec<usize>,
-) -> anyhow::Result<()> {
+) -> Result {
     if !value.starts_with('(') || !value.ends_with(')') {
-        bail!("Malformed value string {}", value)
+        return Err(format!("Malformed value string {}", value));
     }
     let inner_value = &value[1..value.len() - 1];
     let mut progress = vec![0; clients];
     for pair_str in inner_value.split(")(") {
         let mut nums = vec![];
         for num_str in pair_str.split(", ") {
-            let num: usize = num_str.parse().context(format!(
-                "Parsing '{:?}' failed within '{:?}'",
-                num_str, value,
-            ))?;
+            let num: usize = num_str.parse().map_err(|_e| {
+                format!("Parsing '{:?}' failed within '{:?}'", num_str, value)
+            })?;
             nums.push(num);
         }
         if nums.len() != 2 {
-            bail!(
+            return Err(format!(
                 concat!(
                     "More than two numbers in the same group when",
                     " parsing '{:?}' failed within '{:?}'",
                 ),
-                pair_str,
-                value,
-            );
+                pair_str, value,
+            ));
         }
         let (client, curr) = (nums[0], nums[1]);
         if progress[client] != curr {
-            bail!(
+            return Err(format!(
                 "Client {} failed, expecting {}, got {}, others are {:?} in {}",
-                client,
-                progress[client],
-                curr,
-                progress,
-                value,
-            )
+                client, progress[client], curr, progress, value,
+            ));
         }
         progress[client] = curr + 1;
     }
@@ -88,7 +80,7 @@ fn unreliable_many_clients() {
 }
 
 #[test]
-fn unreliable_one_key_many_clients() -> anyhow::Result<()> {
+fn unreliable_one_key_many_clients() -> Result {
     const SERVERS: usize = 5;
     let cfg = Arc::new(make_config(SERVERS, true, 0));
     defer!(cfg.clean_up());
@@ -117,7 +109,7 @@ fn unreliable_one_key_many_clients() -> anyhow::Result<()> {
 }
 
 #[test]
-fn one_partition() -> anyhow::Result<()> {
+fn one_partition() -> Result {
     const SERVERS: usize = 5;
     let cfg = Arc::new(make_config(SERVERS, false, 0));
     defer!(cfg.clean_up());

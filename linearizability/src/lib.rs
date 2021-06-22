@@ -142,7 +142,10 @@ where
     <T as Model>::Output: Sync,
 {
     let mut results = vec![];
+    let mut partitions = vec![];
     for sub_history in T::partition(history) {
+        // Making a copy and pass the original value to the thread below.
+        partitions.push(sub_history.clone());
         results
             .push(std::thread::spawn(move || check_history::<T>(&sub_history)));
     }
@@ -150,7 +153,7 @@ where
     for (index, result) in results.into_iter().enumerate() {
         let result = result.join().expect("Search thread should never panic");
         if !result {
-            eprintln!("Partition {} failed.", index);
+            eprintln!("Partition {} failed: {:?}.", index, partitions[index]);
             failed.push(index);
         }
     }

@@ -1,4 +1,5 @@
-use std::sync::Arc;
+use std::cell::RefCell;
+use std::sync::{Arc, Weak};
 
 use parking_lot::Mutex;
 
@@ -7,9 +8,9 @@ use crate::{Peer, RaftState, State, Term};
 
 #[macro_export]
 macro_rules! check_or_record {
-    ($daemon_env:expr, $condition:expr, $error_kind:expr, $message:expr, $rf:expr) => {
+    ($condition:expr, $error_kind:expr, $message:expr, $rf:expr) => {
         if !$condition {
-            $daemon_env.record_error(
+            crate::daemon_env::ThreadEnv::upgrade().record_error(
                 $error_kind,
                 $message,
                 $rf,
@@ -19,9 +20,10 @@ macro_rules! check_or_record {
     };
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub(crate) struct DaemonEnv {
     data: Arc<Mutex<DaemonEnvData>>,
+    thread_env: ThreadEnv,
 }
 
 #[derive(Debug, Default)]
@@ -132,3 +134,75 @@ struct StrippedRaftState {
     state: State,
     leader_id: Peer,
 }
+
+impl DaemonEnv {
+    pub(crate) fn create() -> Self {
+        let data = Default::default();
+        // Pre-create a template thread_env, so that we can clone the weak
+        // pointer instead of downgrading frequently.
+        let thread_env = ThreadEnv {
+            data: Arc::downgrade(&data),
+        };
+        Self { data, thread_env }
+    }
+
+    pub(crate) fn for_thread(&self) -> ThreadEnv {
+        self.thread_env.clone()
+    }
+
+    pub(crate) fn for_scope(&self) -> ThreadEnvGuard {
+        self.for_thread().attach();
+        ThreadEnvGuard {}
+    }
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct ThreadEnv {
+    data: Weak<Mutex<DaemonEnvData>>,
+}
+
+impl ThreadEnv {
+    thread_local! {static ENV: RefCell<ThreadEnv> = Default::default()}
+
+    // The dance between Arc<> and Weak<> is complex, but useful:
+    // 1) We do not have to worry about slow RPC threads causing
+    // DaemonEnv::shutdown() to fail. They only hold a Weak<> pointer after all;
+    // 2) We have one system that works both in the environments that we control
+    // (daemon threads and our own thread pools), and in those we don't (RPC
+    // handling methods);
+    // 3) Utils (log_array, persister) can log errors without access to Raft;
+    // 4) Because of 2), we do not need to expose DaemonEnv externally outside
+    // this crate, even though there is a public macro referencing it.
+    //
+    // On the other hand, the cost is fairly small, because:
+    // 1) Clone of weak is cheap: one branch plus one relaxed atomic load;
+    // downgrade is more expensive, but we only do it once;
+    // 2) Upgrade of weak is expensive, but that only happens when there is
+    // an error, which should be (knock wood) rare;
+    // 3) Set and unset a thread_local value is cheap, too.
+    pub fn upgrade() -> DaemonEnv {
+        let env = Self::ENV.with(|env| env.borrow().clone());
+        DaemonEnv {
+            data: env.data.upgrade().unwrap(),
+            thread_env: env,
+        }
+    }
+
+    pub fn attach(self) {
+        Self::ENV.with(|env| env.replace(self));
+    }
+
+    pub fn detach() {
+        Self::ENV.with(|env| env.replace(Default::default()));
+    }
+}
+
+pub(crate) struct ThreadEnvGuard {}
+
+impl Drop for ThreadEnvGuard {
+    fn drop(&mut self) {
+        ThreadEnv::detach()
+    }
+}
+
+// TODO(ditsing): add tests.

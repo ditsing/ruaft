@@ -30,6 +30,9 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
         &self,
         args: InstallSnapshotArgs,
     ) -> InstallSnapshotReply {
+        // Note: do not change this to `let _ = ...`.
+        let _guard = self.daemon_env.for_scope();
+
         if args.offset != 0 || !args.done {
             panic!("Current implementation cannot handle segmented snapshots.")
         }
@@ -84,7 +87,6 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
             }
         } else {
             check_or_record!(
-                self.daemon_env,
                 args.last_included_index > rf.commit_index,
                 ErrorKind::SnapshotBeforeCommitted(
                     args.last_included_index,

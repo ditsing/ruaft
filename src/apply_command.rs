@@ -30,8 +30,12 @@ where
         let rf = self.inner_state.clone();
         let condvar = self.apply_command_signal.clone();
         let snapshot_daemon = self.snapshot_daemon.clone();
+        let daemon_env = self.daemon_env.clone();
         let stop_wait_group = self.stop_wait_group.clone();
         let join_handle = std::thread::spawn(move || {
+            // Note: do not change this to `let _ = ...`.
+            let _guard = daemon_env.for_scope();
+
             while keep_running.load(Ordering::SeqCst) {
                 let messages = {
                     let mut rf = rf.lock();

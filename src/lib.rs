@@ -18,7 +18,7 @@ use rand::{thread_rng, Rng};
 
 use crate::apply_command::ApplyCommandFnMut;
 pub use crate::apply_command::ApplyCommandMessage;
-use crate::daemon_env::{DaemonEnv, ErrorKind};
+use crate::daemon_env::{DaemonEnv, ErrorKind, ThreadEnv};
 use crate::index_term::IndexTerm;
 use crate::install_snapshot::InstallSnapshotArgs;
 use crate::persister::PersistedRaftState;
@@ -176,10 +176,14 @@ where
         };
         election.reset_election_timer();
 
+        let daemon_env = DaemonEnv::create();
+        let thread_env = daemon_env.for_thread();
         let thread_pool = tokio::runtime::Builder::new_multi_thread()
             .enable_time()
             .thread_name(format!("raft-instance-{}", me))
             .worker_threads(peer_size)
+            .on_thread_start(move || thread_env.clone().attach())
+            .on_thread_stop(ThreadEnv::detach)
             .build()
             .expect("Creating thread pool should not fail");
         let peers = peers.into_iter().map(Arc::new).collect();
@@ -194,7 +198,7 @@ where
             election: Arc::new(election),
             snapshot_daemon: Default::default(),
             thread_pool: Arc::new(thread_pool),
-            daemon_env: Default::default(),
+            daemon_env,
             stop_wait_group: WaitGroup::new(),
         };
 
@@ -228,6 +232,9 @@ where
         &self,
         args: RequestVoteArgs,
     ) -> RequestVoteReply {
+        // Note: do not change this to `let _ = ...`.
+        let _guard = self.daemon_env.for_scope();
+
         let mut rf = self.inner_state.lock();
 
         let term = rf.current_term;
@@ -277,6 +284,9 @@ where
         &self,
         args: AppendEntriesArgs<Command>,
     ) -> AppendEntriesReply {
+        // Note: do not change this to `let _ = ...`.
+        let _guard = self.daemon_env.for_scope();
+
         let mut rf = self.inner_state.lock();
         if rf.current_term > args.term {
             return AppendEntriesReply {
@@ -313,7 +323,6 @@ where
             if rf.log.end() > index {
                 if rf.log[index].term != entry.term {
                     check_or_record!(
-                        self.daemon_env,
                         index > rf.commit_index,
                         ErrorKind::RollbackCommitted(index),
                         "Entries before commit index should never be rolled back",
@@ -373,6 +382,9 @@ where
     fn run_election_timer(&self) {
         let this = self.clone();
         let join_handle = std::thread::spawn(move || {
+            // Note: do not change this to `let _ = ...`.
+            let _guard = this.daemon_env.for_scope();
+
             let election = this.election.clone();
 
             let mut should_run = None;
@@ -675,6 +687,9 @@ where
         // Clone everything that the thread needs.
         let this = self.clone();
         let join_handle = std::thread::spawn(move || {
+            // Note: do not change this to `let _ = ...`.
+            let _guard = this.daemon_env.for_scope();
+
             let mut openings = vec![];
             openings.resize_with(this.peers.len(), || {
                 Opening(Arc::new(AtomicUsize::new(0)))
@@ -941,7 +956,6 @@ where
         self.apply_command_signal.notify_all();
         self.snapshot_daemon.kill();
         self.stop_wait_group.wait();
-        self.daemon_env.shutdown();
         std::sync::Arc::try_unwrap(self.thread_pool)
             .expect(
                 "All references to the thread pool should have been dropped.",
@@ -949,6 +963,9 @@ where
             .shutdown_timeout(Duration::from_millis(
                 HEARTBEAT_INTERVAL_MILLIS * 2,
             ));
+        // DaemonEnv must be shutdown after the thread pool, since there might
+        // be tasks logging errors in the pool.
+        self.daemon_env.shutdown();
     }
 
     pub fn get_state(&self) -> (Term, bool) {

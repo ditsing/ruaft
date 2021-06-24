@@ -4,6 +4,8 @@ use std::sync::Arc;
 use crossbeam_utils::sync::{Parker, Unparker};
 use parking_lot::{Condvar, Mutex};
 
+use crate::check_or_record;
+use crate::daemon_env::ErrorKind;
 use crate::{Index, Raft};
 
 #[derive(Clone, Debug, Default)]
@@ -78,6 +80,7 @@ impl<C: 'static + Clone + Default + Send + serde::Serialize> Raft<C> {
         let rf = self.inner_state.clone();
         let persister = self.persister.clone();
         let snapshot_daemon = self.snapshot_daemon.clone();
+        let daemon_env = self.daemon_env.clone();
         let stop_wait_group = self.stop_wait_group.clone();
 
         let join_handle = std::thread::spawn(move || loop {
@@ -88,6 +91,7 @@ impl<C: 'static + Clone + Default + Send + serde::Serialize> Raft<C> {
                 drop(rf);
                 drop(persister);
                 drop(snapshot_daemon);
+                drop(daemon_env);
                 drop(stop_wait_group);
                 break;
             }
@@ -118,7 +122,16 @@ impl<C: 'static + Clone + Default + Send + serde::Serialize> Raft<C> {
                     continue;
                 }
 
-                assert!(snapshot.last_included_index < rf.log.end());
+                check_or_record!(
+                    daemon_env,
+                    snapshot.last_included_index < rf.log.end(),
+                    ErrorKind::SnapshotAfterLogEnd(
+                        snapshot.last_included_index,
+                    ),
+                    "Snapshot contains data that is not in the log. \
+                     This could happen when logs shrinks.",
+                    &rf
+                );
 
                 rf.log.shift(snapshot.last_included_index, snapshot.data);
                 persister.save_snapshot_and_state(

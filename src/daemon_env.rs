@@ -41,6 +41,8 @@ pub(crate) struct Error {
 #[derive(Debug)]
 pub(crate) enum ErrorKind {
     RollbackCommitted(usize),
+    SnapshotBeforeCommitted(usize, Term),
+    SnapshotAfterLogEnd(usize),
 }
 
 impl DaemonEnv {

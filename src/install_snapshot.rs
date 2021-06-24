@@ -1,3 +1,5 @@
+use crate::check_or_record;
+use crate::daemon_env::ErrorKind;
 use crate::index_term::IndexTerm;
 use crate::utils::retry_rpc;
 use crate::{
@@ -81,7 +83,16 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
                 rf.log.shift(args.last_included_index, args.data);
             }
         } else {
-            assert!(args.last_included_index > rf.commit_index);
+            check_or_record!(
+                self.daemon_env,
+                args.last_included_index > rf.commit_index,
+                ErrorKind::SnapshotBeforeCommitted(
+                    args.last_included_index,
+                    args.last_included_term
+                ),
+                "Snapshot data is inconsistent with committed log entry.",
+                &rf
+            );
             rf.commit_index = args.last_included_index;
             rf.log.reset(
                 args.last_included_index,

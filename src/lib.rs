@@ -18,6 +18,7 @@ use rand::{thread_rng, Rng};
 
 use crate::apply_command::ApplyCommandFnMut;
 pub use crate::apply_command::ApplyCommandMessage;
+use crate::daemon_env::{Component, DaemonEnv, ErrorKind};
 use crate::index_term::IndexTerm;
 use crate::install_snapshot::InstallSnapshotArgs;
 use crate::persister::PersistedRaftState;
@@ -30,6 +31,7 @@ use crate::snapshot::{RequestSnapshotFnMut, SnapshotDaemon};
 use crate::utils::retry_rpc;
 
 mod apply_command;
+mod daemon_env;
 mod index_term;
 mod install_snapshot;
 mod log_array;
@@ -79,6 +81,7 @@ pub struct Raft<Command> {
 
     thread_pool: Arc<tokio::runtime::Runtime>,
 
+    daemon_env: DaemonEnv<Command>,
     stop_wait_group: WaitGroup,
 }
 
@@ -191,6 +194,7 @@ where
             election: Arc::new(election),
             snapshot_daemon: Default::default(),
             thread_pool: Arc::new(thread_pool),
+            daemon_env: Default::default(),
             stop_wait_group: WaitGroup::new(),
         };
 
@@ -308,9 +312,13 @@ where
             let index = i + args.prev_log_index + 1;
             if rf.log.end() > index {
                 if rf.log[index].term != entry.term {
-                    assert!(
+                    check_or_record!(
+                        self.daemon_env,
                         index > rf.commit_index,
-                        "Entries before commit index should never be rolled back"
+                        Component::AppendEntries,
+                        ErrorKind::RollbackCommitted(index),
+                        "Entries before commit index should never be rolled back",
+                        &rf
                     );
                     rf.log.truncate(index);
                     rf.log.push(entry.clone());
@@ -363,9 +371,9 @@ impl<Command> Raft<Command>
 where
     Command: 'static + Clone + Send + serde::Serialize + Default,
 {
-    fn run_election_timer(&self) -> std::thread::JoinHandle<()> {
+    fn run_election_timer(&self) {
         let this = self.clone();
-        std::thread::spawn(move || {
+        let join_handle = std::thread::spawn(move || {
             let election = this.election.clone();
 
             let mut should_run = None;
@@ -435,7 +443,8 @@ where
             // Making sure the rest of `this` is dropped before the wait group.
             drop(this);
             drop(stop_wait_group);
-        })
+        });
+        self.daemon_env.watch_daemon(join_handle);
     }
 
     fn run_election(
@@ -660,13 +669,13 @@ where
         Ok(())
     }
 
-    fn run_log_entry_daemon(&mut self) -> std::thread::JoinHandle<()> {
+    fn run_log_entry_daemon(&mut self) {
         let (tx, rx) = std::sync::mpsc::channel::<Option<Peer>>();
         self.new_log_entry.replace(tx);
 
         // Clone everything that the thread needs.
         let this = self.clone();
-        std::thread::spawn(move || {
+        let join_handle = std::thread::spawn(move || {
             let mut openings = vec![];
             openings.resize_with(this.peers.len(), || {
                 Opening(Arc::new(AtomicUsize::new(0)))
@@ -703,7 +712,8 @@ where
             // Making sure the rest of `this` is dropped before the wait group.
             drop(this);
             drop(stop_wait_group);
-        })
+        });
+        self.daemon_env.watch_daemon(join_handle);
     }
 
     async fn sync_log_entry(
@@ -932,6 +942,7 @@ where
         self.apply_command_signal.notify_all();
         self.snapshot_daemon.kill();
         self.stop_wait_group.wait();
+        self.daemon_env.shutdown();
         std::sync::Arc::try_unwrap(self.thread_pool)
             .expect(
                 "All references to the thread pool should have been dropped.",

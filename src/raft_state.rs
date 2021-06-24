@@ -2,7 +2,7 @@ use crate::{
     log_array::LogArray, persister::PersistedRaftState, Index, Peer, Term,
 };
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum State {
     Follower,
     Candidate,

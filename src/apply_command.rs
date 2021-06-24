@@ -25,13 +25,13 @@ where
     pub(crate) fn run_apply_command_daemon(
         &self,
         mut apply_command: impl ApplyCommandFnMut<Command>,
-    ) -> std::thread::JoinHandle<()> {
+    ) {
         let keep_running = self.keep_running.clone();
         let rf = self.inner_state.clone();
         let condvar = self.apply_command_signal.clone();
         let snapshot_daemon = self.snapshot_daemon.clone();
         let stop_wait_group = self.stop_wait_group.clone();
-        std::thread::spawn(move || {
+        let join_handle = std::thread::spawn(move || {
             while keep_running.load(Ordering::SeqCst) {
                 let messages = {
                     let mut rf = rf.lock();
@@ -79,6 +79,7 @@ where
             }
 
             drop(stop_wait_group);
-        })
+        });
+        self.daemon_env.watch_daemon(join_handle);
     }
 }

@@ -80,7 +80,7 @@ impl<C: 'static + Clone + Default + Send + serde::Serialize> Raft<C> {
         let snapshot_daemon = self.snapshot_daemon.clone();
         let stop_wait_group = self.stop_wait_group.clone();
 
-        std::thread::spawn(move || loop {
+        let join_handle = std::thread::spawn(move || loop {
             parker.park();
             if !keep_running.load(Ordering::SeqCst) {
                 // Explicitly drop every thing.
@@ -127,5 +127,6 @@ impl<C: 'static + Clone + Default + Send + serde::Serialize> Raft<C> {
                 );
             }
         });
+        self.daemon_env.watch_daemon(join_handle);
     }
 }

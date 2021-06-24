@@ -96,7 +96,6 @@ impl<C> LogArray<C> {
     }
 
     /// All log entries stored in the array.
-    #[cfg(test)]
     pub fn all(&self) -> &[LogEntry<C>] {
         &self.inner[..]
     }

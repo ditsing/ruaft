@@ -18,7 +18,7 @@ use rand::{thread_rng, Rng};
 
 use crate::apply_command::ApplyCommandFnMut;
 pub use crate::apply_command::ApplyCommandMessage;
-use crate::daemon_env::{Component, DaemonEnv, ErrorKind};
+use crate::daemon_env::{DaemonEnv, ErrorKind};
 use crate::index_term::IndexTerm;
 use crate::install_snapshot::InstallSnapshotArgs;
 use crate::persister::PersistedRaftState;
@@ -315,7 +315,6 @@ where
                     check_or_record!(
                         self.daemon_env,
                         index > rf.commit_index,
-                        Component::AppendEntries,
                         ErrorKind::RollbackCommitted(index),
                         "Entries before commit index should never be rolled back",
                         &rf

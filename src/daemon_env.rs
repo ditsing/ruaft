@@ -8,10 +8,9 @@ use crate::{Peer, RaftState, State, Term};
 
 #[macro_export]
 macro_rules! check_or_record {
-    ($daemon_env:expr, $condition:expr, $component:expr, $error_kind:expr, $message:expr, $rf:expr) => {
+    ($daemon_env:expr, $condition:expr, $error_kind:expr, $message:expr, $rf:expr) => {
         if !$condition {
             $daemon_env.record_error(
-                $component,
                 $error_kind,
                 $message,
                 $rf,
@@ -35,7 +34,6 @@ struct DaemonEnvData<T> {
 
 #[derive(Debug)]
 pub(crate) struct Error {
-    component: Component,
     error_kind: ErrorKind,
     message: String,
     raft_state: StrippedRaftState,
@@ -47,34 +45,15 @@ pub(crate) enum ErrorKind {
     RollbackCommitted(usize),
 }
 
-#[allow(dead_code)]
-#[derive(Debug)]
-pub(crate) enum Component {
-    // Daemon threads.
-    Election,
-    SyncLogEntry,
-    ApplyCommand,
-    Snapshot,
-    // Daemon tasks
-    VoteCountingTask,
-    SyncLogEntryTask,
-    // RPC handlers
-    InstallSnapshot,
-    AppendEntries,
-    RequestVote,
-}
-
 impl<T> DaemonEnv<T> {
     pub fn record_error<S: AsRef<str>>(
         &self,
-        component: Component,
         error_kind: ErrorKind,
         message: S,
         raft_state: &RaftState<T>,
         file_line: &'static str,
     ) {
         self.data.lock().errors.push(Error {
-            component,
             error_kind,
             message: message.as_ref().into(),
             raft_state: Self::strip_data(raft_state),

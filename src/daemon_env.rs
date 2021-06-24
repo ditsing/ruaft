@@ -1,4 +1,3 @@
-use std::marker::PhantomData;
 use std::sync::Arc;
 
 use parking_lot::Mutex;
@@ -21,15 +20,14 @@ macro_rules! check_or_record {
 }
 
 #[derive(Clone, Debug, Default)]
-pub(crate) struct DaemonEnv<T> {
-    data: Arc<Mutex<DaemonEnvData<T>>>,
+pub(crate) struct DaemonEnv {
+    data: Arc<Mutex<DaemonEnvData>>,
 }
 
 #[derive(Debug, Default)]
-struct DaemonEnvData<T> {
+struct DaemonEnvData {
     errors: Vec<Error>,
     daemons: Vec<std::thread::JoinHandle<()>>,
-    phantom: PhantomData<T>,
 }
 
 #[derive(Debug)]
@@ -45,8 +43,8 @@ pub(crate) enum ErrorKind {
     RollbackCommitted(usize),
 }
 
-impl<T> DaemonEnv<T> {
-    pub fn record_error<S: AsRef<str>>(
+impl DaemonEnv {
+    pub fn record_error<T, S: AsRef<str>>(
         &self,
         error_kind: ErrorKind,
         message: S,
@@ -109,7 +107,7 @@ impl<T> DaemonEnv<T> {
         }
     }
 
-    fn strip_data(raft: &RaftState<T>) -> StrippedRaftState {
+    fn strip_data<T>(raft: &RaftState<T>) -> StrippedRaftState {
         StrippedRaftState {
             current_term: raft.current_term,
             voted_for: raft.voted_for,

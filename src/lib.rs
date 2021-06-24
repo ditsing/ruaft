@@ -81,7 +81,7 @@ pub struct Raft<Command> {
 
     thread_pool: Arc<tokio::runtime::Runtime>,
 
-    daemon_env: DaemonEnv<Command>,
+    daemon_env: DaemonEnv,
     stop_wait_group: WaitGroup,
 }
 

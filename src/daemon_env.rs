@@ -78,10 +78,12 @@ impl DaemonEnv {
             .into_iter()
             .filter_map(|join_handle| {
                 let err = join_handle.join().err()?;
-                let err_str = err
-                    .downcast_ref::<&str>()
-                    .map_or("unknown panic error", |s| s.to_owned());
-                Some("\n".to_owned() + err_str)
+                let err_str = err.downcast_ref::<&str>().map(|s| s.to_owned());
+                let err_string =
+                    err.downcast_ref::<String>().map(|s| s.as_str());
+                let err =
+                    err_str.or(err_string).unwrap_or("unknown panic error");
+                Some("\n".to_owned() + err)
             })
             .collect();
         let recorded_errors: Vec<String> = data

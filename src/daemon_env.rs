@@ -162,7 +162,7 @@ impl DaemonEnv {
     /// environment. It should be added to any thread that executes Raft code.
     /// Use [`DaemonEnv::for_thread`] or [`DaemonEnv::for_scope`] to register
     /// the environment.
-    pub(crate) fn create() -> Self {
+    pub fn create() -> Self {
         let data = Default::default();
         // Pre-create a template thread_env, so that we can clone the weak
         // pointer instead of downgrading frequently.
@@ -176,13 +176,13 @@ impl DaemonEnv {
     /// running in the thread can use this `DaemonEnv` to log errors. The thread
     /// must be stopped before `DaemonEnv::shutdown()` is called, otherwise it
     /// will panic when logging an error.
-    pub(crate) fn for_thread(&self) -> ThreadEnv {
+    pub fn for_thread(&self) -> ThreadEnv {
         self.thread_env.clone()
     }
 
     /// Creates a [`ThreadEnvGuard`] that registers this `DaemonEnv` in the
     /// current scope, which also remove it from the scope when dropped.
-    pub(crate) fn for_scope(&self) -> ThreadEnvGuard {
+    pub fn for_scope(&self) -> ThreadEnvGuard {
         self.for_thread().attach();
         ThreadEnvGuard {}
     }

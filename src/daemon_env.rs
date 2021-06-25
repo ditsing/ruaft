@@ -231,7 +231,7 @@ impl ThreadEnv {
 
     /// Detach the instance stored in the current thread.
     pub fn detach() {
-        Self::ENV.with(|env| env.replace(Default::default()));
+        Self::ENV.with(|env| env.take());
     }
 }
 

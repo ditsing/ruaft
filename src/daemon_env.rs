@@ -245,4 +245,104 @@ impl Drop for ThreadEnvGuard {
     }
 }
 
-// TODO(ditsing): add tests.
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_same_env(local_env: DaemonEnv, daemon_env: DaemonEnv) {
+        assert!(Arc::ptr_eq(&local_env.data, &daemon_env.data));
+    }
+
+    fn make_raft_state() -> RaftState<i32> {
+        RaftState {
+            current_term: Term(0),
+            voted_for: None,
+            log: crate::log_array::LogArray::create(),
+            commit_index: 0,
+            last_applied: 0,
+            next_index: vec![1; 1],
+            match_index: vec![0; 1],
+            current_step: vec![0; 1],
+            state: State::Follower,
+            leader_id: Peer(0),
+        }
+    }
+
+    #[test]
+    fn test_for_thread() {
+        let daemon_env = DaemonEnv::create();
+        let thread_env = daemon_env.for_thread();
+        let join_handle = std::thread::spawn(|| {
+            thread_env.attach();
+            let local_env = ThreadEnv::upgrade();
+            ThreadEnv::detach();
+            local_env
+        });
+        let local_env = join_handle
+            .join()
+            .expect("local env should be the same as daemon_env");
+        assert_same_env(local_env, daemon_env);
+    }
+
+    #[test]
+    fn test_for_scope() {
+        let daemon_env = DaemonEnv::create();
+        let local_env = {
+            let _gurad = daemon_env.for_scope();
+            ThreadEnv::upgrade()
+        };
+        assert_same_env(local_env, daemon_env);
+        // A weak pointer with weak_count == 0 is a null weak pointer.
+        ThreadEnv::ENV
+            .with(|env| assert_eq!(env.borrow().data.weak_count(), 0));
+    }
+
+    #[test]
+    fn test_record_error() {
+        let daemon_env = DaemonEnv::create();
+        {
+            let _guard = daemon_env.for_scope();
+            let state = make_raft_state();
+            check_or_record!(
+                0 > 1,
+                ErrorKind::SnapshotAfterLogEnd(1),
+                "Just kidding",
+                &state
+            )
+        }
+        let guard = daemon_env.data.lock();
+        let errors = &guard.errors;
+        assert_eq!(errors.len(), 1);
+        assert!(matches!(
+            errors[0].error_kind,
+            ErrorKind::SnapshotAfterLogEnd(1)
+        ));
+        assert_eq!(&errors[0].message, "Just kidding");
+    }
+
+    #[test]
+    fn test_watch_daemon_shutdown() {
+        let daemon_env = DaemonEnv::create();
+        let panic_thread = std::thread::spawn(|| {
+            panic!("message with type &str");
+        });
+        daemon_env.watch_daemon(panic_thread);
+        let another_panic_thread = std::thread::spawn(|| {
+            panic!("message with type {:?}", "debug string");
+        });
+        daemon_env.watch_daemon(another_panic_thread);
+
+        let result = std::thread::spawn(move || {
+            daemon_env.shutdown();
+        })
+        .join();
+        let message = result.expect_err("shutdown should have panicked");
+        let message = message
+            .downcast_ref::<String>()
+            .expect("Error message should be a string.");
+        assert_eq!(
+            message,
+            "\n2 daemon panic(s):\nmessage with type &str\nmessage with type \"debug string\"\n0 error(s):\n"
+        );
+    }
+}

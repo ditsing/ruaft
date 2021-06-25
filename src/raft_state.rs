@@ -27,6 +27,23 @@ pub(crate) struct RaftState<Command> {
     pub leader_id: Peer,
 }
 
+impl<Command: Default> RaftState<Command> {
+    pub fn create(peer_size: usize, me: Peer) -> Self {
+        RaftState {
+            current_term: Term(0),
+            voted_for: None,
+            log: crate::log_array::LogArray::create(),
+            commit_index: 0,
+            last_applied: 0,
+            next_index: vec![1; peer_size],
+            match_index: vec![0; peer_size],
+            current_step: vec![0; peer_size],
+            state: State::Follower,
+            leader_id: me,
+        }
+    }
+}
+
 impl<Command: Clone> RaftState<Command> {
     pub fn persisted_state(&self) -> PersistedRaftState<Command> {
         self.into()

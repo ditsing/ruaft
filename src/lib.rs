@@ -148,18 +148,8 @@ where
         request_snapshot: impl RequestSnapshotFnMut,
     ) -> Self {
         let peer_size = peers.len();
-        let mut state = RaftState {
-            current_term: Term(0),
-            voted_for: None,
-            log: log_array::LogArray::create(),
-            commit_index: 0,
-            last_applied: 0,
-            next_index: vec![1; peer_size],
-            match_index: vec![0; peer_size],
-            current_step: vec![0; peer_size],
-            state: State::Follower,
-            leader_id: Peer(me),
-        };
+        assert!(peer_size > me, "My index should be smaller than peer size.");
+        let mut state = RaftState::create(peer_size, Peer(me));
 
         if let Ok(persisted_state) =
             PersistedRaftState::try_from(persister.read_state())

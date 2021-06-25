@@ -253,21 +253,6 @@ mod tests {
         assert!(Arc::ptr_eq(&local_env.data, &daemon_env.data));
     }
 
-    fn make_raft_state() -> RaftState<i32> {
-        RaftState {
-            current_term: Term(0),
-            voted_for: None,
-            log: crate::log_array::LogArray::create(),
-            commit_index: 0,
-            last_applied: 0,
-            next_index: vec![1; 1],
-            match_index: vec![0; 1],
-            current_step: vec![0; 1],
-            state: State::Follower,
-            leader_id: Peer(0),
-        }
-    }
-
     #[test]
     fn test_for_thread() {
         let daemon_env = DaemonEnv::create();
@@ -302,7 +287,7 @@ mod tests {
         let daemon_env = DaemonEnv::create();
         {
             let _guard = daemon_env.for_scope();
-            let state = make_raft_state();
+            let state = RaftState::<i32>::create(1, Peer(0));
             check_or_record!(
                 0 > 1,
                 ErrorKind::SnapshotAfterLogEnd(1),

@@ -1,10 +1,10 @@
 use crate::check_or_record;
 use crate::daemon_env::ErrorKind;
 use crate::index_term::IndexTerm;
+use crate::sync_log_entry::SyncLogEntryResult;
 use crate::utils::retry_rpc;
 use crate::{
-    Index, Peer, Raft, RaftState, RpcClient, State, SyncLogEntryResult, Term,
-    RPC_DEADLINE,
+    Index, Peer, Raft, RaftState, RpcClient, State, Term, RPC_DEADLINE,
 };
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

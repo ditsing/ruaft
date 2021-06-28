@@ -5,11 +5,10 @@ use std::time::Duration;
 use parking_lot::{Condvar, Mutex};
 
 use crate::index_term::IndexTerm;
-use crate::install_snapshot::InstallSnapshotArgs;
 use crate::utils::retry_rpc;
 use crate::{
-    AppendEntriesArgs, Peer, Raft, RaftState, RpcClient, Term,
-    HEARTBEAT_INTERVAL_MILLIS, RPC_DEADLINE,
+    AppendEntriesArgs, InstallSnapshotArgs, Peer, Raft, RaftState, RpcClient,
+    Term, HEARTBEAT_INTERVAL_MILLIS, RPC_DEADLINE,
 };
 
 #[repr(align(64))]
@@ -114,8 +113,7 @@ where
                 let term = args.term;
                 let prev_log_index = args.last_included_index;
                 let match_index = args.last_included_index;
-                let succeeded =
-                    Self::send_install_snapshot(&rpc_client, args).await;
+                let succeeded = Self::install_snapshot(&rpc_client, args).await;
 
                 (term, prev_log_index, match_index, succeeded)
             }
@@ -284,6 +282,42 @@ where
                 } else {
                     SyncLogEntryResult::Diverged(committed)
                 }
+            } else {
+                SyncLogEntryResult::Success
+            }
+        } else {
+            SyncLogEntryResult::TermElapsed(reply.term)
+        })
+    }
+
+    fn build_install_snapshot(rf: &RaftState<Command>) -> InstallSnapshotArgs {
+        let (last, snapshot) = rf.log.snapshot();
+        InstallSnapshotArgs {
+            term: rf.current_term,
+            leader_id: rf.leader_id,
+            last_included_index: last.index,
+            last_included_term: last.term,
+            data: snapshot.to_owned(),
+            offset: 0,
+            done: true,
+        }
+    }
+
+    const INSTALL_SNAPSHOT_RETRY: usize = 1;
+    async fn install_snapshot(
+        rpc_client: &RpcClient,
+        args: InstallSnapshotArgs,
+    ) -> std::io::Result<SyncLogEntryResult> {
+        let term = args.term;
+        let reply = retry_rpc(
+            Self::INSTALL_SNAPSHOT_RETRY,
+            RPC_DEADLINE,
+            move |_round| rpc_client.call_install_snapshot(args.clone()),
+        )
+        .await?;
+        Ok(if reply.term == term {
+            if let Some(committed) = reply.committed {
+                SyncLogEntryResult::Archived(committed)
             } else {
                 SyncLogEntryResult::Success
             }

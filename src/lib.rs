@@ -33,10 +33,10 @@ mod daemon_env;
 mod election;
 mod heartbeats;
 mod index_term;
-mod install_snapshot;
 mod log_array;
 mod persister;
 mod process_append_entries;
+mod process_install_snapshot;
 mod process_request_vote;
 mod raft_state;
 pub mod rpcs;
@@ -109,6 +109,24 @@ struct AppendEntriesArgs<Command> {
 struct AppendEntriesReply {
     term: Term,
     success: bool,
+    committed: Option<IndexTerm>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct InstallSnapshotArgs {
+    pub(crate) term: Term,
+    leader_id: Peer,
+    pub(crate) last_included_index: Index,
+    last_included_term: Term,
+    // TODO(ditsing): Serde cannot handle Vec<u8> as efficient as expected.
+    data: Vec<u8>,
+    offset: usize,
+    done: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+struct InstallSnapshotReply {
+    term: Term,
     committed: Option<IndexTerm>,
 }
 

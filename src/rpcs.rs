@@ -1,10 +1,9 @@
 use labrpc::{Client, Network, ReplyMessage, RequestMessage, Server};
 use parking_lot::Mutex;
 
-use crate::install_snapshot::{InstallSnapshotArgs, InstallSnapshotReply};
 use crate::{
-    AppendEntriesArgs, AppendEntriesReply, Raft, RequestVoteArgs,
-    RequestVoteReply,
+    AppendEntriesArgs, AppendEntriesReply, InstallSnapshotArgs,
+    InstallSnapshotReply, Raft, RequestVoteArgs, RequestVoteReply,
 };
 use serde::de::DeserializeOwned;
 use serde::Serialize;

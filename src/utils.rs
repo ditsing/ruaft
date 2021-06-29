@@ -28,3 +28,5 @@ where
         format!("Timed out after {} retries", max_retry),
     ))
 }
+
+pub const RPC_DEADLINE: Duration = Duration::from_secs(2);

@@ -5,11 +5,8 @@ use std::time::{Duration, Instant};
 use parking_lot::{Condvar, Mutex};
 use rand::{thread_rng, Rng};
 
-use crate::utils::retry_rpc;
-use crate::{
-    Peer, Raft, RaftState, RequestVoteArgs, RpcClient, State, Term,
-    RPC_DEADLINE,
-};
+use crate::utils::{retry_rpc, RPC_DEADLINE};
+use crate::{Peer, Raft, RaftState, RequestVoteArgs, RpcClient, State, Term};
 
 #[derive(Default)]
 pub(crate) struct ElectionState {

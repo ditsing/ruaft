@@ -5,10 +5,10 @@ use std::time::Duration;
 use parking_lot::{Condvar, Mutex};
 
 use crate::index_term::IndexTerm;
-use crate::utils::retry_rpc;
+use crate::utils::{retry_rpc, RPC_DEADLINE};
 use crate::{
     AppendEntriesArgs, InstallSnapshotArgs, Peer, Raft, RaftState, RpcClient,
-    Term, HEARTBEAT_INTERVAL_MILLIS, RPC_DEADLINE,
+    Term, HEARTBEAT_INTERVAL_MILLIS,
 };
 
 #[repr(align(64))]

@@ -269,7 +269,6 @@ where
 }
 
 pub(crate) const HEARTBEAT_INTERVAL_MILLIS: u64 = 150;
-const RPC_DEADLINE: Duration = Duration::from_secs(2);
 
 impl<C> Raft<C> {
     pub const NO_SNAPSHOT: fn(Index) = |_| {};

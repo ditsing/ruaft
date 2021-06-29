@@ -4,8 +4,8 @@ use std::time::Duration;
 
 use parking_lot::Mutex;
 
-use crate::utils::retry_rpc;
-use crate::{AppendEntriesArgs, Raft, RaftState, RpcClient, RPC_DEADLINE};
+use crate::utils::{retry_rpc, RPC_DEADLINE};
+use crate::{AppendEntriesArgs, Raft, RaftState, RpcClient};
 
 // Command must be
 // 0. 'static: Raft<Command> must be 'static, it is moved to another thread.

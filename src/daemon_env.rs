@@ -288,7 +288,7 @@ mod tests {
     fn test_for_scope() {
         let daemon_env = DaemonEnv::create();
         let local_env = {
-            let _gurad = daemon_env.for_scope();
+            let _guard = daemon_env.for_scope();
             ThreadEnv::upgrade()
         };
         assert_same_env(local_env, daemon_env);

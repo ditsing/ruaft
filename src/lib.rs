@@ -41,7 +41,7 @@ mod process_request_vote;
 mod raft_state;
 pub mod rpcs;
 mod snapshot;
-mod sync_log_entry;
+mod sync_log_entries;
 pub mod utils;
 
 #[derive(

@@ -45,6 +45,10 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
         // to rollback beyond that, since it is guaranteed that committed log
         // entries will never be rolled back.
         if args.last_included_index < rf.log.start() {
+            // This is a condition that should always hold. Combine the if- and
+            // assert- conditions, we can conclude that last_include_index is
+            // smaller than commit_index. The leader might double check that.
+            assert!(rf.log.start() <= rf.commit_index);
             return InstallSnapshotReply {
                 term: args.term,
                 committed: Some(rf.log.first_after(rf.commit_index).into()),

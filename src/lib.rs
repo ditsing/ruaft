@@ -161,6 +161,10 @@ where
         let peer_size = peers.len();
         assert!(peer_size > me, "My index should be smaller than peer size.");
         let mut state = RaftState::create(peer_size, Peer(me));
+        // COMMIT_INDEX_INVARIANT, SNAPSHOT_INDEX_INVARIANT: Initially
+        // commit_index = log.start() and commit_index + 1 = log.end(). Thus
+        // log.start() <= commit_index and commit_index < log.end() both hold.
+        assert_eq!(state.commit_index + 1, state.log.end());
 
         if let Ok(persisted_state) =
             PersistedRaftState::try_from(persister.read_state())
@@ -169,6 +173,10 @@ where
             state.voted_for = persisted_state.voted_for;
             state.log = persisted_state.log;
             state.commit_index = state.log.start();
+            // COMMIT_INDEX_INVARIANT, SNAPSHOT_INDEX_INVARIANT: the saved
+            // snapshot must have a valid log.start() and log.end(). Thus
+            // log.start() <= commit_index and commit_index < log.end() hold.
+            assert!(state.commit_index < state.log.end());
         }
 
         let election = ElectionState::create();

@@ -59,6 +59,9 @@ pub(crate) enum ErrorKind {
     SnapshotBeforeCommitted(usize, Term),
     /// The application sent a snapshot that contains items beyond the log end.
     SnapshotAfterLogEnd(usize),
+    /// The application sent a snapshot that contains items that are not
+    /// committed yet. Only committed items are sent to the application.
+    SnapshotNotCommitted(usize),
     /// The recipient of [`crate::InstallSnapshot`] should have been able to
     /// verify the term at index `.0` but did not. The index `.0` is after
     /// their commit index `.1`, and thus not yet committed or archived into a

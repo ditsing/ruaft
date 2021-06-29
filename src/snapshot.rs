@@ -134,7 +134,20 @@ impl<C: 'static + Clone + Default + Send + serde::Serialize> Raft<C> {
                      This could happen when logs shrinks.",
                     &rf
                 );
+                check_or_record!(
+                    snapshot.last_included_index <= rf.commit_index,
+                    ErrorKind::SnapshotNotCommitted(
+                        snapshot.last_included_index
+                    ),
+                    "Snapshot contains data that is not committed. \
+                     This should never happen.",
+                    &rf
+                );
 
+                // SNAPSHOT_INDEX_INVARIANT: log.start() is shifted to
+                // last_included_index. We checked that last_included_index is
+                // smaller than commit_index. This is the only place where
+                // log.start() changes.
                 rf.log.shift(snapshot.last_included_index, snapshot.data);
                 persister.save_snapshot_and_state(
                     rf.persisted_state().into(),

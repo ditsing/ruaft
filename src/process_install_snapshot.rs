@@ -61,11 +61,18 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
         {
             // Do nothing if the index and term match the current snapshot.
             if args.last_included_index != rf.log.start() {
+                // SNAPSHOT_INDEX_INVARIANT: commit_index increases (or stays
+                // unchanged) after this if-statement. Thus log.start() <=
+                // commit_index still holds.
+                // COMMIT_INDEX_INVARIANT: The condition of the outer if-
+                // statement guarantees that last_included_index is smaller
+                // than log.end().
                 if rf.commit_index < args.last_included_index {
                     rf.commit_index = args.last_included_index;
                 }
                 rf.log.shift(args.last_included_index, args.data);
             }
+            // COMMIT_INDEX_INVARIANT: log.end() does not move.
         } else {
             check_or_record!(
                 args.last_included_index > rf.commit_index,
@@ -76,6 +83,8 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
                 "Snapshot data is inconsistent with committed log entry.",
                 &rf
             );
+            // COMMIT_INDEX_INVARIANT, SNAPSHOT_INDEX_INVARIANT: After those two
+            // updates, commit_index is exactly log.start() and log.end() - 1.
             rf.commit_index = args.last_included_index;
             rf.log.reset(
                 args.last_included_index,

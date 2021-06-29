@@ -49,6 +49,8 @@ where
             };
         }
 
+        // COMMIT_INDEX_INVARIANT: Before this loop, we can safely assume that
+        // commit_index < log.end().
         for (i, entry) in args.entries.iter().enumerate() {
             let index = i + args.prev_log_index + 1;
             if rf.log.end() > index {
@@ -59,20 +61,36 @@ where
                         "Entries before commit index should never be rolled back",
                         &rf
                     );
+                    // COMMIT_INDEX_INVARIANT: log.end() shrinks to index. We
+                    // checked that index is strictly larger than commit_index.
+                    // The condition that commit_index < log.end() holds.
                     rf.log.truncate(index);
                     rf.log.push(entry.clone());
                 }
+                // COMMIT_INDEX_INVARIANT: Otherwise log.end() does not move.
+                // The condition that commit_index < log.end() holds.
             } else {
+                // COMMIT_INDEX_INVARIANT: log.end() grows larger. The condition
+                // that commit_index < log.end() holds.
                 rf.log.push(entry.clone());
             }
         }
+        // COMMIT_INDEX_INVARIANT: After the loop, commit_index < log.end()
+        // must still hold.
 
         self.persister.save_state(rf.persisted_state().into());
 
+        // SNAPSHOT_INDEX_INVARIANT: commit_index increases (or stays unchanged)
+        // after this if-statement. log.start() <= commit_index still holds.
         if args.leader_commit > rf.commit_index {
+            // COMMIT_INDEX_INVARIANT: commit_index < log.end() still holds
+            // after this assignment.
             rf.commit_index = if args.leader_commit < rf.log.end() {
+                // COMMIT_INDEX_INVARIANT: The if-condition guarantees that
+                // leader_commit < log.end().
                 args.leader_commit
             } else {
+                // COMMIT_INDEX_INVARIANT: This is exactly log.end() - 1.
                 rf.log.last_index_term().index
             };
             self.apply_command_signal.notify_one();

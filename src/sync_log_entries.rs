@@ -143,6 +143,10 @@ where
                         if new_commit_index > rf.commit_index
                             && rf.log[new_commit_index].term == rf.current_term
                         {
+                            // COMMIT_INDEX_INVARIANT, SNAPSHOT_INDEX_INVARIANT:
+                            // Index new_commit_index exists in the log array,
+                            // which implies new_commit_index is in range
+                            // [log.start(), log.end()).
                             rf.commit_index = new_commit_index;
                             apply_command_signal.notify_one();
                         }

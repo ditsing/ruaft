@@ -59,6 +59,18 @@ pub(crate) enum ErrorKind {
     SnapshotBeforeCommitted(usize, Term),
     /// The application sent a snapshot that contains items beyond the log end.
     SnapshotAfterLogEnd(usize),
+    /// The recipient of [`crate::InstallSnapshot`] should have been able to
+    /// verify the term at index `.0` but did not. The index `.0` is after
+    /// their commit index `.1`, and thus not yet committed or archived into a
+    /// local snapshot. The recipient should still have the log entry at `.0`.
+    RefusedSnapshotAfterCommitted(usize, usize),
+    /// Similar to [`Self::RollbackCommitted`], but this error is logged by the
+    /// leader after receiving a reply from a follower.
+    DivergedBeforeCommitted(usize, usize),
+    /// A follower committed a log entry that is different from the leader. An
+    /// opportunistic check that looks for log mismatches, missing committed log
+    /// entries or other corruptions.
+    DivergedAtCommitted(usize),
 }
 
 impl DaemonEnv {

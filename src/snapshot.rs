@@ -25,6 +25,10 @@ pub trait RequestSnapshotFnMut: 'static + Send + FnMut(Index) {}
 impl<T: 'static + Send + FnMut(Index)> RequestSnapshotFnMut for T {}
 
 impl SnapshotDaemon {
+    /// Saves the snapshot into the staging area of the daemon, before it is
+    /// applied to the log.
+    ///
+    /// Does nothing if the snapshot has a lower index than any snapshot before.
     pub(crate) fn save_snapshot(&self, snapshot: Snapshot) {
         let mut curr = self.current_snapshot.0.lock();
         // The new snapshot can have a last_included_index that is smaller than
@@ -36,6 +40,7 @@ impl SnapshotDaemon {
         self.current_snapshot.1.notify_one();
     }
 
+    /// Wakes up the daemon and gives it a chance to request a new snapshot.
     pub(crate) fn trigger(&self) {
         match &self.unparker {
             Some(unparker) => unparker.unpark(),
@@ -45,12 +50,16 @@ impl SnapshotDaemon {
 
     const MIN_SNAPSHOT_INDEX_INTERVAL: usize = 100;
 
+    /// Notifies the daemon that the log has grown. It might be a good time to
+    /// request a new snapshot.
     pub(crate) fn log_grow(&self, first_index: Index, last_index: Index) {
         if last_index - first_index > Self::MIN_SNAPSHOT_INDEX_INTERVAL {
             self.trigger();
         }
     }
 
+    /// Wakes up the daemon and asks it to shutdown. Does not wait for the
+    /// daemon to fully exit. This method never fails or blocks forever.
     pub(crate) fn kill(&self) {
         self.trigger();
         // Acquire the lock to make sure the daemon thread either has been
@@ -61,10 +70,33 @@ impl SnapshotDaemon {
 }
 
 impl<C: 'static + Clone + Default + Send + serde::Serialize> Raft<C> {
+    /// Saves the snapshot into a staging area before it is applied to the log.
+    ///
+    /// Does nothing if the snapshot has a lower index than any snapshot before.
+    ///
+    /// This method Will not block forever. It contains minimal logic so that it
+    /// is safe to run on an application thread. There is no guarantee that the
+    /// saved snapshot will be applied to the internal log.
     pub fn save_snapshot(&self, snapshot: Snapshot) {
         self.snapshot_daemon.save_snapshot(snapshot)
     }
 
+    /// Runs a daemon that requests and handles application snapshot.
+    ///
+    /// A snapshot must be taken when the size of the persisted log exceeds the
+    /// limit specified by `max_state_size`. The daemon also attempts to take
+    /// the snapshot when there are more than 100 entries in the log.
+    ///
+    /// A snapshot is requested by calling `request_snapshot`. The callback
+    /// accepts a parameter that specifies the minimal log index the new
+    /// snapshot must contain. The callback should not block. The callback could
+    /// be called again when a snapshot is being prepared. The callback can be
+    /// called multiple times with the same minimal log index.
+    ///
+    /// A new snapshot is delivered by calling [`Raft::save_snapshot`]. The new
+    /// snapshot will be saved in a temporary space. This daemon will wake up,
+    /// apply the snapshot into the log and discard log entries before the
+    /// snapshot. There is no guarantee that the snapshot will be applied.
     pub(crate) fn run_snapshot_daemon(
         &mut self,
         max_state_size: Option<usize>,

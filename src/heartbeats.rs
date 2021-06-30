@@ -16,6 +16,17 @@ impl<Command> Raft<Command>
 where
     Command: 'static + Clone + Send + serde::Serialize,
 {
+    /// Schedules tasks that send heartbeats to peers.
+    ///
+    /// One task is scheduled for each peer. The task sleeps for a duration
+    /// specified by `interval`, wakes up, builds the request message to send
+    /// and delegates the actual RPC-sending to another task before going back
+    /// to sleep.
+    ///
+    /// The sleeping task does nothing if we are not the leader.
+    ///
+    /// The request message is a stripped down version of `AppendEntries`. The
+    /// response from the peer is ignored.
     pub(crate) fn schedule_heartbeats(&self, interval: Duration) {
         for (peer_index, rpc_client) in self.peers.iter().enumerate() {
             if peer_index != self.me.0 {

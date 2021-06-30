@@ -38,8 +38,9 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
         // The snapshot could not be verified because the index is beyond log
         // start. Fail this request and ask leader to send something that we
         // could verify. We cannot rollback to a point beyond commit index
-        // anyway. Otherwise if the system fails right after the rollback,
-        // committed entries before log start would be lost forever.
+        // anyway, let alone rolling back before the log start(). If we rollback
+        // and the system fails right after the rollback, committed entries
+        // before log start would be lost forever.
         //
         // The commit index is sent back to leader. The leader would never need
         // to rollback beyond that, since it is guaranteed that committed log

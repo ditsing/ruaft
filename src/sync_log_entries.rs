@@ -173,6 +173,8 @@ where
                 Self::check_committed(&rf, peer, committed.clone());
 
                 rf.current_step[peer_index] = 0;
+                // Next index moves towards the log end. This is the only place
+                // where that happens.
                 rf.next_index[peer_index] = committed.index;
 
                 // Ignore the error. The log syncing thread must have died.

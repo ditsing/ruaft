@@ -57,6 +57,9 @@ where
                     } else if rf.last_applied < rf.commit_index {
                         let index = rf.last_applied + 1;
                         let last_one = rf.commit_index + 1;
+                        // This is safe because commit_index is always smaller
+                        // than log.end(), see COMMIT_INDEX_INVARIANT.
+                        assert!(last_one <= rf.log.end());
                         let messages: Vec<ApplyCommandMessage<Command>> = rf
                             .log
                             .between(index, last_one)

@@ -27,6 +27,9 @@ impl<T: 'static + Send + FnMut(Index)> RequestSnapshotFnMut for T {}
 impl SnapshotDaemon {
     pub(crate) fn save_snapshot(&self, snapshot: Snapshot) {
         let mut curr = self.current_snapshot.0.lock();
+        // The new snapshot can have a last_included_index that is smaller than
+        // the current snapshot, if this instance is a follower and the leader
+        // has installed a new snapshot on it.
         if curr.last_included_index < snapshot.last_included_index {
             *curr = snapshot;
         }

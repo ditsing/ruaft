@@ -62,7 +62,7 @@ pub(crate) enum ErrorKind {
     /// The application sent a snapshot that contains items that are not
     /// committed yet. Only committed items are sent to the application.
     SnapshotNotCommitted(usize),
-    /// The recipient of [`crate::InstallSnapshot`] should have been able to
+    /// The recipient of the `InstallSnapshot` RPC should have been able to
     /// verify the term at index `.0` but did not. The index `.0` is after
     /// their commit index `.1`, and thus not yet committed or archived into a
     /// local snapshot. The recipient should still have the log entry at `.0`.
@@ -214,7 +214,7 @@ pub(crate) struct ThreadEnv {
 impl ThreadEnv {
     thread_local! {static ENV: RefCell<ThreadEnv> = Default::default()}
 
-    /// Upgrade to the referenced [`DaemonEvn`].
+    /// Upgrade to the referenced [`DaemonEnv`].
     // The dance between Arc<> and Weak<> is complex, but useful:
     // 1) We do not have to worry about slow RPC threads causing
     // DaemonEnv::shutdown() to fail. They only hold a Weak<> pointer after all;

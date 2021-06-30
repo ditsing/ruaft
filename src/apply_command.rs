@@ -22,6 +22,31 @@ impl<Command> Raft<Command>
 where
     Command: 'static + Clone + Send,
 {
+    /// Runs a daemon thread that sends committed log entries to the
+    /// application via a callback `apply_command`.
+    ///
+    /// If we still have the log entries to apply, they will be sent to the
+    /// application in a loop. Otherwise if the log entries to apply is
+    /// covered by the current log snapshot, the snapshot will be installed.
+    ///
+    /// This daemon guarantees to send log entries and snapshots in increasing
+    /// order of the log index.
+    ///
+    /// No assumption is made about the callback `apply_command`, with a few
+    /// exceptions.
+    /// * This daemon does not assume the log entry has been 'accepted' or
+    /// 'applied' by the application when the callback returns.
+    ///
+    /// * The callback can block, although blocking is not recommended. The
+    /// callback should not block forever, otherwise Raft will fail to shutdown
+    /// cleanly.
+    ///
+    /// * The `apply_command` callback cannot fail. It must keep retrying until
+    /// the current log entry is 'accepted'. Otherwise the next log entry cannot
+    /// be delivered to the application.
+    ///
+    /// After sending each log entry to the application, this daemon notifies
+    /// the snapshot daemon that there may be a chance to create a new snapshot.
     pub(crate) fn run_apply_command_daemon(
         &self,
         mut apply_command: impl ApplyCommandFnMut<Command>,
@@ -40,6 +65,8 @@ where
                 let messages = {
                     let mut rf = rf.lock();
                     if rf.last_applied >= rf.commit_index {
+                        // We have applied all committed log entries, wait until
+                        // new log entries are committed.
                         condvar.wait_for(
                             &mut rf,
                             Duration::from_millis(HEARTBEAT_INTERVAL_MILLIS),

@@ -64,7 +64,7 @@ impl SnapshotDaemon {
         self.trigger();
         // Acquire the lock to make sure the daemon thread either has been
         // waiting on the condition, or has not checked `keep_running` yet.
-        let _ = self.current_snapshot.0.lock();
+        let _guard = self.current_snapshot.0.lock();
         self.current_snapshot.1.notify_all();
     }
 }

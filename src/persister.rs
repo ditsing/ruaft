@@ -7,6 +7,11 @@ use serde::Serialize;
 use crate::log_array::LogArray;
 use crate::{Peer, RaftState, Term};
 
+/// An object that saves bytes to permanent storage.
+///
+/// When the methods of this trait returns, data should have been persisted to
+/// the storage. These methods should never return failure except panicking.
+/// They should not block forever, either.
 pub trait Persister: Send + Sync {
     fn read_state(&self) -> Bytes;
     fn save_state(&self, bytes: Bytes);

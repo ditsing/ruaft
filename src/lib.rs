@@ -148,7 +148,7 @@ where
 {
     /// Create a new raft instance.
     ///
-    /// Each instance will create at least 3 + (number of peers) threads. The
+    /// Each instance will create at least 4 + (number of peers) threads. The
     /// extensive usage of threads is to minimize latency.
     pub fn new(
         peers: Vec<RpcClient>,
@@ -236,6 +236,11 @@ impl<Command> Raft<Command>
 where
     Command: 'static + Clone + Send + serde::Serialize + Default,
 {
+    /// Adds a new command to the log, returns its index and the current term.
+    ///
+    /// Returns `None` if we are not the leader. The log entry may not have been
+    /// committed to the log when this method returns. When and if it is
+    /// committed, the `apply_command` callback will be called.
     pub fn start(&self, command: Command) -> Option<(Term, Index)> {
         let mut rf = self.inner_state.lock();
         let term = rf.current_term;
@@ -251,6 +256,8 @@ where
         Some((term, index))
     }
 
+    /// Cleanly shutdown this instance. This function never blocks forever. It
+    /// either panics or returns eventually.
     pub fn kill(mut self) {
         self.keep_running.store(false, Ordering::SeqCst);
         self.election.stop_election_timer();
@@ -270,6 +277,10 @@ where
         self.daemon_env.shutdown();
     }
 
+    /// Returns the current term and whether we are the leader.
+    ///
+    /// Take a quick peek at the current state of this instance. The returned
+    /// value is stale as soon as this function returns.
     pub fn get_state(&self) -> (Term, bool) {
         let state = self.inner_state.lock();
         (state.current_term, state.is_leader())
@@ -279,5 +290,7 @@ where
 pub(crate) const HEARTBEAT_INTERVAL_MILLIS: u64 = 150;
 
 impl<C> Raft<C> {
+    /// Pass this function to [`Raft::new`] if the application will not accept
+    /// any request for taking snapshots.
     pub const NO_SNAPSHOT: fn(Index) = |_| {};
 }

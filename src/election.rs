@@ -69,6 +69,53 @@ impl<Command> Raft<Command>
 where
     Command: 'static + Clone + Send + serde::Serialize,
 {
+    /// Runs the election timer daemon that triggers elections.
+    ///
+    /// The daemon holds a counter and an optional deadline in a mutex. Each
+    /// time the timer is reset, the counter is increased by one. The deadline
+    /// will be replaced with a randomized timeout. No other data is held.
+    ///
+    /// The daemon runs in a loop. In each iteration, the timer either fires, or
+    /// is reset. At the beginning of each iteration, a new election will be
+    /// started if
+    /// 1. In the last iteration, the timer fired, and
+    /// 2. Since the fired timer was set until now, the timer has not been
+    /// reset, i.e. the counter has not been updated.
+    ///
+    /// If both conditions are met, an election is started. We keep a cancel
+    /// token for the running election. Canceling is a courtesy and does not
+    /// impact correctness. A should-have-been-cancelled election would cancel
+    /// itself after counting enough votes ("term has changed").
+    ///
+    /// In each election, the first thing that happens is resetting the election
+    /// timer. This reset and condition 2 above is tested and applied in the
+    /// same atomic operation. Then one RPC is sent to each peer, asking for a
+    /// vote. A task is created to wait for those RPCs to return and then count
+    /// the votes.
+    ///
+    /// At the same time, the daemon locks the counter and the timeout. It
+    /// expects the counter to increase by 1 but no more than that. If that
+    /// expectation is not met, the daemon knows the election either did not
+    /// happen, or the timer has been reset after the election starts. In that
+    /// case it considers the timer not fired and skips the wait described
+    /// below.
+    ///
+    /// If the expectation is met, the daemon waits util the timer fires, or
+    /// the timer is reset, which ever happens first. If both happen when daemon
+    /// wakes up, the reset takes precedence and the timer is considered not
+    /// fired. The result (timer fired or is reset) is recorded so that it could
+    /// be used in the next iteration.
+    ///
+    /// The daemon cancels the running election after waking up, no matter what
+    /// happens. The iteration ends here.
+    ///
+    /// Before the first iteration, the timer is considered reset and not fired.
+    ///
+    /// The vote-counting task operates independently of the daemon. If it
+    /// collects enough votes and the term has not yet passed, it resets the
+    /// election timer. There could be more than one vote-counting tasks running
+    /// at the same time, but all earlier tasks except the newest one will
+    /// eventually realize the term they were competing for has passed and quit.
     pub(crate) fn run_election_timer(&self) {
         let this = self.clone();
         let join_handle = std::thread::spawn(move || {
@@ -85,7 +132,19 @@ where
 
                 let mut guard = election.timer.lock();
                 let (timer_count, deadline) = *guard;
+                // If the timer is reset
+                // 0. Zero times. We know should_run is None. If should_run has
+                // a value, the election would have been started and the timer
+                // reset by the election. That means the timer did not fire in
+                // the last iteration. We should just wait.
+                // 1. One time. We know that the timer is either reset by the
+                // election or by someone else before the election, in which
+                // case the election was never started. We should just wait.
+                // 2. More than one time. We know that the timer is first reset
+                // by the election, and then reset by someone else, in that
+                // order. We should cancel the election and just wait.
                 if let Some(last_timer_count) = should_run {
+                    assert!(timer_count >= last_timer_count + 1);
                     // If the timer was changed more than once, we know the
                     // last scheduled election should have been cancelled.
                     if timer_count > last_timer_count + 1 {

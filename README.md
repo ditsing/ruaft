@@ -16,12 +16,12 @@ The implementation is thoroughly tested. I copied (and translated) the tests fro
 indexed by a search engine, I will not name the source. The testing framework from the same source is also translated
 from the original Go version. The code can be found at the [`labrpc`](https://github.com/ditsing/labrpc) repo.
 
-## Application: KV Server
+## KV Server
 To test the snapshot functionality, I wrote a KV server that supports `get()`, `put()` and `append()`. The complexity
 of the KV server is so high that it has its own set of tests. Integration tests in `tests/snapshot_tests.rs` are all
 based on the KV server. The KV server is inspired by the equivalent Go version.
 
-## Threads
+## Daemons
 Ruaft uses both threads and async thread pools. There are 4 'daemon threads':
 
 1. Election timer: watches the election timer, starts and cancels elections. Correctly implementing a versioned timer

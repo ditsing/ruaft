@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 use parking_lot::{Condvar, Mutex};
 use rand::{thread_rng, Rng};
 
+use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, RPC_DEADLINE};
 use crate::{Peer, Raft, RaftState, RequestVoteArgs, RpcClient, State, Term};
 
@@ -245,15 +246,17 @@ where
         };
 
         let mut votes = vec![];
+        let term_marker = self.term_marker();
         for (index, rpc_client) in self.peers.iter().enumerate() {
             if index != self.me.0 {
                 // RpcClient must be cloned so that it lives long enough for
                 // spawn(), which requires static life time.
-                let rpc_client = rpc_client.clone();
                 // RPCs are started right away.
-                let one_vote = self
-                    .thread_pool
-                    .spawn(Self::request_vote(rpc_client, args.clone()));
+                let one_vote = self.thread_pool.spawn(Self::request_vote(
+                    rpc_client.clone(),
+                    args.clone(),
+                    term_marker.clone(),
+                ));
                 votes.push(one_vote);
             }
         }
@@ -275,6 +278,7 @@ where
     async fn request_vote(
         rpc_client: Arc<RpcClient>,
         args: RequestVoteArgs,
+        term_marker: TermMarker<Command>,
     ) -> Option<bool> {
         let term = args.term;
         // See the comment in send_heartbeat() for this override.
@@ -285,6 +289,7 @@ where
             })
             .await;
         if let Ok(reply) = reply {
+            term_marker.mark(reply.term);
             return Some(reply.vote_granted && reply.term == term);
         }
         None

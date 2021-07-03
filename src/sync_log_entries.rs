@@ -7,6 +7,7 @@ use parking_lot::{Condvar, Mutex};
 use crate::check_or_record;
 use crate::daemon_env::ErrorKind;
 use crate::index_term::IndexTerm;
+use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, RPC_DEADLINE};
 use crate::{
     AppendEntriesArgs, InstallSnapshotArgs, Peer, Raft, RaftState, RpcClient,
@@ -91,6 +92,7 @@ where
                                 this.new_log_entry.clone().unwrap(),
                                 openings[i].0.clone(),
                                 this.apply_command_signal.clone(),
+                                this.term_marker(),
                             ));
                         }
                     }
@@ -152,6 +154,7 @@ where
         rerun: std::sync::mpsc::Sender<Option<Peer>>,
         opening: Arc<AtomicUsize>,
         apply_command_signal: Arc<Condvar>,
+        term_marker: TermMarker<Command>,
     ) {
         if opening.swap(0, Ordering::SeqCst) == 0 {
             return;
@@ -274,7 +277,9 @@ where
                 let _ = rerun.send(Some(Peer(peer_index)));
             }
             // Do nothing, not our term anymore.
-            Ok(SyncLogEntriesResult::TermElapsed(_)) => {}
+            Ok(SyncLogEntriesResult::TermElapsed(term)) => {
+                term_marker.mark(term);
+            }
             Err(_) => {
                 tokio::time::sleep(Duration::from_millis(
                     HEARTBEAT_INTERVAL_MILLIS,

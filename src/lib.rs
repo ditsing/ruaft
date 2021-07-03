@@ -42,6 +42,7 @@ mod raft_state;
 pub mod rpcs;
 mod snapshot;
 mod sync_log_entries;
+mod term_marker;
 pub mod utils;
 
 #[derive(

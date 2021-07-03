@@ -4,6 +4,7 @@ use std::time::Duration;
 
 use parking_lot::Mutex;
 
+use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, RPC_DEADLINE};
 use crate::{AppendEntriesArgs, Raft, RaftState, RpcClient};
 
@@ -32,6 +33,8 @@ where
             if peer_index != self.me.0 {
                 // rf is now owned by the outer async function.
                 let rf = self.inner_state.clone();
+                // A function that updates term with responses to heartbeats.
+                let term_marker = self.term_marker();
                 // RPC client must be cloned into the outer async function.
                 let rpc_client = rpc_client.clone();
                 // Shutdown signal.
@@ -44,6 +47,7 @@ where
                             tokio::spawn(Self::send_heartbeat(
                                 rpc_client.clone(),
                                 args,
+                                term_marker.clone(),
                             ));
                         }
                     }
@@ -77,6 +81,7 @@ where
     async fn send_heartbeat(
         rpc_client: Arc<RpcClient>,
         args: AppendEntriesArgs<Command>,
+        term_watermark: TermMarker<Command>,
     ) -> std::io::Result<()> {
         // Passing a reference that is moved to the following closure.
         //
@@ -93,10 +98,12 @@ where
         // of type Arc can be passed-in directly. However that requires args to
         // be sync because they can be shared by more than one futures.
         let rpc_client = rpc_client.as_ref();
-        retry_rpc(Self::HEARTBEAT_RETRY, RPC_DEADLINE, move |_round| {
-            rpc_client.call_append_entries(args.clone())
-        })
-        .await?;
+        let response =
+            retry_rpc(Self::HEARTBEAT_RETRY, RPC_DEADLINE, move |_round| {
+                rpc_client.call_append_entries(args.clone())
+            })
+            .await?;
+        term_watermark.mark(response.term);
         Ok(())
     }
 }

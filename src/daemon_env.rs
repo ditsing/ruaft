@@ -174,7 +174,7 @@ impl DaemonEnv {
         StrippedRaftState {
             current_term: raft.current_term,
             voted_for: raft.voted_for,
-            log: raft.log.all().iter().map(|s| s.into()).collect(),
+            log: raft.log.all_index_term(),
             commit_index: raft.commit_index,
             last_applied: raft.last_applied,
             state: raft.state,

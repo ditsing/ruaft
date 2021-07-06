@@ -178,6 +178,11 @@ where
             // snapshot must have a valid log.start() and log.end(). Thus
             // log.start() <= commit_index and commit_index < log.end() hold.
             assert!(state.commit_index < state.log.end());
+
+            state
+                .log
+                .validate(state.current_term)
+                .expect("Persisted log should not contain error");
         }
 
         let election = ElectionState::create();

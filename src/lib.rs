@@ -265,6 +265,13 @@ where
         self.new_log_entry.take().map(|n| n.send(None));
         self.apply_command_signal.notify_all();
         self.snapshot_daemon.kill();
+        // We cannot easily combine stop_wait_group into DaemonEnv because of
+        // shutdown dependencies. The thread pool is not managed by DaemonEnv,
+        // but it cannot be shutdown until all daemons are. On the other hand
+        // the thread pool uses DaemonEnv, thus must be shutdown before
+        // DaemonEnv. The shutdown sequence is stop_wait_group -> thread_pool
+        // -> DaemonEnv. The first and third cannot be combined with the second
+        // in the middle.
         self.stop_wait_group.wait();
         std::sync::Arc::try_unwrap(self.thread_pool)
             .expect(

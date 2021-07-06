@@ -190,6 +190,12 @@ where
                     return;
                 }
 
+                check_or_record!(
+                    match_index < rf.log.end(),
+                    ErrorKind::LeaderLogShrunk(match_index),
+                    "The leader log shrunk",
+                    &rf
+                );
                 rf.next_index[peer_index] = match_index + 1;
                 rf.current_step[peer_index] = 0;
                 if match_index > rf.match_index[peer_index] {
@@ -234,7 +240,8 @@ where
 
                 rf.current_step[peer_index] = 0;
                 // Next index moves towards the log end. This is the only place
-                // where that happens.
+                // where that happens. committed.index should be between log
+                // start and end, guaranteed by check_committed() above.
                 rf.next_index[peer_index] = committed.index;
 
                 // Ignore the error. The log syncing thread must have died.
@@ -351,6 +358,7 @@ where
         rf: &RaftState<Command>,
         peer_index: usize,
     ) -> AppendEntriesArgs<Command> {
+        // It is guaranteed that next_index <= rf.log.end(). Panic otherwise.
         let prev_log_index = rf.next_index[peer_index] - 1;
         let prev_log_term = rf.log.at(prev_log_index).term;
         AppendEntriesArgs {

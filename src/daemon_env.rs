@@ -81,6 +81,9 @@ pub(crate) enum ErrorKind {
     /// leader. An opportunistic check that looks for log mismatches, missing
     /// committed log entries or other corruptions.
     CommittedBeyondEnd(usize),
+    /// When examining a sync log entry response from a follower, the leader
+    /// noticed that a log entry that it sent out is no longer in its own log.
+    LeaderLogShrunk(usize),
 }
 
 impl DaemonEnv {

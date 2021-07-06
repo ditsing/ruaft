@@ -58,7 +58,8 @@ impl<C: Clone + Default + serde::Serialize> Raft<C> {
 
         if args.last_included_index < rf.log.end()
             && args.last_included_index >= rf.log.start()
-            && args.last_included_term == rf.log[args.last_included_index].term
+            && args.last_included_term
+                == rf.log.at(args.last_included_index).term
         {
             // Do nothing if the index and term match the current snapshot.
             if args.last_included_index != rf.log.start() {

@@ -41,7 +41,7 @@ where
 
         if rf.log.start() > args.prev_log_index
             || rf.log.end() <= args.prev_log_index
-            || rf.log[args.prev_log_index].term != args.prev_log_term
+            || rf.log.at(args.prev_log_index).term != args.prev_log_term
         {
             return AppendEntriesReply {
                 term: args.term,
@@ -74,7 +74,7 @@ where
         for (i, entry) in args.entries.iter().enumerate() {
             let index = i + args.prev_log_index + 1;
             if rf.log.end() > index {
-                if rf.log[index].term != entry.term {
+                if rf.log.at(index).term != entry.term {
                     check_or_record!(
                         index > rf.commit_index,
                         ErrorKind::RollbackCommitted(index),

@@ -106,14 +106,6 @@ impl<C> LogArray<C> {
     }
 }
 
-impl<C> std::ops::Index<usize> for LogArray<C> {
-    type Output = LogEntry<C>;
-
-    fn index(&self, index: usize) -> &Self::Output {
-        self.at(index)
-    }
-}
-
 // Mutations
 impl<C> LogArray<C> {
     /// Add a new entry to the Raft log, with term and command. The new index is
@@ -275,6 +267,14 @@ mod tests {
     use std::panic::catch_unwind;
 
     use super::*;
+
+    impl<C> std::ops::Index<usize> for LogArray<C> {
+        type Output = LogEntry<C>;
+
+        fn index(&self, index: usize) -> &Self::Output {
+            self.at(index)
+        }
+    }
 
     fn make_log_array(len: usize) -> LogArray<i32> {
         make_log_array_range(0, len)

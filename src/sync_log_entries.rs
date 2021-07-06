@@ -200,7 +200,8 @@ where
                         matched.sort_unstable();
                         let new_commit_index = matched[mid];
                         if new_commit_index > rf.commit_index
-                            && rf.log[new_commit_index].term == rf.current_term
+                            && rf.log.at(new_commit_index).term
+                                == rf.current_term
                         {
                             // COMMIT_INDEX_INVARIANT, SNAPSHOT_INDEX_INVARIANT:
                             // Index new_commit_index exists in the log array,
@@ -351,7 +352,7 @@ where
         peer_index: usize,
     ) -> AppendEntriesArgs<Command> {
         let prev_log_index = rf.next_index[peer_index] - 1;
-        let prev_log_term = rf.log[prev_log_index].term;
+        let prev_log_term = rf.log.at(prev_log_index).term;
         AppendEntriesArgs {
             term: rf.current_term,
             leader_id: rf.leader_id,

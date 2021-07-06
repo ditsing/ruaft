@@ -299,6 +299,18 @@ where
         if committed.index < rf.log.start() {
             return;
         }
+        check_or_record!(
+            committed.index < rf.log.end(),
+            ErrorKind::CommittedBeyondEnd(committed.index),
+            format!(
+                "Follower {:?} committed a log entry {:?} that is
+                beyond the end of the leader log at {:?}",
+                peer,
+                committed,
+                rf.log.end(),
+            ),
+            rf
+        );
         let local_term = rf.log.at(committed.index).term;
         check_or_record!(
             committed.term == local_term,

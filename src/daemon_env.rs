@@ -74,6 +74,13 @@ pub(crate) enum ErrorKind {
     /// opportunistic check that looks for log mismatches, missing committed log
     /// entries or other corruptions.
     DivergedAtCommitted(usize),
+    /// A follower received an AppendEntries RPC with a `prev_log_index` that
+    /// is inconsistent with the index of entries included in the same RPC.
+    AppendEntriesIndexMismatch(usize, Vec<IndexTerm>),
+    /// A follower committed a log entry that is beyond the log end of the
+    /// leader. An opportunistic check that looks for log mismatches, missing
+    /// committed log entries or other corruptions.
+    CommittedBeyondEnd(usize),
 }
 
 impl DaemonEnv {

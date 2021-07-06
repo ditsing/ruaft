@@ -1,4 +1,5 @@
 use crate::daemon_env::ErrorKind;
+use crate::index_term::IndexTerm;
 use crate::{
     check_or_record, AppendEntriesArgs, AppendEntriesReply, Raft, State,
 };
@@ -47,6 +48,25 @@ where
                 success: args.prev_log_index < rf.log.start(),
                 committed: Some(rf.log.first_after(rf.commit_index).into()),
             };
+        }
+        let index_matches = args
+            .entries
+            .iter()
+            .enumerate()
+            .all(|(i, entry)| entry.index == i + args.prev_log_index + 1);
+        if !index_matches {
+            let indexes: Vec<IndexTerm> =
+                args.entries.iter().map(|e| e.into()).collect();
+
+            check_or_record!(
+                index_matches,
+                ErrorKind::AppendEntriesIndexMismatch(
+                    args.prev_log_index,
+                    indexes
+                ),
+                "Entries in AppendEntries request shows index mismatch",
+                &rf
+            );
         }
 
         // COMMIT_INDEX_INVARIANT: Before this loop, we can safely assume that

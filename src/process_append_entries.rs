@@ -67,6 +67,12 @@ where
                 "Entries in AppendEntries request shows index mismatch",
                 &rf
             );
+
+            return AppendEntriesReply {
+                term: args.term,
+                success: false,
+                committed: Some(rf.log.first_after(rf.commit_index).into()),
+            };
         }
 
         // COMMIT_INDEX_INVARIANT: Before this loop, we can safely assume that

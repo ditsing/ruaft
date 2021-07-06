@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 use parking_lot::{Condvar, Mutex};
 use rand::{thread_rng, Rng};
 
+use crate::daemon_env::Daemon;
 use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, RPC_DEADLINE};
 use crate::{Peer, Raft, RaftState, RequestVoteArgs, RpcClient, State, Term};
@@ -205,7 +206,8 @@ where
             drop(this);
             drop(stop_wait_group);
         });
-        self.daemon_env.watch_daemon(join_handle);
+        self.daemon_env
+            .watch_daemon(Daemon::ElectionTimer, join_handle);
     }
 
     fn run_election(

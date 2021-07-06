@@ -1,6 +1,7 @@
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
+use crate::daemon_env::Daemon;
 use crate::{Index, Raft, Snapshot, HEARTBEAT_INTERVAL_MILLIS};
 
 pub enum ApplyCommandMessage<Command> {
@@ -114,6 +115,7 @@ where
 
             drop(stop_wait_group);
         });
-        self.daemon_env.watch_daemon(join_handle);
+        self.daemon_env
+            .watch_daemon(Daemon::ApplyCommand, join_handle);
     }
 }

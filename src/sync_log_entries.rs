@@ -5,7 +5,7 @@ use std::time::Duration;
 use parking_lot::{Condvar, Mutex};
 
 use crate::check_or_record;
-use crate::daemon_env::ErrorKind;
+use crate::daemon_env::{Daemon, ErrorKind};
 use crate::index_term::IndexTerm;
 use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, RPC_DEADLINE};
@@ -104,7 +104,8 @@ where
             drop(this);
             drop(stop_wait_group);
         });
-        self.daemon_env.watch_daemon(join_handle);
+        self.daemon_env
+            .watch_daemon(Daemon::SyncLogEntries, join_handle);
     }
 
     /// Syncs log entries to a peer once, requests a new sync if that fails.

@@ -33,10 +33,18 @@ pub(crate) struct DaemonEnv {
     thread_env: ThreadEnv,
 }
 
+#[derive(Debug)]
+pub(crate) enum Daemon {
+    Snapshot,
+    ElectionTimer,
+    SyncLogEntries,
+    ApplyCommand,
+}
+
 #[derive(Debug, Default)]
 struct DaemonEnvData {
     errors: Vec<Error>,
-    daemons: Vec<std::thread::JoinHandle<()>>,
+    daemons: Vec<(Daemon, std::thread::JoinHandle<()>)>,
 }
 
 #[derive(Debug)]
@@ -106,8 +114,12 @@ impl DaemonEnv {
 
     /// Register a daemon thread to make sure it is correctly shutdown when the
     /// Raft instance is killed.
-    pub fn watch_daemon(&self, thread: std::thread::JoinHandle<()>) {
-        self.data.lock().daemons.push(thread);
+    pub fn watch_daemon(
+        &self,
+        daemon: Daemon,
+        thread: std::thread::JoinHandle<()>,
+    ) {
+        self.data.lock().daemons.push((daemon, thread));
     }
 
     /// Makes sure that all daemons have been shutdown, no more errors can be
@@ -121,14 +133,14 @@ impl DaemonEnv {
         let daemon_panics: Vec<String> = data
             .daemons
             .into_iter()
-            .filter_map(|join_handle| {
+            .filter_map(|(daemon, join_handle)| {
                 let err = join_handle.join().err()?;
                 let err_str = err.downcast_ref::<&str>().map(|s| s.to_owned());
                 let err_string =
                     err.downcast_ref::<String>().map(|s| s.as_str());
                 let err =
                     err_str.or(err_string).unwrap_or("unknown panic error");
-                Some("\n".to_owned() + err)
+                Some(format!("\nDaemon {:?} panicked: {}", daemon, err))
             })
             .collect();
         let recorded_errors: Vec<String> = data
@@ -336,11 +348,11 @@ mod tests {
         let panic_thread = std::thread::spawn(|| {
             panic!("message with type &str");
         });
-        daemon_env.watch_daemon(panic_thread);
+        daemon_env.watch_daemon(Daemon::ApplyCommand, panic_thread);
         let another_panic_thread = std::thread::spawn(|| {
             panic!("message with type {:?}", "debug string");
         });
-        daemon_env.watch_daemon(another_panic_thread);
+        daemon_env.watch_daemon(Daemon::Snapshot, another_panic_thread);
 
         let result = std::thread::spawn(move || {
             daemon_env.shutdown();
@@ -352,7 +364,7 @@ mod tests {
             .expect("Error message should be a string.");
         assert_eq!(
             message,
-            "\n2 daemon panic(s):\nmessage with type &str\nmessage with type \"debug string\"\n0 error(s):\n"
+            "\n2 daemon panic(s):\nDaemon ApplyCommand panicked: message with type &str\nDaemon Snapshot panicked: message with type \"debug string\"\n0 error(s):\n"
         );
     }
 }

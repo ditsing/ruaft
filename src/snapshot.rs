@@ -5,7 +5,7 @@ use crossbeam_utils::sync::{Parker, Unparker};
 use parking_lot::{Condvar, Mutex};
 
 use crate::check_or_record;
-use crate::daemon_env::ErrorKind;
+use crate::daemon_env::{Daemon, ErrorKind};
 use crate::{Index, Raft};
 
 #[derive(Clone, Debug, Default)]
@@ -190,6 +190,6 @@ impl<C: 'static + Clone + Default + Send + serde::Serialize> Raft<C> {
                 );
             }
         });
-        self.daemon_env.watch_daemon(join_handle);
+        self.daemon_env.watch_daemon(Daemon::Snapshot, join_handle);
     }
 }

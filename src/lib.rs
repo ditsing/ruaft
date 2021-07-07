@@ -2,6 +2,7 @@ extern crate bincode;
 extern crate futures_channel;
 extern crate futures_util;
 extern crate labrpc;
+extern crate log;
 extern crate rand;
 #[macro_use]
 extern crate serde_derive;
@@ -259,6 +260,7 @@ where
 
         let _ = self.new_log_entry.clone().unwrap().send(None);
 
+        log::info!("{:?} started new entry at {} {:?}", self.me, index, term);
         Some((term, index))
     }
 

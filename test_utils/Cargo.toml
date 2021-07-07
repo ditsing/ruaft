@@ -1,0 +1,9 @@
+[package]
+name = "test_utils"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+env_logger = "0.8"
+log = "0.4"
+rand = "0.8"

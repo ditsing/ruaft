@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::time::Instant;
@@ -30,6 +31,7 @@ pub struct Config {
     server_count: usize,
     state: Mutex<ConfigState>,
     log: Arc<Mutex<LogState>>,
+    log_file_path: PathBuf,
 }
 
 impl Config {
@@ -361,6 +363,7 @@ impl Config {
     pub fn end(&self) {}
 
     pub fn cleanup(&self) {
+        log::trace!("Cleaning up test config ...");
         let mut network = self.network.lock();
         for i in 0..self.server_count {
             network.remove_server(Self::server_name(i));
@@ -372,6 +375,8 @@ impl Config {
                 raft.kill();
             }
         }
+        log::trace!("Cleaning up test config done.");
+        eprintln!("Ruaft log file: {:?}", self.log_file_path.as_os_str());
     }
 }
 
@@ -433,6 +438,9 @@ impl Config {
 }
 
 pub fn make_config(server_count: usize, unreliable: bool) -> Config {
+    // Create a logger first.
+    let log_file_path = test_utils::init_test_log!();
+
     let network = labrpc::Network::run_daemon();
     {
         let mut unlocked_network = network.lock();
@@ -460,6 +468,7 @@ pub fn make_config(server_count: usize, unreliable: bool) -> Config {
         server_count,
         state,
         log,
+        log_file_path,
     };
 
     for i in 0..server_count {

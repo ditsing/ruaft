@@ -33,6 +33,17 @@ pub fn init_log(module: &str) -> std::io::Result<PathBuf> {
     path.push(log_file_name);
     let log_file = std::fs::File::create(path.as_path())?;
 
+    {
+        let mut latest_path = path.clone();
+        latest_path.pop();
+        latest_path.push(format!("{}-latest", module_file));
+        let _ = std::fs::remove_file(latest_path.as_path());
+        #[cfg(unix)]
+        let _ = std::os::unix::fs::symlink(path.as_path(), latest_path);
+        #[cfg(windows)]
+        let _ = std::os::windows::fs::symlink_file(path.as_path(), latest_path);
+    }
+
     let module = match module.rfind("::") {
         Some(pos) => &module[..pos],
         None => &module,

@@ -3,4 +3,5 @@ extern crate log;
 extern crate rand;
 
 mod logging;
-pub use logging::{init_log, init_log_once, LOG_DIR};
+pub mod thread_local_logger;
+pub use logging::{init_log, LOG_DIR};

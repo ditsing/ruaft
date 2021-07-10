@@ -32,6 +32,7 @@ pub struct Config {
     state: Mutex<ConfigState>,
     log: Arc<Mutex<LogState>>,
     log_file_path: PathBuf,
+    test_path: &'static str,
 }
 
 impl Config {
@@ -376,7 +377,11 @@ impl Config {
             }
         }
         log::trace!("Cleaning up test config done.");
-        eprintln!("Ruaft log file: {:?}", self.log_file_path.as_os_str());
+        eprintln!(
+            "Ruaft log file for {}: {:?}",
+            self.test_path,
+            self.log_file_path.as_os_str()
+        );
     }
 }
 
@@ -437,9 +442,25 @@ impl Config {
     }
 }
 
-pub fn make_config(server_count: usize, unreliable: bool) -> Config {
+#[macro_export]
+macro_rules! make_config {
+    ($server_count:expr, $unreliable:expr) => {
+        $crate::config::make_config(
+            $server_count,
+            $unreliable,
+            stdext::function_name!(),
+        )
+    };
+}
+
+pub fn make_config(
+    server_count: usize,
+    unreliable: bool,
+    test_path: &'static str,
+) -> Config {
     // Create a logger first.
-    let log_file_path = test_utils::init_test_log!();
+    let log_file_path = test_utils::init_log(test_path)
+        .expect("Test log file creation should never fail");
 
     let network = labrpc::Network::run_daemon();
     {
@@ -469,6 +490,7 @@ pub fn make_config(server_count: usize, unreliable: bool) -> Config {
         state,
         log,
         log_file_path,
+        test_path,
     };
 
     for i in 0..server_count {

@@ -36,6 +36,7 @@ anyhow = "1.0"
 futures = { version = "0.3.15", features = ["thread-pool"] }
 ruaft = { path = ".", features = ["integration-test"] }
 scopeguard = "1.1.0"
+stdext = "0.3"
 test_utils = { path = "test_utils" }
 kvraft = { path = "kvraft" }
 

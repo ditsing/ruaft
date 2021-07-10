@@ -12,7 +12,7 @@ pub mod config;
 #[test]
 fn initial_election() -> config::Result<()> {
     const SERVERS: usize = 3;
-    let cfg = config::make_config(SERVERS, false);
+    let cfg = make_config!(SERVERS, false);
     defer!(cfg.cleanup());
 
     cfg.begin("Test (2A): initial election");
@@ -39,7 +39,7 @@ fn initial_election() -> config::Result<()> {
 #[test]
 fn re_election() -> config::Result<()> {
     const SERVERS: usize = 3;
-    let cfg = config::make_config(SERVERS, false);
+    let cfg = make_config!(SERVERS, false);
     defer!(cfg.cleanup());
 
     cfg.begin("Test (2A): election after network failure");

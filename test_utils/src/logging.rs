@@ -12,8 +12,7 @@ macro_rules! init_test_log {
 
 pub const LOG_DIR: &str = "/tmp/ruaft-test-logs/";
 
-pub fn init_log(module_path: &str) -> std::io::Result<PathBuf> {
-    let module = module_path.replace("::config", "");
+pub fn init_log(module: &str) -> std::io::Result<PathBuf> {
     let module_file = module.replace("::", "-");
     let timestamp = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
@@ -34,10 +33,15 @@ pub fn init_log(module_path: &str) -> std::io::Result<PathBuf> {
     path.push(log_file_name);
     let log_file = std::fs::File::create(path.as_path())?;
 
+    let module = match module.rfind("::") {
+        Some(pos) => &module[..pos],
+        None => &module,
+    };
+
     let env = env_logger::Env::default().default_filter_or("info");
     let logger = env_logger::Builder::from_env(env)
         .target(env_logger::Target::Pipe(Box::new(log_file)))
-        .filter(Some(module.as_str()), log::LevelFilter::Trace)
+        .filter(Some(module), log::LevelFilter::Trace)
         .format_timestamp_millis()
         .is_test(true)
         .build();

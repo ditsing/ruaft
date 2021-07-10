@@ -15,7 +15,7 @@ pub mod config;
 #[test]
 fn basic_agreement() -> config::Result<()> {
     const SERVERS: usize = 5;
-    let cfg = config::make_config(SERVERS, false);
+    let cfg = make_config!(SERVERS, false);
     defer!(cfg.cleanup());
 
     cfg.begin("Test (2B): basic agreement");
@@ -38,7 +38,7 @@ fn basic_agreement() -> config::Result<()> {
 #[test]
 fn fail_agree() -> config::Result<()> {
     const SERVERS: usize = 3;
-    let cfg = config::make_config(SERVERS, false);
+    let cfg = make_config!(SERVERS, false);
     defer!(cfg.cleanup());
 
     cfg.begin("Test (2B): agreement despite follower disconnection");
@@ -71,7 +71,7 @@ fn fail_agree() -> config::Result<()> {
 #[test]
 fn fail_no_agree() -> config::Result<()> {
     const SERVERS: usize = 5;
-    let cfg = config::make_config(SERVERS, false);
+    let cfg = make_config!(SERVERS, false);
     defer!(cfg.cleanup());
 
     cfg.begin("Test (2B): no agreement if too many followers disconnect");
@@ -120,7 +120,7 @@ fn fail_no_agree() -> config::Result<()> {
 #[test]
 fn rejoin() -> config::Result<()> {
     const SERVERS: usize = 3;
-    let cfg = config::make_config(SERVERS, false);
+    let cfg = make_config!(SERVERS, false);
     defer!(cfg.cleanup());
 
     cfg.begin("Test (2B): rejoin of partitioned leader");
@@ -160,7 +160,7 @@ fn rejoin() -> config::Result<()> {
 #[test]
 fn backup() -> config::Result<()> {
     const SERVERS: usize = 5;
-    let cfg = config::make_config(SERVERS, false);
+    let cfg = make_config!(SERVERS, false);
     defer!(cfg.cleanup());
 
     cfg.begin(
@@ -237,7 +237,7 @@ fn backup() -> config::Result<()> {
 #[test]
 fn count() -> config::Result<()> {
     const SERVERS: usize = 3;
-    let cfg = config::make_config(SERVERS, false);
+    let cfg = make_config!(SERVERS, false);
     defer!(cfg.cleanup());
 
     cfg.begin("Test (2B): RPC counts aren't too high");

@@ -19,7 +19,7 @@ pub mod config;
 #[test]
 fn persist1() -> config::Result<()> {
     const SERVERS: usize = 5;
-    let cfg = config::make_config(SERVERS, false);
+    let cfg = make_config!(SERVERS, false);
     defer!(cfg.cleanup());
 
     cfg.begin("Test (2C): basic persistence");
@@ -68,7 +68,7 @@ fn persist1() -> config::Result<()> {
 #[test]
 fn persist2() -> config::Result<()> {
     const SERVERS: usize = 5;
-    let cfg = config::make_config(SERVERS, false);
+    let cfg = make_config!(SERVERS, false);
     defer!(cfg.cleanup());
 
     cfg.begin("Test (2C): more persistence");
@@ -118,7 +118,7 @@ fn persist2() -> config::Result<()> {
 #[test]
 fn persist3() -> config::Result<()> {
     const SERVERS: usize = 3;
-    let cfg = config::make_config(SERVERS, false);
+    let cfg = make_config!(SERVERS, false);
     defer!(cfg.cleanup());
 
     cfg.begin(
@@ -152,7 +152,7 @@ fn persist3() -> config::Result<()> {
 #[test]
 fn figure8() -> config::Result<()> {
     const SERVERS: usize = 5;
-    let cfg = config::make_config(SERVERS, false);
+    let cfg = make_config!(SERVERS, false);
     defer!(cfg.cleanup());
 
     cfg.begin("Test (2C): Figure 8");
@@ -210,7 +210,7 @@ fn figure8() -> config::Result<()> {
 #[test]
 fn unreliable_agree() -> config::Result<()> {
     const SERVERS: usize = 5;
-    let cfg = Arc::new(config::make_config(SERVERS, true));
+    let cfg = Arc::new(make_config!(SERVERS, true));
     defer!(cfg.cleanup());
 
     cfg.begin("Test (2C): unreliable agreement");
@@ -242,7 +242,7 @@ fn unreliable_agree() -> config::Result<()> {
 #[test]
 fn figure8_unreliable() -> config::Result<()> {
     const SERVERS: usize = 5;
-    let cfg = config::make_config(SERVERS, false);
+    let cfg = make_config!(SERVERS, false);
     defer!(cfg.cleanup());
 
     cfg.begin("Test (2C): Figure 8 (unreliable)");
@@ -304,7 +304,7 @@ fn figure8_unreliable() -> config::Result<()> {
 
 fn internal_churn(unreliable: bool) -> config::Result<()> {
     const SERVERS: usize = 5;
-    let cfg = Arc::new(config::make_config(SERVERS, false));
+    let cfg = Arc::new(make_config!(SERVERS, false));
     defer!(cfg.cleanup());
 
     if unreliable {

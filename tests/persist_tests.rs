@@ -219,8 +219,11 @@ fn unreliable_agree() -> config::Result<()> {
     for iters in 1..50 {
         for j in 0..4 {
             let cfg = cfg.clone();
-            let handle =
-                std::thread::spawn(move || cfg.one(100 * iters + j, 1, true));
+            let logger = test_utils::thread_local_logger::get();
+            let handle = std::thread::spawn(move || {
+                test_utils::thread_local_logger::set(logger);
+                cfg.one(100 * iters + j, 1, true)
+            });
             handles.push(handle);
         }
 
@@ -318,7 +321,9 @@ fn internal_churn(unreliable: bool) -> config::Result<()> {
     for client_index in 0..3 {
         let stop = stop.clone();
         let cfg = cfg.clone();
+        let logger = test_utils::thread_local_logger::get();
         let handle = std::thread::spawn(move || {
+            test_utils::thread_local_logger::set(logger);
             let mut cmds = vec![];
             while !stop.load(Ordering::SeqCst) {
                 let cmd = thread_rng().gen();

@@ -5,8 +5,12 @@ use log::{Log, Metadata, Record};
 use std::fmt::Formatter;
 
 pub struct GlobalLogger;
+#[cfg(not(feature = "must-log"))]
 #[derive(Clone)]
 pub struct LocalLogger(Arc<dyn Log>);
+#[cfg(feature = "must-log")]
+#[derive(Clone)]
+pub struct LocalLogger(Option<Arc<dyn Log>>);
 
 thread_local!(static LOCAL_LOGGER: RefCell<LocalLogger> = Default::default());
 
@@ -24,7 +28,10 @@ pub fn global_init_once() {
 
 pub fn thread_init<T: 'static + Log>(logger: T) {
     global_init_once();
+    #[cfg(not(feature = "must-log"))]
     self::set(LocalLogger(Arc::new(logger)));
+    #[cfg(feature = "must-log")]
+    self::set(LocalLogger(Some(Arc::new(logger))));
 }
 
 pub fn get() -> LocalLogger {
@@ -41,7 +48,12 @@ pub fn reset() {
 
 impl Default for LocalLogger {
     fn default() -> Self {
-        Self(Arc::new(NopLogger))
+        #[cfg(not(feature = "must-log"))]
+        {
+            Self(Arc::new(NopLogger))
+        }
+        #[cfg(feature = "must-log")]
+        Self(None)
     }
 }
 
@@ -49,7 +61,12 @@ impl std::ops::Deref for LocalLogger {
     type Target = dyn Log;
 
     fn deref(&self) -> &Self::Target {
-        self.0.deref()
+        #[cfg(not(feature = "must-log"))]
+        {
+            self.0.deref()
+        }
+        #[cfg(feature = "must-log")]
+        self.0.as_ref().unwrap().as_ref()
     }
 }
 

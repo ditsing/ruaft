@@ -112,18 +112,22 @@ impl<C: 'static + Clone + Default + Send + serde::Serialize> Raft<C> {
         self.snapshot_daemon.unparker.replace(unparker.clone());
 
         let keep_running = self.keep_running.clone();
+        let me = self.me;
         let rf = self.inner_state.clone();
         let persister = self.persister.clone();
         let snapshot_daemon = self.snapshot_daemon.clone();
         let daemon_env = self.daemon_env.clone();
         let stop_wait_group = self.stop_wait_group.clone();
 
+        log::info!("{:?} snapshot daemon running ...", me);
         let join_handle = std::thread::spawn(move || loop {
             // Note: do not change this to `let _ = ...`.
             let _guard = daemon_env.for_scope();
 
             parker.park();
             if !keep_running.load(Ordering::SeqCst) {
+                log::info!("{:?} snapshot daemon done.", me);
+
                 // Explicitly drop every thing.
                 drop(keep_running);
                 drop(rf);

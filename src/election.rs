@@ -123,6 +123,7 @@ where
         let join_handle = std::thread::spawn(move || {
             // Note: do not change this to `let _ = ...`.
             let _guard = this.daemon_env.for_scope();
+            log::info!("{:?} election timer daemon running ...", this.me);
 
             let election = this.election.clone();
 
@@ -200,6 +201,8 @@ where
                 // be notified by the election signal.
                 cancel_handle.map(|c| c.send(()));
             }
+
+            log::info!("{:?} election timer daemon done.", this.me);
 
             let stop_wait_group = this.stop_wait_group.clone();
             // Making sure the rest of `this` is dropped before the wait group.

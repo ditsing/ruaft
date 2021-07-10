@@ -53,6 +53,7 @@ where
         mut apply_command: impl ApplyCommandFnMut<Command>,
     ) {
         let keep_running = self.keep_running.clone();
+        let me = self.me;
         let rf = self.inner_state.clone();
         let condvar = self.apply_command_signal.clone();
         let snapshot_daemon = self.snapshot_daemon.clone();
@@ -61,6 +62,7 @@ where
         let join_handle = std::thread::spawn(move || {
             // Note: do not change this to `let _ = ...`.
             let _guard = daemon_env.for_scope();
+            log::info!("{:?} apply command daemon running ...", me);
 
             while keep_running.load(Ordering::SeqCst) {
                 let messages = {
@@ -112,6 +114,7 @@ where
                     snapshot_daemon.trigger();
                 }
             }
+            log::info!("{:?} apply command daemon done.", me);
 
             drop(stop_wait_group);
         });

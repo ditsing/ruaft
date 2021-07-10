@@ -66,6 +66,8 @@ where
             // Note: do not change this to `let _ = ...`.
             let _guard = this.daemon_env.for_scope();
 
+            log::info!("{:?} sync log entries daemon running ...", this.me);
+
             let mut openings = vec![];
             openings.resize_with(this.peers.len(), || {
                 Opening(Arc::new(AtomicUsize::new(0)))
@@ -98,6 +100,8 @@ where
                     }
                 }
             }
+
+            log::info!("{:?} sync log entries daemon done.", this.me);
 
             let stop_wait_group = this.stop_wait_group.clone();
             // Making sure the rest of `this` is dropped before the wait group.

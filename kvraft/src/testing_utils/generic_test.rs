@@ -30,7 +30,7 @@ where
         let func = func.clone();
         client_threads.push(std::thread::spawn(move || func(i, clerk)))
     }
-    eprintln!("spawning clients done.");
+    log::debug!("spawning clients done.");
     client_threads
 }
 
@@ -39,7 +39,7 @@ fn appending_client(
     mut clerk: Clerk,
     stop: Arc<AtomicBool>,
 ) -> (usize, String) {
-    eprintln!("client {} running.", index);
+    log::info!("client {} running.", index);
     let mut op_count = 0usize;
     let key = index.to_string();
     let mut last = String::new();
@@ -48,7 +48,7 @@ fn appending_client(
     clerk.put(&key, &last);
 
     while !stop.load(Ordering::Acquire) {
-        eprintln!("client {} starting {}.", index, op_count);
+        log::debug!("client {} starting {}.", index, op_count);
         if rng.gen_ratio(1, 2) {
             let value = format!("({}, {}), ", index, op_count);
 
@@ -62,9 +62,9 @@ fn appending_client(
                 .unwrap_or_else(|| panic!("Key {} should exist.", index));
             assert_eq!(value, last);
         }
-        eprintln!("client {} done {}.", index, op_count);
+        log::debug!("client {} done {}.", index, op_count);
     }
-    eprintln!("client {} done.", index);
+    log::info!("client {} done.", index);
     (op_count, last)
 }
 
@@ -255,7 +255,7 @@ pub fn generic_test(test_params: GenericTestParams) {
                     .unwrap_or_else(|| panic!("Key {} should exist.", index));
                 assert_eq!(real_result, last_result);
             }
-            eprintln!("Client {} committed {} operations", index, op_count);
+            log::info!("Client {} committed {} operations", index, op_count);
             assert!(
                 op_count >= min_ops,
                 "Client {} committed {} operations, less than {}",
@@ -280,7 +280,7 @@ pub fn generic_test(test_params: GenericTestParams) {
     cfg.clean_up();
 
     for (index, laps) in laps.iter().enumerate() {
-        eprintln!("Round {} diagnostics: {:?}", index, laps);
+        log::info!("Round {} diagnostics: {:?}", index, laps);
     }
 
     if test_linearizability {
@@ -291,13 +291,13 @@ pub fn generic_test(test_params: GenericTestParams) {
                     .into_inner(),
             ));
         let start = Instant::now();
-        eprintln!("Searching for linearization arrangements ...");
+        log::info!("Searching for linearization arrangements ...");
         assert!(
             linearizability::check_operations_timeout::<KvModel>(&ops, None),
             "History {:?} is not linearizable,",
             ops,
         );
-        eprintln!(
+        log::info!(
             "Searching for linearization arrangements done after {:?}.",
             start.elapsed()
         );

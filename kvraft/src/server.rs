@@ -8,6 +8,7 @@ use std::time::Duration;
 use parking_lot::{Condvar, Mutex};
 
 use ruaft::{ApplyCommandMessage, Persister, Raft, RpcClient, Term};
+use test_utils::thread_local_logger::LocalLogger;
 
 use crate::common::{
     ClerkId, GetArgs, GetEnum, GetReply, KVError, PutAppendArgs, PutAppendEnum,
@@ -20,6 +21,7 @@ pub struct KVServer {
     state: Mutex<KVServerState>,
     rf: Mutex<Raft<UniqueKVOp>>,
     keep_running: AtomicBool,
+    logger: LocalLogger,
 }
 
 #[derive(Clone, Default, Serialize, Deserialize)]
@@ -115,6 +117,7 @@ impl KVServer {
                 move |index| snapshot_holder_clone.request_snapshot(index),
             )),
             keep_running: AtomicBool::new(true),
+            logger: LocalLogger::inherit(),
         });
         ret.process_command(snapshot_holder, rx);
         ret
@@ -199,7 +202,11 @@ impl KVServer {
         command_channel: Receiver<ApplyCommandMessage<UniqueKVOp>>,
     ) {
         let this = Arc::downgrade(self);
+        let logger = LocalLogger::inherit();
+        let me = self.me();
         std::thread::spawn(move || {
+            logger.attach();
+            log::info!("KVServer {} waiting for commands ...", me);
             while let Ok(message) = command_channel.recv() {
                 if let Some(this) = this.upgrade() {
                     match message {
@@ -224,6 +231,7 @@ impl KVServer {
                     break;
                 }
             }
+            log::info!("KVServer {} stopped waiting for commands.", me);
         });
     }
 
@@ -345,6 +353,7 @@ impl KVServer {
     const DEFAULT_TIMEOUT: Duration = Duration::from_secs(1);
 
     pub fn get(&self, args: GetArgs) -> GetReply {
+        self.logger.clone().attach();
         let map_dup = match args.op {
             GetEnum::AllowDuplicate => |r| Ok(r),
             GetEnum::NoDuplicate => |_| Err(KVError::Conflict),
@@ -372,6 +381,7 @@ impl KVServer {
     }
 
     pub fn put_append(&self, args: PutAppendArgs) -> PutAppendReply {
+        self.logger.clone().attach();
         let op = match args.op {
             PutAppendEnum::Put => KVOp::Put(args.key, args.value),
             PutAppendEnum::Append => KVOp::Append(args.key, args.value),

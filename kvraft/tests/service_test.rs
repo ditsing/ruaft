@@ -11,6 +11,8 @@ use kvraft::testing_utils::config::{
 use kvraft::testing_utils::generic_test::{
     generic_test, spawn_clients, GenericTestParams,
 };
+use test_utils::init_test_log;
+use test_utils::thread_local_logger::LocalLogger;
 
 type Result = std::result::Result<(), String>;
 
@@ -56,6 +58,7 @@ fn check_concurrent_results(
 
 #[test]
 fn basic_service() {
+    init_test_log!();
     generic_test(GenericTestParams {
         clients: 1,
         ..Default::default()
@@ -64,6 +67,7 @@ fn basic_service() {
 
 #[test]
 fn concurrent_client() {
+    init_test_log!();
     generic_test(GenericTestParams {
         clients: 5,
         ..Default::default()
@@ -72,6 +76,7 @@ fn concurrent_client() {
 
 #[test]
 fn unreliable_many_clients() {
+    init_test_log!();
     generic_test(GenericTestParams {
         clients: 5,
         unreliable: true,
@@ -81,6 +86,7 @@ fn unreliable_many_clients() {
 
 #[test]
 fn unreliable_one_key_many_clients() -> Result {
+    init_test_log!();
     const SERVERS: usize = 5;
     let cfg = Arc::new(make_config(SERVERS, true, 0));
     defer!(cfg.clean_up());
@@ -93,8 +99,10 @@ fn unreliable_one_key_many_clients() -> Result {
 
     const CLIENTS: usize = 5;
     const ATTEMPTS: usize = 10;
+    let logger = LocalLogger::inherit();
     let client_results =
-        spawn_clients(cfg.clone(), CLIENTS, |index, mut clerk| {
+        spawn_clients(cfg.clone(), CLIENTS, move |index, mut clerk| {
+            logger.clone().attach();
             for i in 0..ATTEMPTS {
                 clerk.append("k", format!("({}, {})", index, i));
             }
@@ -110,6 +118,7 @@ fn unreliable_one_key_many_clients() -> Result {
 
 #[test]
 fn one_partition() -> Result {
+    init_test_log!();
     const SERVERS: usize = 5;
     let cfg = Arc::new(make_config(SERVERS, false, 0));
     defer!(cfg.clean_up());
@@ -174,6 +183,7 @@ fn one_partition() -> Result {
 
 #[test]
 fn many_partitions_one_client() {
+    init_test_log!();
     generic_test(GenericTestParams {
         clients: 1,
         partition: true,
@@ -183,6 +193,7 @@ fn many_partitions_one_client() {
 
 #[test]
 fn many_partitions_many_client() {
+    init_test_log!();
     generic_test(GenericTestParams {
         clients: 5,
         partition: true,
@@ -192,6 +203,7 @@ fn many_partitions_many_client() {
 
 #[test]
 fn persist_one_client() {
+    init_test_log!();
     generic_test(GenericTestParams {
         clients: 1,
         crash: true,
@@ -201,6 +213,7 @@ fn persist_one_client() {
 
 #[test]
 fn persist_concurrent() {
+    init_test_log!();
     generic_test(GenericTestParams {
         clients: 5,
         crash: true,
@@ -210,6 +223,7 @@ fn persist_concurrent() {
 
 #[test]
 fn persist_concurrent_unreliable() {
+    init_test_log!();
     generic_test(GenericTestParams {
         clients: 5,
         unreliable: true,
@@ -220,6 +234,7 @@ fn persist_concurrent_unreliable() {
 
 #[test]
 fn persist_partition() {
+    init_test_log!();
     generic_test(GenericTestParams {
         clients: 5,
         partition: true,
@@ -230,6 +245,7 @@ fn persist_partition() {
 
 #[test]
 fn persist_partition_unreliable() {
+    init_test_log!();
     generic_test(GenericTestParams {
         clients: 5,
         unreliable: true,
@@ -242,6 +258,7 @@ fn persist_partition_unreliable() {
 
 #[test]
 fn linearizability() {
+    init_test_log!();
     generic_test(GenericTestParams {
         clients: 15,
         unreliable: true,

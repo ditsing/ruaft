@@ -5,6 +5,7 @@ use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
+use test_utils::thread_local_logger::LocalLogger;
 
 use linearizability::{KvInput, KvModel, KvOp, KvOutput, Operation};
 
@@ -175,7 +176,8 @@ pub fn generic_test(test_params: GenericTestParams) {
 
     let mut laps = vec![];
     const ROUNDS: usize = 3;
-    for _ in 0..ROUNDS {
+    for round in 0..ROUNDS {
+        log::info!("Running round {}", round);
         let start = Instant::now();
         // Network partition thread.
         let partition_stop = Arc::new(AtomicBool::new(false));
@@ -185,8 +187,11 @@ pub fn generic_test(test_params: GenericTestParams) {
         let config = cfg.clone();
         let clients_stop_clone = clients_stop.clone();
         let ops_clone = ops.clone();
+        let logger = LocalLogger::inherit();
         let spawn_client_results = std::thread::spawn(move || {
+            logger.clone().attach();
             spawn_clients(config, clients, move |index: usize, clerk: Clerk| {
+                logger.clone().attach();
                 if !test_linearizability {
                     appending_client(index, clerk, clients_stop_clone.clone())
                 } else {

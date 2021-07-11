@@ -1,10 +1,9 @@
-extern crate kvraft;
-#[macro_use]
-extern crate scopeguard;
+use std::sync::Arc;
+
+use scopeguard::defer;
 
 use kvraft::testing_utils::config::{make_config, sleep_election_timeouts};
 use kvraft::testing_utils::generic_test::{generic_test, GenericTestParams};
-use std::sync::Arc;
 use test_utils::init_test_log;
 
 #[test]

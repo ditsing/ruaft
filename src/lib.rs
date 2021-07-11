@@ -1,13 +1,3 @@
-extern crate bincode;
-extern crate futures_channel;
-extern crate futures_util;
-extern crate labrpc;
-extern crate log;
-extern crate rand;
-#[macro_use]
-extern crate serde_derive;
-extern crate tokio;
-
 use std::convert::TryFrom;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -15,6 +5,7 @@ use std::time::Duration;
 
 use crossbeam_utils::sync::WaitGroup;
 use parking_lot::{Condvar, Mutex};
+use serde_derive::{Deserialize, Serialize};
 
 use crate::apply_command::ApplyCommandFnMut;
 pub use crate::apply_command::ApplyCommandMessage;

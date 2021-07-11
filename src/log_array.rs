@@ -1,3 +1,5 @@
+use serde_derive::{Deserialize, Serialize};
+
 use crate::index_term::IndexTerm;
 use crate::{Index, LogEntry, Term};
 

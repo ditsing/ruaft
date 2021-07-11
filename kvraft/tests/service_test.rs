@@ -1,7 +1,3 @@
-extern crate kvraft;
-#[macro_use]
-extern crate scopeguard;
-
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
@@ -11,6 +7,7 @@ use kvraft::testing_utils::config::{
 use kvraft::testing_utils::generic_test::{
     generic_test, spawn_clients, GenericTestParams,
 };
+use scopeguard::defer;
 use test_utils::init_test_log;
 use test_utils::thread_local_logger::LocalLogger;
 

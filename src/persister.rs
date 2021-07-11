@@ -3,6 +3,7 @@ use std::convert::TryFrom;
 use bytes::Bytes;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use serde_derive::{Deserialize, Serialize};
 
 use crate::log_array::LogArray;
 use crate::{Peer, RaftState, Term};

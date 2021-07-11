@@ -1,3 +1,5 @@
+use serde_derive::{Deserialize, Serialize};
+
 use crate::{Index, LogEntry, Term};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]

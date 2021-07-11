@@ -1,13 +1,6 @@
 #![allow(clippy::identity_op)]
-#[macro_use]
-extern crate anyhow;
-extern crate bytes;
-extern crate labrpc;
-extern crate ruaft;
-#[macro_use]
-extern crate scopeguard;
-
 use rand::{thread_rng, Rng};
+use scopeguard::defer;
 
 // This is to remove the annoying "unused code in config" warnings.
 pub mod config;

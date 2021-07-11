@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use parking_lot::{Condvar, Mutex};
+use serde_derive::{Deserialize, Serialize};
 
 use ruaft::{ApplyCommandMessage, Persister, Raft, RpcClient, Term};
 use test_utils::thread_local_logger::LocalLogger;

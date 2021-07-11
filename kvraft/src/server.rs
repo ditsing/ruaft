@@ -101,8 +101,8 @@ impl KVServer {
     ) -> Arc<Self> {
         let (tx, rx) = channel();
         let apply_command = move |message| {
-            tx.send(message)
-                .expect("The receiving end of apply command channel should have not been dropped");
+            // Ignore apply errors.
+            let _ = tx.send(message);
         };
         let snapshot_holder = Arc::new(SnapshotHolder::default());
         let snapshot_holder_clone = snapshot_holder.clone();

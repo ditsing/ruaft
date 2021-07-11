@@ -6,7 +6,8 @@ use rand::Rng;
 #[macro_export]
 macro_rules! init_test_log {
     () => {
-        $crate::init_log(stdext::function_name!()).unwrap()
+        $crate::init_log(stdext::function_name!())
+            .expect("Initializing test log should never fail")
     };
 }
 

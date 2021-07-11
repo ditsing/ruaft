@@ -20,7 +20,8 @@ pub fn global_init_once() {
     static INIT_LOG_ONCE: Once = Once::new();
 
     INIT_LOG_ONCE.call_once(|| {
-        log::set_logger(&GLOBAL_LOGGER).unwrap();
+        log::set_logger(&GLOBAL_LOGGER)
+            .expect("Set global logger should never fail");
         // Enable all logging globally. Each local logger should have its own
         // filtering, which could be less efficient.
         log::set_max_level(log::LevelFilter::max());

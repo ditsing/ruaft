@@ -1,3 +1,28 @@
+/// A logger that is local to each thread.
+///
+/// Logger as defined by the `log` crate is a global construct. A logger is
+/// shared by the whole process and all of its threads. This makes sense for an
+/// application.
+///
+/// However, a global logger is rarely useful for tests. `cargo test` creates
+/// one process for each test source file, and runs each test method in a
+/// separate thread. By default, logs of different tests will be mixed together,
+/// which is less useful.
+///
+/// A similar problem exists in tests for `stdout` and `stderr`. Therefore,
+/// `libtest` implemented something called `output capture`. Internally in crate
+/// `std::io`, output `stdout` and `stderr` of a thread can be configured to
+/// redirected to a sink of type `Arc<Mutex<Vec<u8>>>`. The sink is stored in a
+/// `thread_local` variable. For each test method, `libtest` creates a sink
+/// specific to the test and stores it in the main test thread. The output of
+/// the main test thread will be redirected to the sink by `std::io`. Later in
+/// `std::thread::spawn()`, when a new thread is created, the sink is copied to
+/// the new thread's local variable. Thus, the output of the new thread is also
+/// redirected to the same sink. That is how tests output are captured.
+///
+/// We took a similar approach by storing a logger in each thread, and copy the
+/// logger to all sub-threads. Unfortunately we do not have access to methods
+/// like `std::thread::spawn()`, thus the copying can only be done manually.
 use std::cell::RefCell;
 use std::sync::{Arc, Once};
 
@@ -5,7 +30,7 @@ use log::{Log, Metadata, Record};
 use std::fmt::Formatter;
 use std::ops::Deref;
 
-pub struct GlobalLogger;
+struct GlobalLogger;
 #[cfg(not(feature = "must-log"))]
 #[derive(Clone)]
 pub struct LocalLogger(Arc<dyn Log>);
@@ -15,6 +40,10 @@ pub struct LocalLogger(Option<Arc<dyn Log>>);
 
 thread_local!(static LOCAL_LOGGER: RefCell<LocalLogger> = Default::default());
 
+/// Initialized the global logger used by the `log` crate.
+///
+/// This method can be called multiple times by different tests. The logger is
+/// only initialized once and it works for all tests and all threads.
 pub fn global_init_once() {
     static GLOBAL_LOGGER: GlobalLogger = GlobalLogger;
     static INIT_LOG_ONCE: Once = Once::new();
@@ -28,6 +57,13 @@ pub fn global_init_once() {
     });
 }
 
+/// Set the logger for the main test thread.
+///
+/// This method should only be called once at the beginning of each test.
+///
+/// Before creating a child thread, use [`LocalLogger::inherit()`] to copy the
+/// logger from the parent thread. Move the copied logger to the child thread
+/// and use [`LocalLogger::attach()`] to set the logger for the child thread.
 pub fn thread_init<T: 'static + Log>(logger: T) {
     global_init_once();
     #[cfg(not(feature = "must-log"))]
@@ -36,25 +72,30 @@ pub fn thread_init<T: 'static + Log>(logger: T) {
     self::set(LocalLogger(Some(Arc::new(logger))));
 }
 
+#[doc(hidden)]
 pub fn get() -> LocalLogger {
     let result = LOCAL_LOGGER.with(|inner| inner.borrow().clone());
     let _ = result.deref();
     result
 }
 
+#[doc(hidden)]
 pub fn set(logger: LocalLogger) {
     LOCAL_LOGGER.with(|inner| inner.replace(logger));
 }
 
+#[doc(hidden)]
 pub fn reset() {
     self::set(LocalLogger::default())
 }
 
 impl LocalLogger {
+    /// Inherit the logger from the current thread.
     pub fn inherit() -> Self {
         get()
     }
 
+    /// Set the logger of this thread to `self`.
     pub fn attach(self) {
         set(self)
     }

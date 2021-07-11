@@ -3,6 +3,15 @@ use std::time::SystemTime;
 
 use rand::Rng;
 
+/// Initialize a thread local logger for a test.
+///
+/// A log file will be created in [`LOG_DIR`]. The name of the log file will
+/// be derived from the fully qualified test method name, plus a timestamp and
+/// 10 random characters, e.g. `mod-test_method-1600000000-abcdefghij.log`.
+///
+/// The test logger is backed by `env_logger`. By default the test module will
+/// have `trace` level logging. Other modules have `info` level logging. See the
+/// documentation of `env_logger` on how to configure log levels.
 #[macro_export]
 macro_rules! init_test_log {
     () => {
@@ -13,6 +22,9 @@ macro_rules! init_test_log {
 
 pub const LOG_DIR: &str = "/tmp/ruaft-test-logs/";
 
+/// Initialize a thread local logger for `module`.
+///
+/// See [`init_test_log`] for more details.
 pub fn init_log(module: &str) -> std::io::Result<PathBuf> {
     let module_file = module.replace("::", "-");
     let timestamp = SystemTime::now()

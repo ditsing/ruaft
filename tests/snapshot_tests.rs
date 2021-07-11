@@ -5,9 +5,11 @@ extern crate scopeguard;
 use kvraft::testing_utils::config::{make_config, sleep_election_timeouts};
 use kvraft::testing_utils::generic_test::{generic_test, GenericTestParams};
 use std::sync::Arc;
+use test_utils::init_test_log;
 
 #[test]
 fn install_snapshot_rpc() {
+    init_test_log!();
     const SERVERS: usize = 3;
     const MAX_RAFT_STATE: usize = 1000;
     const KEY: &str = "a";
@@ -67,6 +69,7 @@ fn install_snapshot_rpc() {
 
 #[test]
 fn snapshot_size() {
+    init_test_log!();
     const SERVERS: usize = 3;
     const MAX_RAFT_STATE: usize = 1000;
     const MAX_SNAPSHOT_STATE: usize = 500;
@@ -94,6 +97,7 @@ fn snapshot_size() {
 
 #[test]
 fn snapshot_recover_test() {
+    init_test_log!();
     generic_test(GenericTestParams {
         clients: 1,
         crash: true,
@@ -104,6 +108,7 @@ fn snapshot_recover_test() {
 
 #[test]
 fn snapshot_recover_many_clients() {
+    init_test_log!();
     generic_test(GenericTestParams {
         clients: 20,
         crash: true,
@@ -115,6 +120,7 @@ fn snapshot_recover_many_clients() {
 
 #[test]
 fn snapshot_unreliable_test() {
+    init_test_log!();
     generic_test(GenericTestParams {
         clients: 5,
         unreliable: true,
@@ -125,6 +131,7 @@ fn snapshot_unreliable_test() {
 
 #[test]
 fn snapshot_unreliable_recover_test() {
+    init_test_log!();
     generic_test(GenericTestParams {
         clients: 5,
         unreliable: true,
@@ -136,6 +143,7 @@ fn snapshot_unreliable_recover_test() {
 
 #[test]
 fn snapshot_unreliable_recover_partition() {
+    init_test_log!();
     generic_test(GenericTestParams {
         clients: 5,
         unreliable: true,
@@ -148,6 +156,7 @@ fn snapshot_unreliable_recover_partition() {
 }
 #[test]
 fn linearizability() {
+    init_test_log!();
     generic_test(GenericTestParams {
         clients: 15,
         unreliable: true,

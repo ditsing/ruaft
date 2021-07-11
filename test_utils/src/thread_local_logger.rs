@@ -3,6 +3,7 @@ use std::sync::{Arc, Once};
 
 use log::{Log, Metadata, Record};
 use std::fmt::Formatter;
+use std::ops::Deref;
 
 pub struct GlobalLogger;
 #[cfg(not(feature = "must-log"))]
@@ -35,7 +36,9 @@ pub fn thread_init<T: 'static + Log>(logger: T) {
 }
 
 pub fn get() -> LocalLogger {
-    LOCAL_LOGGER.with(|inner| inner.borrow().clone())
+    let result = LOCAL_LOGGER.with(|inner| inner.borrow().clone());
+    let _ = result.deref();
+    result
 }
 
 pub fn set(logger: LocalLogger) {
@@ -44,6 +47,16 @@ pub fn set(logger: LocalLogger) {
 
 pub fn reset() {
     self::set(LocalLogger::default())
+}
+
+impl LocalLogger {
+    pub fn inherit() -> Self {
+        get()
+    }
+
+    pub fn attach(self) {
+        set(self)
+    }
 }
 
 impl Default for LocalLogger {
@@ -66,7 +79,10 @@ impl std::ops::Deref for LocalLogger {
             self.0.deref()
         }
         #[cfg(feature = "must-log")]
-        self.0.as_ref().unwrap().as_ref()
+        self.0
+            .as_ref()
+            .expect("Local logger must be set before use")
+            .as_ref()
     }
 }
 

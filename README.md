@@ -84,4 +84,4 @@ Things would be better after I implement an RPC interface and improve the `persi
 - [ ] Add a proper RPC interface to all public methods
 - [ ] Benchmarks
 - [x] Allow storing arbitrary information
-- [ ] Add more logging.
+- [x] Add more logging.

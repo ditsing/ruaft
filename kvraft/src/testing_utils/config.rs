@@ -6,7 +6,7 @@ use rand::seq::SliceRandom;
 use rand::thread_rng;
 
 use ruaft::rpcs::register_server;
-use ruaft::{Persister, RpcClient};
+use ruaft::Persister;
 
 use crate::client::Clerk;
 use crate::server::KVServer;
@@ -48,7 +48,7 @@ impl Config {
         {
             let mut network = self.network.lock();
             for j in 0..self.server_count {
-                clients.push(RpcClient::new(network.make_client(
+                clients.push(ruaft::rpcs::RpcClient::new(network.make_client(
                     Self::client_name(index, j),
                     Self::server_name(j),
                 )))

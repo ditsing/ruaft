@@ -16,7 +16,7 @@ use crate::persister::PersistedRaftState;
 pub use crate::persister::Persister;
 pub(crate) use crate::raft_state::RaftState;
 pub(crate) use crate::raft_state::State;
-pub use crate::rpcs::RpcClient;
+pub use crate::remote_raft::RemoteRaft;
 pub use crate::snapshot::Snapshot;
 use crate::snapshot::{RequestSnapshotFnMut, SnapshotDaemon};
 
@@ -31,6 +31,7 @@ mod process_append_entries;
 mod process_install_snapshot;
 mod process_request_vote;
 mod raft_state;
+mod remote_raft;
 pub mod rpcs;
 mod snapshot;
 mod sync_log_entries;
@@ -56,7 +57,7 @@ struct LogEntry<Command> {
 #[derive(Clone)]
 pub struct Raft<Command> {
     inner_state: Arc<Mutex<RaftState<Command>>>,
-    peers: Vec<Arc<RpcClient>>,
+    peers: Vec<Arc<dyn RemoteRaft<Command>>>,
 
     me: Peer,
 
@@ -75,7 +76,7 @@ pub struct Raft<Command> {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct RequestVoteArgs {
+pub struct RequestVoteArgs {
     term: Term,
     candidate_id: Peer,
     last_log_index: Index,
@@ -83,13 +84,13 @@ struct RequestVoteArgs {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct RequestVoteReply {
+pub struct RequestVoteReply {
     term: Term,
     vote_granted: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct AppendEntriesArgs<Command> {
+pub struct AppendEntriesArgs<Command> {
     term: Term,
     leader_id: Peer,
     prev_log_index: Index,
@@ -99,14 +100,14 @@ struct AppendEntriesArgs<Command> {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct AppendEntriesReply {
+pub struct AppendEntriesReply {
     term: Term,
     success: bool,
     committed: Option<IndexTerm>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct InstallSnapshotArgs {
+pub struct InstallSnapshotArgs {
     pub(crate) term: Term,
     leader_id: Peer,
     pub(crate) last_included_index: Index,
@@ -118,7 +119,7 @@ struct InstallSnapshotArgs {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-struct InstallSnapshotReply {
+pub struct InstallSnapshotReply {
     term: Term,
     committed: Option<IndexTerm>,
 }
@@ -144,7 +145,7 @@ where
     /// Each instance will create at least 4 + (number of peers) threads. The
     /// extensive usage of threads is to minimize latency.
     pub fn new(
-        peers: Vec<RpcClient>,
+        peers: Vec<impl RemoteRaft<Command> + 'static>,
         me: usize,
         persister: Arc<dyn Persister>,
         apply_command: impl ApplyCommandFnMut<Command>,
@@ -190,7 +191,11 @@ where
             .on_thread_stop(ThreadEnv::detach)
             .build()
             .expect("Creating thread pool should not fail");
-        let peers = peers.into_iter().map(Arc::new).collect();
+        let peers = peers
+            .into_iter()
+            .map(|r| Arc::new(r) as Arc<dyn RemoteRaft<Command>>)
+            .collect();
+
         let mut this = Raft {
             inner_state: Arc::new(Mutex::new(state)),
             peers,

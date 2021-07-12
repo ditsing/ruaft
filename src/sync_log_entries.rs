@@ -10,7 +10,7 @@ use crate::index_term::IndexTerm;
 use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, RPC_DEADLINE};
 use crate::{
-    AppendEntriesArgs, InstallSnapshotArgs, Peer, Raft, RaftState, RpcClient,
+    AppendEntriesArgs, InstallSnapshotArgs, Peer, Raft, RaftState, RemoteRaft,
     Term, HEARTBEAT_INTERVAL_MILLIS,
 };
 
@@ -154,7 +154,7 @@ where
     /// and a committed log entry can never diverge.
     async fn sync_log_entries(
         rf: Arc<Mutex<RaftState<Command>>>,
-        rpc_client: Arc<RpcClient>,
+        rpc_client: impl RemoteRaft<Command>,
         peer_index: usize,
         rerun: std::sync::mpsc::Sender<Option<Peer>>,
         opening: Arc<AtomicUsize>,
@@ -378,14 +378,14 @@ where
 
     const APPEND_ENTRIES_RETRY: usize = 1;
     async fn append_entries(
-        rpc_client: &RpcClient,
+        rpc_client: &dyn RemoteRaft<Command>,
         args: AppendEntriesArgs<Command>,
     ) -> std::io::Result<SyncLogEntriesResult> {
         let term = args.term;
         let reply = retry_rpc(
             Self::APPEND_ENTRIES_RETRY,
             RPC_DEADLINE,
-            move |_round| rpc_client.call_append_entries(args.clone()),
+            move |_round| rpc_client.append_entries(args.clone()),
         )
         .await?;
         Ok(if reply.term == term {
@@ -418,14 +418,14 @@ where
 
     const INSTALL_SNAPSHOT_RETRY: usize = 1;
     async fn install_snapshot(
-        rpc_client: &RpcClient,
+        rpc_client: &dyn RemoteRaft<Command>,
         args: InstallSnapshotArgs,
     ) -> std::io::Result<SyncLogEntriesResult> {
         let term = args.term;
         let reply = retry_rpc(
             Self::INSTALL_SNAPSHOT_RETRY,
             RPC_DEADLINE,
-            move |_round| rpc_client.call_install_snapshot(args.clone()),
+            move |_round| rpc_client.install_snapshot(args.clone()),
         )
         .await?;
         Ok(if reply.term == term {

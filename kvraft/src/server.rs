@@ -8,7 +8,7 @@ use std::time::Duration;
 use parking_lot::{Condvar, Mutex};
 use serde_derive::{Deserialize, Serialize};
 
-use ruaft::{ApplyCommandMessage, Persister, Raft, RpcClient, Term};
+use ruaft::{ApplyCommandMessage, Persister, Raft, RemoteRaft, Term};
 use test_utils::thread_local_logger::LocalLogger;
 
 use crate::common::{
@@ -94,7 +94,7 @@ impl From<CommitError> for KVError {
 
 impl KVServer {
     pub fn new(
-        servers: Vec<RpcClient>,
+        servers: Vec<impl RemoteRaft<UniqueKVOp> + 'static>,
         me: usize,
         persister: Arc<dyn Persister>,
         max_state_size_bytes: Option<usize>,

@@ -8,7 +8,7 @@ use rand::{thread_rng, Rng};
 use crate::daemon_env::Daemon;
 use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, RPC_DEADLINE};
-use crate::{Peer, Raft, RaftState, RequestVoteArgs, RpcClient, State, Term};
+use crate::{Peer, Raft, RaftState, RemoteRaft, RequestVoteArgs, State, Term};
 
 #[derive(Default)]
 pub(crate) struct ElectionState {
@@ -281,16 +281,16 @@ where
 
     const REQUEST_VOTE_RETRY: usize = 1;
     async fn request_vote(
-        rpc_client: Arc<RpcClient>,
+        rpc_client: impl RemoteRaft<Command>,
         args: RequestVoteArgs,
         term_marker: TermMarker<Command>,
     ) -> Option<bool> {
         let term = args.term;
         // See the comment in send_heartbeat() for this override.
-        let rpc_client = rpc_client.as_ref();
+        let rpc_client = &rpc_client;
         let reply =
             retry_rpc(Self::REQUEST_VOTE_RETRY, RPC_DEADLINE, move |_round| {
-                rpc_client.call_request_vote(args.clone())
+                rpc_client.request_vote(args.clone())
             })
             .await;
         if let Ok(reply) = reply {

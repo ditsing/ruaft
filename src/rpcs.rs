@@ -1,3 +1,4 @@
+use async_trait::async_trait;
 use labrpc::{Client, Network, ReplyMessage, RequestMessage, Server};
 use parking_lot::Mutex;
 
@@ -59,6 +60,32 @@ impl RpcClient {
         request: InstallSnapshotArgs,
     ) -> std::io::Result<InstallSnapshotReply> {
         self.call_rpc(INSTALL_SNAPSHOT_RPC, request).await
+    }
+}
+
+#[async_trait]
+impl<Command: 'static + Send + Serialize>
+    crate::remote_raft::RemoteRaft<Command> for RpcClient
+{
+    async fn request_vote(
+        &self,
+        args: RequestVoteArgs,
+    ) -> std::io::Result<RequestVoteReply> {
+        self.call_request_vote(args).await
+    }
+
+    async fn append_entries(
+        &self,
+        args: AppendEntriesArgs<Command>,
+    ) -> std::io::Result<AppendEntriesReply> {
+        self.call_append_entries(args).await
+    }
+
+    async fn install_snapshot(
+        &self,
+        args: InstallSnapshotArgs,
+    ) -> std::io::Result<InstallSnapshotReply> {
+        self.call_install_snapshot(args).await
     }
 }
 

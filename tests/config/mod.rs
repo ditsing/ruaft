@@ -11,7 +11,7 @@ use rand::{thread_rng, Rng};
 use tokio::time::Duration;
 
 use ruaft::rpcs::register_server;
-use ruaft::{ApplyCommandMessage, Persister, Raft, RpcClient, Term};
+use ruaft::{ApplyCommandMessage, Persister, Raft, Term};
 
 pub mod persister;
 
@@ -304,7 +304,7 @@ impl Config {
         {
             let mut network = self.network.lock();
             for j in 0..self.server_count {
-                clients.push(RpcClient::new(network.make_client(
+                clients.push(ruaft::rpcs::RpcClient::new(network.make_client(
                     Self::client_name(index, j),
                     Self::server_name(j),
                 )))

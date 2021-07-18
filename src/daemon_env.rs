@@ -5,7 +5,7 @@ use parking_lot::Mutex;
 
 use crate::index_term::IndexTerm;
 use crate::{Peer, RaftState, State, Term};
-#[cfg(feature = "integration-test")]
+#[cfg(all(not(test), feature = "integration-test"))]
 use test_utils::thread_local_logger::{self, LocalLogger};
 
 /// A convenient macro to record errors.
@@ -207,7 +207,7 @@ impl DaemonEnv {
         // pointer instead of downgrading frequently.
         let thread_env = ThreadEnv {
             data: Arc::downgrade(&data),
-            #[cfg(feature = "integration-test")]
+            #[cfg(all(not(test), feature = "integration-test"))]
             local_logger: thread_local_logger::get(),
         };
         Self { data, thread_env }
@@ -235,7 +235,7 @@ impl DaemonEnv {
 #[derive(Clone, Debug, Default)]
 pub(crate) struct ThreadEnv {
     data: Weak<Mutex<DaemonEnvData>>,
-    #[cfg(feature = "integration-test")]
+    #[cfg(all(not(test), feature = "integration-test"))]
     local_logger: LocalLogger,
 }
 
@@ -269,7 +269,7 @@ impl ThreadEnv {
 
     /// Attach this instance to the current thread.
     pub fn attach(self) {
-        #[cfg(feature = "integration-test")]
+        #[cfg(all(not(test), feature = "integration-test"))]
         thread_local_logger::set(self.local_logger.clone());
 
         Self::ENV.with(|env| env.replace(self));

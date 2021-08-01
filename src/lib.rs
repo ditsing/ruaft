@@ -108,9 +108,9 @@ pub struct AppendEntriesReply {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct InstallSnapshotArgs {
-    pub(crate) term: Term,
+    term: Term,
     leader_id: Peer,
-    pub(crate) last_included_index: Index,
+    last_included_index: Index,
     last_included_term: Term,
     // TODO(ditsing): Serde cannot handle Vec<u8> as efficient as expected.
     data: Vec<u8>,

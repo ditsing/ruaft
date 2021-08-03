@@ -1,7 +1,7 @@
 use labrpc::{Network, Server};
 use parking_lot::Mutex;
 
-use ruaft::rpcs::make_rpc_handler;
+use test_configs::make_rpc_handler;
 
 use crate::common::{GET, PUT_APPEND};
 use crate::server::KVServer;

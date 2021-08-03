@@ -13,6 +13,7 @@ ruaft = { path = "..", features = ["integration-test"] }
 linearizability = { path = "../linearizability" }
 serde = "1.0.116"
 serde_derive = "1.0.116"
+test_configs = { path = "../test_configs" }
 test_utils = { path = "../test_utils" }
 tokio = { version = "1.7", features = ["time", "parking_lot"] }
 log = "0.4.14"

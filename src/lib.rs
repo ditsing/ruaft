@@ -32,7 +32,6 @@ mod process_install_snapshot;
 mod process_request_vote;
 mod raft_state;
 mod remote_raft;
-pub mod rpcs;
 mod snapshot;
 mod sync_log_entries;
 mod term_marker;

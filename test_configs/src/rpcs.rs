@@ -1,13 +1,13 @@
 use async_trait::async_trait;
 use labrpc::{Client, Network, ReplyMessage, RequestMessage, Server};
 use parking_lot::Mutex;
+use serde::de::DeserializeOwned;
+use serde::Serialize;
 
-use crate::{
+use ruaft::{
     AppendEntriesArgs, AppendEntriesReply, InstallSnapshotArgs,
     InstallSnapshotReply, Raft, RequestVoteArgs, RequestVoteReply,
 };
-use serde::de::DeserializeOwned;
-use serde::Serialize;
 
 const REQUEST_VOTE_RPC: &str = "Raft.RequestVote";
 const APPEND_ENTRIES_RPC: &str = "Raft.AppendEntries";
@@ -43,8 +43,8 @@ impl RpcClient {
 }
 
 #[async_trait]
-impl<Command: 'static + Send + Serialize>
-    crate::remote_raft::RemoteRaft<Command> for RpcClient
+impl<Command: 'static + Send + Serialize> ruaft::RemoteRaft<Command>
+    for RpcClient
 {
     async fn request_vote(
         &self,
@@ -136,12 +136,16 @@ mod tests {
 
     use bytes::Bytes;
 
-    use crate::{ApplyCommandMessage, Peer, RemoteRaft, Term};
+    use ruaft::{ApplyCommandMessage, RemoteRaft, Term};
 
     use super::*;
+    use ruaft::utils::integration_test::{
+        make_append_entries_args, make_request_vote_args,
+        unpack_append_entries_reply, unpack_request_vote_reply,
+    };
 
-    type DoNothingPersister = ();
-    impl crate::Persister for DoNothingPersister {
+    struct DoNothingPersister;
+    impl ruaft::Persister for DoNothingPersister {
         fn read_state(&self) -> Bytes {
             Bytes::new()
         }
@@ -157,6 +161,8 @@ mod tests {
 
     #[test]
     fn test_basic_message() -> std::io::Result<()> {
+        test_utils::init_test_log!();
+
         let client = {
             let network = Network::run_daemon();
             let name = "test-basic-message";
@@ -168,7 +174,7 @@ mod tests {
             let raft = Arc::new(Raft::new(
                 vec![RpcClient(client)],
                 0,
-                Arc::new(()),
+                Arc::new(DoNothingPersister),
                 |_: ApplyCommandMessage<i32>| {},
                 None,
                 Raft::<i32>::NO_SNAPSHOT,
@@ -182,30 +188,20 @@ mod tests {
         };
 
         let rpc_client = RpcClient(client);
-        let request = RequestVoteArgs {
-            term: Term(2021),
-
-            candidate_id: Peer(0),
-            last_log_index: 0,
-            last_log_term: Term(0),
-        };
+        let request = make_request_vote_args(Term(2021), 0, 0, Term(0));
         let response = futures::executor::block_on(
             (&rpc_client as &dyn RemoteRaft<i32>).request_vote(request),
         )?;
-        assert!(response.vote_granted);
+        let (_, vote_granted) = unpack_request_vote_reply(response);
+        assert!(vote_granted);
 
-        let request = AppendEntriesArgs::<i32> {
-            term: Term(2021),
-            leader_id: Peer(0),
-            prev_log_index: 0,
-            prev_log_term: Term(0),
-            entries: vec![],
-            leader_commit: 0,
-        };
+        let request =
+            make_append_entries_args::<i32>(Term(2021), 0, 0, Term(0), 0);
         let response =
             futures::executor::block_on(rpc_client.append_entries(request))?;
-        assert_eq!(2021, response.term.0);
-        assert!(response.success);
+        let (Term(term), success) = unpack_append_entries_reply(response);
+        assert_eq!(2021, term);
+        assert!(success);
 
         Ok(())
     }

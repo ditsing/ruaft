@@ -12,7 +12,7 @@ impl<Command> Raft<Command>
 where
     Command: Clone + serde::Serialize + Default,
 {
-    pub(crate) fn process_append_entries(
+    pub fn process_append_entries(
         &self,
         args: AppendEntriesArgs<Command>,
     ) -> AppendEntriesReply {

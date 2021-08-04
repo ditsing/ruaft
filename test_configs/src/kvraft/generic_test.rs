@@ -9,11 +9,11 @@ use test_utils::thread_local_logger::LocalLogger;
 
 use linearizability::{KvInput, KvModel, KvOp, KvOutput, Operation};
 
-use crate::testing_utils::config::{
+use super::config::{
     make_config, sleep_election_timeouts, sleep_millis, Config,
     LONG_ELECTION_TIMEOUT_MILLIS,
 };
-use crate::Clerk;
+use kvraft::Clerk;
 
 pub fn spawn_clients<T, Func>(
     config: Arc<Config>,

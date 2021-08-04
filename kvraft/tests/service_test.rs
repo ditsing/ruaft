@@ -1,13 +1,13 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use kvraft::testing_utils::config::{
+use scopeguard::defer;
+use test_configs::kvraft::config::{
     make_config, sleep_election_timeouts, sleep_millis,
 };
-use kvraft::testing_utils::generic_test::{
+use test_configs::kvraft::generic_test::{
     generic_test, spawn_clients, GenericTestParams,
 };
-use scopeguard::defer;
 use test_utils::init_test_log;
 use test_utils::thread_local_logger::LocalLogger;
 

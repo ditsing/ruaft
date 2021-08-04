@@ -5,11 +5,10 @@ use parking_lot::Mutex;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
-use test_configs::{register_server, Persister};
+use crate::{register_kv_server, register_server, Persister};
 
-use crate::client::Clerk;
-use crate::server::KVServer;
-use crate::testing_utils::rpcs::register_kv_server;
+use kvraft::Clerk;
+use kvraft::KVServer;
 
 struct ConfigState {
     kv_servers: Vec<Option<Arc<KVServer>>>,
@@ -46,7 +45,7 @@ impl Config {
         {
             let mut network = self.network.lock();
             for j in 0..self.server_count {
-                clients.push(test_configs::RpcClient::new(network.make_client(
+                clients.push(crate::RpcClient::new(network.make_client(
                     Self::client_name(index, j),
                     Self::server_name(j),
                 )))

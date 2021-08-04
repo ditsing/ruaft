@@ -4,6 +4,7 @@ use parking_lot::Mutex;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+use kvraft::{KVServer, GET, PUT_APPEND};
 use ruaft::{
     AppendEntriesArgs, AppendEntriesReply, InstallSnapshotArgs,
     InstallSnapshotReply, Raft, RequestVoteArgs, RequestVoteReply,
@@ -123,6 +124,33 @@ pub fn register_server<
         make_rpc_handler(move |args| {
             raft_clone.as_ref().process_install_snapshot(args)
         }),
+    )?;
+
+    network.add_server(server_name, server);
+
+    Ok(())
+}
+pub fn register_kv_server<
+    KV: 'static + AsRef<KVServer> + Clone,
+    S: AsRef<str>,
+>(
+    kv: KV,
+    name: S,
+    network: &Mutex<Network>,
+) -> std::io::Result<()> {
+    let mut network = network.lock();
+    let server_name = name.as_ref();
+    let mut server = Server::make_server(server_name);
+
+    let kv_clone = kv.clone();
+    server.register_rpc_handler(
+        GET.to_owned(),
+        make_rpc_handler(move |args| kv_clone.as_ref().get(args)),
+    )?;
+
+    server.register_rpc_handler(
+        PUT_APPEND.to_owned(),
+        make_rpc_handler(move |args| kv.as_ref().put_append(args)),
     )?;
 
     network.add_server(server_name, server);

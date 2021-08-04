@@ -52,8 +52,8 @@ impl UniqueIdSequence {
     }
 }
 
-pub(crate) const GET: &str = "KVServer.Get";
-pub(crate) const PUT_APPEND: &str = "KVServer.PutAppend";
+pub const GET: &str = "KVServer.Get";
+pub const PUT_APPEND: &str = "KVServer.PutAppend";
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub enum PutAppendEnum {

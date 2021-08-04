@@ -5,12 +5,10 @@ use parking_lot::Mutex;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
-use ruaft::Persister;
-use test_configs::register_server;
+use test_configs::{register_server, Persister};
 
 use crate::client::Clerk;
 use crate::server::KVServer;
-use crate::testing_utils::memory_persister::{MemoryPersister, MemoryStorage};
 use crate::testing_utils::rpcs::register_kv_server;
 
 struct ConfigState {
@@ -22,7 +20,7 @@ pub struct Config {
     network: Arc<Mutex<labrpc::Network>>,
     server_count: usize,
     state: Mutex<ConfigState>,
-    storage: Mutex<MemoryStorage>,
+    storage: Mutex<Vec<Arc<Persister>>>,
     maxraftstate: usize,
 }
 
@@ -55,7 +53,7 @@ impl Config {
             }
         }
 
-        let persister = self.storage.lock().at(index);
+        let persister = self.storage.lock()[index].clone();
 
         let kv =
             KVServer::new(clients, index, persister, Some(self.maxraftstate));
@@ -153,9 +151,10 @@ impl Config {
             network.remove_server(Self::kv_server_name(index));
         }
 
-        let data = self.storage.lock().at(index).read();
+        let data = self.storage.lock()[index].read();
 
-        let persister = self.storage.lock().replace(index);
+        let persister = Arc::new(Persister::new());
+        self.storage.lock()[index] = persister.clone();
         persister.restore(data);
 
         if let Some(kv_server) = self.state.lock().kv_servers[index].take() {
@@ -253,10 +252,10 @@ impl Config {
     fn check_size(
         &self,
         upper: usize,
-        size_fn: impl Fn(&MemoryPersister) -> usize,
+        size_fn: impl Fn(&Persister) -> usize,
     ) -> Result<(), String> {
         let mut over_limits = String::new();
-        for (index, p) in self.storage.lock().all().iter().enumerate() {
+        for (index, p) in self.storage.lock().iter().enumerate() {
             let size = size_fn(p);
             if size > upper {
                 let str = format!(" (index {}, size {})", index, size);
@@ -273,11 +272,11 @@ impl Config {
     }
 
     pub fn check_log_size(&self, upper: usize) -> Result<(), String> {
-        self.check_size(upper, MemoryPersister::state_size)
+        self.check_size(upper, ruaft::Persister::state_size)
     }
 
     pub fn check_snapshot_size(&self, upper: usize) -> Result<(), String> {
-        self.check_size(upper, MemoryPersister::snapshot_size)
+        self.check_size(upper, Persister::snapshot_size)
     }
 }
 
@@ -298,11 +297,10 @@ pub fn make_config(
         next_clerk: 0,
     });
 
-    let mut storage = MemoryStorage::default();
-    for _ in 0..server_count {
-        storage.make();
-    }
-    let storage = Mutex::new(storage);
+    let storage = Mutex::new(vec![]);
+    storage
+        .lock()
+        .resize_with(server_count, || Arc::new(Persister::new()));
 
     let cfg = Config {
         network,

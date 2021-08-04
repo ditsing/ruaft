@@ -1,5 +1,5 @@
 use scopeguard::defer;
-use test_configs::{config, make_config};
+use test_configs::{make_config, raft::config};
 
 #[test]
 fn initial_election() -> config::Result<()> {

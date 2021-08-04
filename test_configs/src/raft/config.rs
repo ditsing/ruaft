@@ -12,8 +12,6 @@ use rand::{thread_rng, Rng};
 use crate::register_server;
 use ruaft::{ApplyCommandMessage, Persister, Raft, Term};
 
-pub mod persister;
-
 struct ConfigState {
     rafts: Vec<Option<Raft<i32>>>,
     connected: Vec<bool>,
@@ -23,7 +21,7 @@ struct LogState {
     committed_logs: Vec<Vec<i32>>,
     results: Vec<Result<()>>,
     max_index: usize,
-    saved: Vec<Arc<persister::Persister>>,
+    saved: Vec<Arc<super::Persister>>,
 }
 
 pub struct Config {
@@ -290,7 +288,7 @@ impl Config {
             raft.kill();
         }
         let mut log = self.log.lock();
-        log.saved[index] = Arc::new(persister::Persister::new());
+        log.saved[index] = Arc::new(super::Persister::new());
         log.saved[index].save_state(data);
     }
 
@@ -445,7 +443,7 @@ impl Config {
 #[macro_export]
 macro_rules! make_config {
     ($server_count:expr, $unreliable:expr) => {
-        $crate::config::make_config(
+        $crate::raft::config::make_config(
             $server_count,
             $unreliable,
             stdext::function_name!(),
@@ -475,7 +473,7 @@ pub fn make_config(
     });
 
     let mut saved = vec![];
-    saved.resize_with(server_count, || Arc::new(persister::Persister::new()));
+    saved.resize_with(server_count, || Arc::new(super::Persister::new()));
     let log = Arc::new(Mutex::new(LogState {
         committed_logs: vec![vec![]; server_count],
         results: vec![],

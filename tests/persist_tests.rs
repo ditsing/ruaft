@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use rand::{thread_rng, Rng};
 use scopeguard::defer;
-use test_configs::{config, make_config};
+use test_configs::{make_config, raft::config};
 
 #[test]
 fn persist1() -> config::Result<()> {

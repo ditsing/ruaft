@@ -2,7 +2,6 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Once;
 use std::time::Duration;
 
-use labrpc::{Client, RequestMessage};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -11,6 +10,7 @@ use crate::common::{
     PutAppendReply, UniqueIdSequence, GET, PUT_APPEND,
 };
 use crate::common::{KVError, ValidReply};
+use crate::RemoteKvraft;
 
 pub struct Clerk {
     init: Once,
@@ -18,7 +18,7 @@ pub struct Clerk {
 }
 
 impl Clerk {
-    pub fn new(servers: Vec<Client>) -> Self {
+    pub fn new(servers: Vec<impl RemoteKvraft>) -> Self {
         Self {
             init: Once::new(),
             inner: ClerkInner::new(servers),
@@ -64,7 +64,7 @@ impl Clerk {
 }
 
 pub struct ClerkInner {
-    servers: Vec<Client>,
+    servers: Vec<Box<dyn RemoteKvraft>>,
 
     last_server_index: AtomicUsize,
     unique_id: UniqueIdSequence,
@@ -73,7 +73,11 @@ pub struct ClerkInner {
 }
 
 impl ClerkInner {
-    pub fn new(servers: Vec<Client>) -> Self {
+    pub fn new(servers: Vec<impl RemoteKvraft>) -> Self {
+        let servers = servers
+            .into_iter()
+            .map(|s| Box::new(s) as Box<dyn RemoteKvraft>)
+            .collect();
         Self {
             servers,
 
@@ -128,10 +132,8 @@ impl ClerkInner {
         R: DeserializeOwned + ValidReply,
     {
         let method = method.as_ref().to_owned();
-        let data = RequestMessage::from(
-            bincode::serialize(&args)
-                .expect("Serialization of requests should not fail"),
-        );
+        let data = bincode::serialize(&args)
+            .expect("Serialization of requests should not fail");
 
         let max_retry =
             std::cmp::max(max_retry.unwrap_or(usize::MAX), self.servers.len());

@@ -5,7 +5,7 @@ use parking_lot::Mutex;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
-use crate::{register_kv_server, register_server, Persister};
+use crate::{register_kv_server, register_server, Persister, RpcClient};
 
 use kvraft::Clerk;
 use kvraft::KVServer;
@@ -196,10 +196,10 @@ impl Config {
         {
             let mut network = self.network.lock();
             for j in 0..self.server_count {
-                clients.push(network.make_client(
+                clients.push(RpcClient::new(network.make_client(
                     Self::kv_clerk_name(clerk_index, j),
                     Self::kv_server_name(j),
-                ));
+                )));
             }
             // Disable clerk connection to all kv servers.
             Self::set_clerk_connect(

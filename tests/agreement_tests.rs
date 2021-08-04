@@ -1,9 +1,7 @@
 #![allow(clippy::identity_op)]
 use rand::{thread_rng, Rng};
 use scopeguard::defer;
-
-// This is to remove the annoying "unused code in config" warnings.
-pub mod config;
+use test_configs::{config, make_config};
 
 #[test]
 fn basic_agreement() -> config::Result<()> {

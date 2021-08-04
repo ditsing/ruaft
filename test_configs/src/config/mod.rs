@@ -2,16 +2,15 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 pub use anyhow::Result;
 use anyhow::{anyhow, bail};
 use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
-use tokio::time::Duration;
 
+use crate::register_server;
 use ruaft::{ApplyCommandMessage, Persister, Raft, Term};
-use test_configs::register_server;
 
 pub mod persister;
 
@@ -304,7 +303,7 @@ impl Config {
         {
             let mut network = self.network.lock();
             for j in 0..self.server_count {
-                clients.push(test_configs::RpcClient::new(network.make_client(
+                clients.push(crate::RpcClient::new(network.make_client(
                     Self::client_name(index, j),
                     Self::server_name(j),
                 )))
@@ -365,7 +364,7 @@ impl Config {
     pub fn end(&self) {}
 
     pub fn cleanup(&self) {
-        log::trace!("Cleaning up test config ...");
+        log::trace!("Cleaning up test raft.config ...");
         let mut network = self.network.lock();
         for i in 0..self.server_count {
             network.remove_server(Self::server_name(i));
@@ -377,7 +376,7 @@ impl Config {
                 raft.kill();
             }
         }
-        log::trace!("Cleaning up test config done.");
+        log::trace!("Cleaning up test raft.config done.");
         eprintln!(
             "Ruaft log file for {}: {:?}",
             self.test_path,
@@ -502,7 +501,7 @@ pub fn make_config(
 }
 
 pub fn sleep_millis(mills: u64) {
-    std::thread::sleep(std::time::Duration::from_millis(mills))
+    std::thread::sleep(Duration::from_millis(mills))
 }
 
 pub const LONG_ELECTION_TIMEOUT_MILLIS: u64 = 1000;

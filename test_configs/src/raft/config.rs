@@ -21,7 +21,7 @@ struct LogState {
     committed_logs: Vec<Vec<i32>>,
     results: Vec<Result<()>>,
     max_index: usize,
-    saved: Vec<Arc<super::Persister>>,
+    saved: Vec<Arc<crate::Persister>>,
 }
 
 pub struct Config {
@@ -288,7 +288,7 @@ impl Config {
             raft.kill();
         }
         let mut log = self.log.lock();
-        log.saved[index] = Arc::new(super::Persister::new());
+        log.saved[index] = Arc::new(crate::Persister::new());
         log.saved[index].save_state(data);
     }
 
@@ -473,7 +473,7 @@ pub fn make_config(
     });
 
     let mut saved = vec![];
-    saved.resize_with(server_count, || Arc::new(super::Persister::new()));
+    saved.resize_with(server_count, || Arc::new(crate::Persister::new()));
     let log = Arc::new(Mutex::new(LogState {
         committed_logs: vec![vec![]; server_count],
         results: vec![],

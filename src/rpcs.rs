@@ -9,9 +9,9 @@ use crate::{
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-pub(crate) const REQUEST_VOTE_RPC: &str = "Raft.RequestVote";
-pub(crate) const APPEND_ENTRIES_RPC: &str = "Raft.AppendEntries";
-pub(crate) const INSTALL_SNAPSHOT_RPC: &str = "Raft.InstallSnapshot";
+const REQUEST_VOTE_RPC: &str = "Raft.RequestVote";
+const APPEND_ENTRIES_RPC: &str = "Raft.AppendEntries";
+const INSTALL_SNAPSHOT_RPC: &str = "Raft.InstallSnapshot";
 
 pub struct RpcClient(Client);
 
@@ -40,27 +40,6 @@ impl RpcClient {
         Ok(bincode::deserialize(reply.as_ref())
             .expect("Deserialization of reply should not fail"))
     }
-
-    pub(crate) async fn call_request_vote(
-        &self,
-        request: RequestVoteArgs,
-    ) -> std::io::Result<RequestVoteReply> {
-        self.call_rpc(REQUEST_VOTE_RPC, request).await
-    }
-
-    pub(crate) async fn call_append_entries<Command: Serialize>(
-        &self,
-        request: AppendEntriesArgs<Command>,
-    ) -> std::io::Result<AppendEntriesReply> {
-        self.call_rpc(APPEND_ENTRIES_RPC, request).await
-    }
-
-    pub(crate) async fn call_install_snapshot(
-        &self,
-        request: InstallSnapshotArgs,
-    ) -> std::io::Result<InstallSnapshotReply> {
-        self.call_rpc(INSTALL_SNAPSHOT_RPC, request).await
-    }
 }
 
 #[async_trait]
@@ -71,21 +50,21 @@ impl<Command: 'static + Send + Serialize>
         &self,
         args: RequestVoteArgs,
     ) -> std::io::Result<RequestVoteReply> {
-        self.call_request_vote(args).await
+        self.call_rpc(REQUEST_VOTE_RPC, args).await
     }
 
     async fn append_entries(
         &self,
         args: AppendEntriesArgs<Command>,
     ) -> std::io::Result<AppendEntriesReply> {
-        self.call_append_entries(args).await
+        self.call_rpc(APPEND_ENTRIES_RPC, args).await
     }
 
     async fn install_snapshot(
         &self,
         args: InstallSnapshotArgs,
     ) -> std::io::Result<InstallSnapshotReply> {
-        self.call_install_snapshot(args).await
+        self.call_rpc(INSTALL_SNAPSHOT_RPC, args).await
     }
 }
 
@@ -157,7 +136,7 @@ mod tests {
 
     use bytes::Bytes;
 
-    use crate::{ApplyCommandMessage, Peer, Term};
+    use crate::{ApplyCommandMessage, Peer, RemoteRaft, Term};
 
     use super::*;
 
@@ -210,8 +189,9 @@ mod tests {
             last_log_index: 0,
             last_log_term: Term(0),
         };
-        let response =
-            futures::executor::block_on(rpc_client.call_request_vote(request))?;
+        let response = futures::executor::block_on(
+            (&rpc_client as &dyn RemoteRaft<i32>).request_vote(request),
+        )?;
         assert!(response.vote_granted);
 
         let request = AppendEntriesArgs::<i32> {
@@ -222,9 +202,8 @@ mod tests {
             entries: vec![],
             leader_commit: 0,
         };
-        let response = futures::executor::block_on(
-            rpc_client.call_append_entries(request),
-        )?;
+        let response =
+            futures::executor::block_on(rpc_client.append_entries(request))?;
         assert_eq!(2021, response.term.0);
         assert!(response.success);
 

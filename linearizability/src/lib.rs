@@ -210,7 +210,7 @@ mod tests {
 
     #[test]
     fn accept() {
-        let mut ops = Box::leak(Box::new(vec![]));
+        let ops = Box::leak(Box::new(vec![]));
         let start = Instant::now();
         for i in 0..4 {
             ops.push(Operation {

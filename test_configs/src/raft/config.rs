@@ -10,7 +10,7 @@ use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
 
 use crate::register_server;
-use crate::utils::sleep_millis;
+use crate::utils::{sleep_millis, NO_SNAPSHOT};
 use ruaft::{ApplyCommandMessage, Persister, Raft, Term};
 
 struct ConfigState {
@@ -319,7 +319,7 @@ impl Config {
                 Self::apply_command(log_clone.clone(), index, message)
             },
             None,
-            Raft::<i32>::NO_SNAPSHOT,
+            NO_SNAPSHOT,
         );
         self.state.lock().rafts[index].replace(raft.clone());
 

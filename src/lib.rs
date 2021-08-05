@@ -298,9 +298,3 @@ where
 }
 
 pub(crate) const HEARTBEAT_INTERVAL_MILLIS: u64 = 150;
-
-impl<C> Raft<C> {
-    /// Pass this function to [`Raft::new`] if the application will not accept
-    /// any request for taking snapshots.
-    pub const NO_SNAPSHOT: fn(Index) = |_| {};
-}

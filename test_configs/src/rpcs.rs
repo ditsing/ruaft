@@ -224,7 +224,7 @@ mod tests {
                 Arc::new(DoNothingPersister),
                 |_: ApplyCommandMessage<i32>| {},
                 None,
-                Raft::<i32>::NO_SNAPSHOT,
+                crate::utils::NO_SNAPSHOT,
             ));
             register_server(raft, name, network.as_ref())?;
 

@@ -1,10 +1,13 @@
 use async_trait::async_trait;
 
+use crate::common::{GetArgs, GetReply, PutAppendArgs, PutAppendReply};
+
 #[async_trait]
 pub trait RemoteKvraft: Send + Sync + 'static {
-    async fn call_rpc(
+    async fn get(&self, args: GetArgs) -> std::io::Result<GetReply>;
+
+    async fn put_append(
         &self,
-        method: String,
-        request: Vec<u8>,
-    ) -> std::io::Result<Vec<u8>>;
+        args: PutAppendArgs,
+    ) -> std::io::Result<PutAppendReply>;
 }

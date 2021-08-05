@@ -4,7 +4,9 @@ use parking_lot::Mutex;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use kvraft::{KVServer, RemoteKvraft, GET, PUT_APPEND};
+use kvraft::{
+    GetArgs, GetReply, KVServer, PutAppendArgs, PutAppendReply, RemoteKvraft,
+};
 use ruaft::{
     AppendEntriesArgs, AppendEntriesReply, InstallSnapshotArgs,
     InstallSnapshotReply, Raft, RequestVoteArgs, RequestVoteReply,
@@ -69,17 +71,20 @@ impl<Command: 'static + Send + Serialize> ruaft::RemoteRaft<Command>
     }
 }
 
+const GET: &str = "KVServer.Get";
+const PUT_APPEND: &str = "KVServer.PutAppend";
+
 #[async_trait]
 impl RemoteKvraft for RpcClient {
-    async fn call_rpc(
+    async fn get(&self, args: GetArgs) -> std::io::Result<GetReply> {
+        self.call_rpc(GET, args).await
+    }
+
+    async fn put_append(
         &self,
-        method: String,
-        request: Vec<u8>,
-    ) -> std::io::Result<Vec<u8>> {
-        self.0
-            .call_rpc(method, RequestMessage::from(request))
-            .await
-            .map(|data| data.to_vec())
+        args: PutAppendArgs,
+    ) -> std::io::Result<PutAppendReply> {
+        self.call_rpc(PUT_APPEND, args).await
     }
 }
 

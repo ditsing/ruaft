@@ -1,5 +1,5 @@
 pub use client::Clerk;
-pub use common::{GET, PUT_APPEND};
+pub use common::{GetArgs, GetReply, PutAppendArgs, PutAppendReply};
 pub use remote_kvraft::RemoteKvraft;
 pub use server::KVServer;
 

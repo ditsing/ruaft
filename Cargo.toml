@@ -32,14 +32,11 @@ default = []
 integration-test = ["test_utils"]
 
 [dev-dependencies]
-anyhow = "1.0"
-futures = { version = "0.3.15", features = ["thread-pool"] }
-ruaft = { path = ".", features = ["integration-test"] }
+kvraft = { path = "kvraft" }
 scopeguard = "1.1.0"
 stdext = "0.3"
 test_configs = { path = "test_configs" }
 test_utils = { path = "test_utils" }
-kvraft = { path = "kvraft" }
 
 [workspace]
 members = [

@@ -1,4 +1,5 @@
 use scopeguard::defer;
+use test_configs::utils::{sleep_election_timeouts, sleep_millis};
 use test_configs::{make_config, raft::config};
 
 #[test]
@@ -11,10 +12,10 @@ fn initial_election() -> config::Result<()> {
 
     cfg.check_one_leader()?;
 
-    config::sleep_millis(50);
+    sleep_millis(50);
 
     let first_term = cfg.check_terms()?;
-    config::sleep_election_timeouts(2);
+    sleep_election_timeouts(2);
 
     let second_term = cfg.check_terms()?;
 

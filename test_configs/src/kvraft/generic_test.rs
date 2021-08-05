@@ -9,9 +9,9 @@ use test_utils::thread_local_logger::LocalLogger;
 
 use linearizability::{KvInput, KvModel, KvOp, KvOutput, Operation};
 
-use super::config::{
-    make_config, sleep_election_timeouts, sleep_millis, Config,
-    LONG_ELECTION_TIMEOUT_MILLIS,
+use super::config::{make_config, Config};
+use crate::utils::{
+    sleep_election_timeouts, sleep_millis, LONG_ELECTION_TIMEOUT_MILLIS,
 };
 use kvraft::Clerk;
 
@@ -129,7 +129,7 @@ fn run_partition(cfg: Arc<Config>, stop: Arc<AtomicBool>) {
             LONG_ELECTION_TIMEOUT_MILLIS
                 ..LONG_ELECTION_TIMEOUT_MILLIS + PARTITION_MAX_DELAY_MILLIS,
         );
-        std::thread::sleep(Duration::from_millis(delay));
+        sleep_millis(delay);
     }
 }
 

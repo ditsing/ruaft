@@ -1,6 +1,7 @@
 #![allow(clippy::identity_op)]
 use rand::{thread_rng, Rng};
 use scopeguard::defer;
+use test_configs::utils::{sleep_election_timeouts, sleep_millis};
 use test_configs::{make_config, raft::config};
 
 #[test]
@@ -43,7 +44,7 @@ fn fail_agree() -> config::Result<()> {
     // agree despite one disconnected server?
     cfg.one(102, SERVERS - 1, false)?;
     cfg.one(103, SERVERS - 1, false)?;
-    config::sleep_election_timeouts(1);
+    sleep_election_timeouts(1);
     cfg.one(104, SERVERS - 1, false)?;
     cfg.one(105, SERVERS - 1, false)?;
 
@@ -52,7 +53,7 @@ fn fail_agree() -> config::Result<()> {
 
     // agree with full set of servers?
     cfg.one(106, SERVERS, true)?;
-    config::sleep_election_timeouts(1);
+    sleep_election_timeouts(1);
     cfg.one(107, SERVERS, true)?;
 
     cfg.end();
@@ -80,7 +81,7 @@ fn fail_no_agree() -> config::Result<()> {
     let index = result.unwrap().1;
     assert_eq!(2, index, "expected index 2, got {}", index);
 
-    config::sleep_election_timeouts(2);
+    sleep_election_timeouts(2);
 
     let (commit_count, _) = cfg.committed_count(index)?;
     assert_eq!(
@@ -171,7 +172,7 @@ fn backup() -> config::Result<()> {
         cfg.leader_start(leader1, thread_rng().gen());
     }
 
-    config::sleep_election_timeouts(2);
+    sleep_election_timeouts(2);
 
     cfg.disconnect((leader1 + 0) % SERVERS);
     cfg.disconnect((leader1 + 1) % SERVERS);
@@ -199,7 +200,7 @@ fn backup() -> config::Result<()> {
         cfg.leader_start(leader2, thread_rng().gen());
     }
 
-    config::sleep_election_timeouts(2);
+    sleep_election_timeouts(2);
 
     // bring original leader back to life,
     for i in 0..SERVERS {
@@ -247,7 +248,7 @@ fn count() -> config::Result<()> {
             break (false, 0);
         }
         if retries != 0 {
-            config::sleep_millis(3000);
+            sleep_millis(3000);
         }
         retries += 1;
 
@@ -318,7 +319,7 @@ fn count() -> config::Result<()> {
 
     assert!(success, "term change too often");
 
-    config::sleep_election_timeouts(1);
+    sleep_election_timeouts(1);
 
     let diff = cfg.total_rpcs() - total;
     assert!(

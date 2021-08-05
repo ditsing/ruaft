@@ -2,8 +2,9 @@ use std::sync::Arc;
 
 use scopeguard::defer;
 
-use test_configs::kvraft::config::{make_config, sleep_election_timeouts};
+use test_configs::kvraft::config::make_config;
 use test_configs::kvraft::generic_test::{generic_test, GenericTestParams};
+use test_configs::utils::sleep_election_timeouts;
 use test_utils::init_test_log;
 
 #[test]

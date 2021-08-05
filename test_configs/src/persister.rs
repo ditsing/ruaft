@@ -1,8 +1,9 @@
 use parking_lot::Mutex;
 
-struct State {
-    bytes: bytes::Bytes,
-    snapshot: Vec<u8>,
+#[derive(Clone)]
+pub struct State {
+    pub bytes: bytes::Bytes,
+    pub snapshot: Vec<u8>,
 }
 
 pub struct Persister {
@@ -43,5 +44,19 @@ impl ruaft::Persister for Persister {
         let mut this = self.state.lock();
         this.bytes = state;
         this.snapshot = snapshot.to_vec();
+    }
+}
+
+impl Persister {
+    pub fn read(&self) -> State {
+        self.state.lock().clone()
+    }
+
+    pub fn restore(&self, state: State) {
+        *self.state.lock() = state;
+    }
+
+    pub fn snapshot_size(&self) -> usize {
+        self.state.lock().snapshot.len()
     }
 }

@@ -5,13 +5,10 @@ use parking_lot::Mutex;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
-use ruaft::rpcs::register_server;
-use ruaft::Persister;
+use crate::{register_kv_server, register_server, Persister, RpcClient};
 
-use crate::client::Clerk;
-use crate::server::KVServer;
-use crate::testing_utils::memory_persister::{MemoryPersister, MemoryStorage};
-use crate::testing_utils::rpcs::register_kv_server;
+use kvraft::Clerk;
+use kvraft::KVServer;
 
 struct ConfigState {
     kv_servers: Vec<Option<Arc<KVServer>>>,
@@ -22,7 +19,7 @@ pub struct Config {
     network: Arc<Mutex<labrpc::Network>>,
     server_count: usize,
     state: Mutex<ConfigState>,
-    storage: Mutex<MemoryStorage>,
+    storage: Mutex<Vec<Arc<Persister>>>,
     maxraftstate: usize,
 }
 
@@ -48,14 +45,14 @@ impl Config {
         {
             let mut network = self.network.lock();
             for j in 0..self.server_count {
-                clients.push(ruaft::rpcs::RpcClient::new(network.make_client(
+                clients.push(crate::RpcClient::new(network.make_client(
                     Self::client_name(index, j),
                     Self::server_name(j),
                 )))
             }
         }
 
-        let persister = self.storage.lock().at(index);
+        let persister = self.storage.lock()[index].clone();
 
         let kv =
             KVServer::new(clients, index, persister, Some(self.maxraftstate));
@@ -153,9 +150,10 @@ impl Config {
             network.remove_server(Self::kv_server_name(index));
         }
 
-        let data = self.storage.lock().at(index).read();
+        let data = self.storage.lock()[index].read();
 
-        let persister = self.storage.lock().replace(index);
+        let persister = Arc::new(Persister::new());
+        self.storage.lock()[index] = persister.clone();
         persister.restore(data);
 
         if let Some(kv_server) = self.state.lock().kv_servers[index].take() {
@@ -198,10 +196,10 @@ impl Config {
         {
             let mut network = self.network.lock();
             for j in 0..self.server_count {
-                clients.push(network.make_client(
+                clients.push(RpcClient::new(network.make_client(
                     Self::kv_clerk_name(clerk_index, j),
                     Self::kv_server_name(j),
-                ));
+                )));
             }
             // Disable clerk connection to all kv servers.
             Self::set_clerk_connect(
@@ -253,10 +251,10 @@ impl Config {
     fn check_size(
         &self,
         upper: usize,
-        size_fn: impl Fn(&MemoryPersister) -> usize,
+        size_fn: impl Fn(&Persister) -> usize,
     ) -> Result<(), String> {
         let mut over_limits = String::new();
-        for (index, p) in self.storage.lock().all().iter().enumerate() {
+        for (index, p) in self.storage.lock().iter().enumerate() {
             let size = size_fn(p);
             if size > upper {
                 let str = format!(" (index {}, size {})", index, size);
@@ -273,11 +271,11 @@ impl Config {
     }
 
     pub fn check_log_size(&self, upper: usize) -> Result<(), String> {
-        self.check_size(upper, MemoryPersister::state_size)
+        self.check_size(upper, ruaft::Persister::state_size)
     }
 
     pub fn check_snapshot_size(&self, upper: usize) -> Result<(), String> {
-        self.check_size(upper, MemoryPersister::snapshot_size)
+        self.check_size(upper, Persister::snapshot_size)
     }
 }
 
@@ -298,11 +296,10 @@ pub fn make_config(
         next_clerk: 0,
     });
 
-    let mut storage = MemoryStorage::default();
-    for _ in 0..server_count {
-        storage.make();
-    }
-    let storage = Mutex::new(storage);
+    let storage = Mutex::new(vec![]);
+    storage
+        .lock()
+        .resize_with(server_count, || Arc::new(Persister::new()));
 
     let cfg = Config {
         network,
@@ -318,13 +315,4 @@ pub fn make_config(
     }
 
     cfg
-}
-
-pub fn sleep_millis(mills: u64) {
-    std::thread::sleep(std::time::Duration::from_millis(mills))
-}
-
-pub const LONG_ELECTION_TIMEOUT_MILLIS: u64 = 1000;
-pub fn sleep_election_timeouts(count: u64) {
-    sleep_millis(LONG_ELECTION_TIMEOUT_MILLIS * count)
 }

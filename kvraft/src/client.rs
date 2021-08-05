@@ -1,16 +1,13 @@
+use std::future::Future;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Once;
 use std::time::Duration;
 
-use labrpc::{Client, RequestMessage};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
-
 use crate::common::{
-    GetArgs, GetEnum, GetReply, KVRaftOptions, PutAppendArgs, PutAppendEnum,
-    PutAppendReply, UniqueIdSequence, GET, PUT_APPEND,
+    GetArgs, GetEnum, GetReply, KVError, KVRaftOptions, PutAppendArgs,
+    PutAppendEnum, PutAppendReply, UniqueIdSequence, ValidReply,
 };
-use crate::common::{KVError, ValidReply};
+use crate::RemoteKvraft;
 
 pub struct Clerk {
     init: Once,
@@ -18,7 +15,7 @@ pub struct Clerk {
 }
 
 impl Clerk {
-    pub fn new(servers: Vec<Client>) -> Self {
+    pub fn new(servers: Vec<impl RemoteKvraft>) -> Self {
         Self {
             init: Once::new(),
             inner: ClerkInner::new(servers),
@@ -64,7 +61,7 @@ impl Clerk {
 }
 
 pub struct ClerkInner {
-    servers: Vec<Client>,
+    servers: Vec<Box<dyn RemoteKvraft>>,
 
     last_server_index: AtomicUsize,
     unique_id: UniqueIdSequence,
@@ -73,7 +70,11 @@ pub struct ClerkInner {
 }
 
 impl ClerkInner {
-    pub fn new(servers: Vec<Client>) -> Self {
+    pub fn new(servers: Vec<impl RemoteKvraft>) -> Self {
+        let servers = servers
+            .into_iter()
+            .map(|s| Box::new(s) as Box<dyn RemoteKvraft>)
+            .collect();
         Self {
             servers,
 
@@ -94,7 +95,8 @@ impl ClerkInner {
                 op: GetEnum::NoDuplicate,
                 unique_id: self.unique_id.zero(),
             };
-            let reply: Option<GetReply> = self.call_rpc(GET, args, Some(1));
+            let reply: Option<GetReply> =
+                self.retry_rpc(|remote, args| remote.get(args), args, Some(1));
             if let Some(reply) = reply {
                 match reply.result {
                     Ok(_) => {
@@ -115,24 +117,18 @@ impl ClerkInner {
     }
 
     const DEFAULT_TIMEOUT: Duration = Duration::from_secs(1);
-
-    fn call_rpc<M, A, R>(
-        &mut self,
-        method: M,
-        args: A,
+    pub fn retry_rpc<'a, Func, Fut, Args, Reply>(
+        &'a mut self,
+        mut future_func: Func,
+        args: Args,
         max_retry: Option<usize>,
-    ) -> Option<R>
+    ) -> Option<Reply>
     where
-        M: AsRef<str>,
-        A: Serialize,
-        R: DeserializeOwned + ValidReply,
+        Args: Clone,
+        Reply: ValidReply,
+        Fut: Future<Output = std::io::Result<Reply>> + Send + 'a,
+        Func: FnMut(&'a dyn RemoteKvraft, Args) -> Fut,
     {
-        let method = method.as_ref().to_owned();
-        let data = RequestMessage::from(
-            bincode::serialize(&args)
-                .expect("Serialization of requests should not fail"),
-        );
-
         let max_retry =
             std::cmp::max(max_retry.unwrap_or(usize::MAX), self.servers.len());
 
@@ -142,7 +138,7 @@ impl ClerkInner {
             let rpc_response = self.executor.block_on(async {
                 tokio::time::timeout(
                     Self::DEFAULT_TIMEOUT,
-                    client.call_rpc(method.clone(), data.clone()),
+                    future_func(client.as_ref(), args.clone()),
                 )
                 .await
             });
@@ -150,9 +146,7 @@ impl ClerkInner {
                 Ok(reply) => reply,
                 Err(e) => Err(e.into()),
             };
-            if let Ok(reply) = reply {
-                let ret: R = bincode::deserialize(reply.as_ref())
-                    .expect("Deserialization of reply should not fail");
+            if let Ok(ret) = reply {
                 if ret.is_reply_valid() {
                     self.last_server_index.store(index, Ordering::Relaxed);
                     return Some(ret);
@@ -183,7 +177,11 @@ impl ClerkInner {
             op: GetEnum::AllowDuplicate,
             unique_id: self.unique_id.inc(),
         };
-        let reply: GetReply = self.call_rpc(GET, args, options.max_retry)?;
+        let reply: GetReply = self.retry_rpc(
+            |remote, args| remote.get(args),
+            args,
+            options.max_retry,
+        )?;
         match reply.result {
             Ok(val) => Some(val),
             Err(KVError::Conflict) => panic!("We should never see a conflict."),
@@ -213,8 +211,11 @@ impl ClerkInner {
             op,
             unique_id: self.unique_id.inc(),
         };
-        let reply: PutAppendReply =
-            self.call_rpc(PUT_APPEND, args, options.max_retry)?;
+        let reply: PutAppendReply = self.retry_rpc(
+            |remote, args| remote.put_append(args),
+            args,
+            options.max_retry,
+        )?;
         match reply.result {
             Ok(val) => Some(val),
             Err(KVError::Expired) => Some(()),

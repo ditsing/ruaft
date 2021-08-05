@@ -1,21 +1,23 @@
 [package]
-name = "kvraft"
+name = "test_configs"
 version = "0.1.0"
 edition = "2018"
 
 [dependencies]
+anyhow = "1.0"
 async-trait = "0.1"
 bincode = "1.3.3"
-log = "0.4.14"
+bytes = "1.0"
+kvraft = { path = "../kvraft" }
+labrpc = "0.1.12"
+linearizability = { path = "../linearizability" }
+log = "0.4"
 parking_lot = "0.11.1"
 rand = "0.8"
 ruaft = { path = "..", features = ["integration-test"] }
 serde = "1.0.116"
-serde_derive = "1.0.116"
 test_utils = { path = "../test_utils" }
-tokio = { version = "1.7", features = ["time", "parking_lot"] }
 
 [dev-dependencies]
-scopeguard = "1.1.0"
-stdext = "0.3.0"
-test_configs = { path = "../test_configs" }
+futures = { version = "0.3.15", features = ["thread-pool"] }
+stdext = "0.3"

@@ -3,7 +3,7 @@ use crate::daemon_env::ErrorKind;
 use crate::{InstallSnapshotArgs, InstallSnapshotReply, Raft, State};
 
 impl<C: Clone + Default + serde::Serialize> Raft<C> {
-    pub(crate) fn process_install_snapshot(
+    pub fn process_install_snapshot(
         &self,
         args: InstallSnapshotArgs,
     ) -> InstallSnapshotReply {

@@ -6,9 +6,10 @@ use std::sync::Arc;
 
 use rand::{thread_rng, Rng};
 use scopeguard::defer;
-
-// This is to remove the annoying "unused code in config" warnings.
-pub mod config;
+use test_configs::utils::{
+    sleep_election_timeouts, sleep_millis, LONG_ELECTION_TIMEOUT_MILLIS,
+};
+use test_configs::{make_config, raft::config};
 
 #[test]
 fn persist1() -> config::Result<()> {
@@ -90,7 +91,7 @@ fn persist2() -> config::Result<()> {
         cfg.connect((leader1 + 1) % SERVERS);
         cfg.connect((leader1 + 2) % SERVERS);
 
-        config::sleep_election_timeouts(1);
+        sleep_election_timeouts(1);
 
         cfg.start1((leader1 + 3) % SERVERS)?;
         cfg.connect((leader1 + 3) % SERVERS);
@@ -165,13 +166,13 @@ fn figure8() -> config::Result<()> {
         }
 
         let millis_upper = if thread_rng().gen_ratio(100, 1000) {
-            config::LONG_ELECTION_TIMEOUT_MILLIS >> 1
+            LONG_ELECTION_TIMEOUT_MILLIS >> 1
         } else {
             // Magic number 13?
             13
         };
         let millis = thread_rng().gen_range(0..millis_upper);
-        config::sleep_millis(millis);
+        sleep_millis(millis);
 
         if let Some(leader) = leader {
             cfg.crash1(leader);
@@ -263,13 +264,13 @@ fn figure8_unreliable() -> config::Result<()> {
         }
 
         let millis_upper = if thread_rng().gen_ratio(100, 1000) {
-            config::LONG_ELECTION_TIMEOUT_MILLIS >> 1
+            LONG_ELECTION_TIMEOUT_MILLIS >> 1
         } else {
             // Magic number 13?
             13
         };
         let millis = thread_rng().gen_range(0..millis_upper);
-        config::sleep_millis(millis);
+        sleep_millis(millis);
 
         if let Some(leader) = leader {
             if thread_rng().gen_ratio(1, 2) {
@@ -346,10 +347,10 @@ fn internal_churn(unreliable: bool) -> config::Result<()> {
                             }
                             // The contract we started might not get
                         }
-                        config::sleep_millis(*millis);
+                        sleep_millis(*millis);
                     }
                 } else {
-                    config::sleep_millis(79 + client_index * 17);
+                    sleep_millis(79 + client_index * 17);
                 }
             }
 
@@ -376,10 +377,10 @@ fn internal_churn(unreliable: bool) -> config::Result<()> {
                 cfg.crash1(server);
             }
         }
-        config::sleep_millis(config::LONG_ELECTION_TIMEOUT_MILLIS / 10 * 7);
+        sleep_millis(LONG_ELECTION_TIMEOUT_MILLIS / 10 * 7);
     }
 
-    config::sleep_election_timeouts(1);
+    sleep_election_timeouts(1);
     cfg.set_unreliable(false);
     for i in 0..SERVERS {
         if !cfg.is_server_alive(i) {
@@ -395,7 +396,7 @@ fn internal_churn(unreliable: bool) -> config::Result<()> {
         all_cmds.append(&mut cmds);
     }
 
-    config::sleep_election_timeouts(1);
+    sleep_election_timeouts(1);
 
     let last_cmd_index = cfg.one(thread_rng().gen(), SERVERS, true)?;
     let mut consented = vec![];

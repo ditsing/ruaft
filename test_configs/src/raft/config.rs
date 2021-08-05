@@ -2,18 +2,16 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 pub use anyhow::Result;
 use anyhow::{anyhow, bail};
 use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
-use tokio::time::Duration;
 
-use ruaft::rpcs::register_server;
+use crate::register_server;
+use crate::utils::sleep_millis;
 use ruaft::{ApplyCommandMessage, Persister, Raft, Term};
-
-pub mod persister;
 
 struct ConfigState {
     rafts: Vec<Option<Raft<i32>>>,
@@ -24,7 +22,7 @@ struct LogState {
     committed_logs: Vec<Vec<i32>>,
     results: Vec<Result<()>>,
     max_index: usize,
-    saved: Vec<Arc<persister::Persister>>,
+    saved: Vec<Arc<crate::Persister>>,
 }
 
 pub struct Config {
@@ -291,7 +289,7 @@ impl Config {
             raft.kill();
         }
         let mut log = self.log.lock();
-        log.saved[index] = Arc::new(persister::Persister::new());
+        log.saved[index] = Arc::new(crate::Persister::new());
         log.saved[index].save_state(data);
     }
 
@@ -304,7 +302,7 @@ impl Config {
         {
             let mut network = self.network.lock();
             for j in 0..self.server_count {
-                clients.push(ruaft::rpcs::RpcClient::new(network.make_client(
+                clients.push(crate::RpcClient::new(network.make_client(
                     Self::client_name(index, j),
                     Self::server_name(j),
                 )))
@@ -365,7 +363,7 @@ impl Config {
     pub fn end(&self) {}
 
     pub fn cleanup(&self) {
-        log::trace!("Cleaning up test config ...");
+        log::trace!("Cleaning up test raft.config ...");
         let mut network = self.network.lock();
         for i in 0..self.server_count {
             network.remove_server(Self::server_name(i));
@@ -377,7 +375,7 @@ impl Config {
                 raft.kill();
             }
         }
-        log::trace!("Cleaning up test config done.");
+        log::trace!("Cleaning up test raft.config done.");
         eprintln!(
             "Ruaft log file for {}: {:?}",
             self.test_path,
@@ -446,7 +444,7 @@ impl Config {
 #[macro_export]
 macro_rules! make_config {
     ($server_count:expr, $unreliable:expr) => {
-        $crate::config::make_config(
+        $crate::raft::config::make_config(
             $server_count,
             $unreliable,
             stdext::function_name!(),
@@ -476,7 +474,7 @@ pub fn make_config(
     });
 
     let mut saved = vec![];
-    saved.resize_with(server_count, || Arc::new(persister::Persister::new()));
+    saved.resize_with(server_count, || Arc::new(crate::Persister::new()));
     let log = Arc::new(Mutex::new(LogState {
         committed_logs: vec![vec![]; server_count],
         results: vec![],
@@ -499,13 +497,4 @@ pub fn make_config(
     }
 
     cfg
-}
-
-pub fn sleep_millis(mills: u64) {
-    std::thread::sleep(std::time::Duration::from_millis(mills))
-}
-
-pub const LONG_ELECTION_TIMEOUT_MILLIS: u64 = 1000;
-pub fn sleep_election_timeouts(count: u64) {
-    sleep_millis(LONG_ELECTION_TIMEOUT_MILLIS * count)
 }

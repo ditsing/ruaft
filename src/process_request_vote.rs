@@ -8,7 +8,7 @@ impl<Command> Raft<Command>
 where
     Command: Clone + serde::Serialize + Default,
 {
-    pub(crate) fn process_request_vote(
+    pub fn process_request_vote(
         &self,
         args: RequestVoteArgs,
     ) -> RequestVoteReply {

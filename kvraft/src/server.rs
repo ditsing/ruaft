@@ -18,7 +18,7 @@ use crate::common::{
 use crate::snapshot_holder::SnapshotHolder;
 
 pub struct KVServer {
-    me: AtomicUsize,
+    me: usize,
     state: Mutex<KVServerState>,
     rf: Raft<UniqueKVOp>,
     keep_running: AtomicBool,
@@ -107,7 +107,7 @@ impl KVServer {
         let snapshot_holder = Arc::new(SnapshotHolder::default());
         let snapshot_holder_clone = snapshot_holder.clone();
         let ret = Arc::new(Self {
-            me: AtomicUsize::new(me),
+            me,
             state: Default::default(),
             rf: Raft::new(
                 servers,
@@ -177,7 +177,7 @@ impl KVServer {
             // This KV server might not be the same leader that committed the
             // query. We are not sure if it is a duplicate or a conflict. To
             // tell the difference, terms of all queries must be stored.
-            *result_holder.result.lock() = if leader == self.me() {
+            *result_holder.result.lock() = if leader == self.me {
                 Ok(result)
             } else {
                 Err(CommitError::NotMe(result))
@@ -204,7 +204,7 @@ impl KVServer {
     ) {
         let this = Arc::downgrade(self);
         let logger = LocalLogger::inherit();
-        let me = self.me();
+        let me = self.me;
         std::thread::spawn(move || {
             logger.attach();
             log::info!("KVServer {} waiting for commands ...", me);
@@ -304,7 +304,7 @@ impl KVServer {
         if start {
             let op = UniqueKVOp {
                 op,
-                me: self.me(),
+                me: self.me,
                 unique_id,
             };
             let start = self.rf.start(op);
@@ -420,10 +420,6 @@ impl KVServer {
         };
 
         PutAppendReply { result }
-    }
-
-    pub fn me(&self) -> usize {
-        self.me.load(Ordering::Relaxed)
     }
 
     pub fn raft(&self) -> &Raft<UniqueKVOp> {

@@ -426,8 +426,8 @@ impl KVServer {
         self.me.load(Ordering::Relaxed)
     }
 
-    pub fn raft(&self) -> Raft<UniqueKVOp> {
-        self.rf.clone()
+    pub fn raft(&self) -> &Raft<UniqueKVOp> {
+        &self.rf
     }
 
     pub fn kill(self: Arc<Self>) {
@@ -439,7 +439,7 @@ impl KVServer {
             result_holder.condvar.notify_all();
         }
 
-        let rf = self.raft();
+        let rf = self.raft().clone();
         // We must drop self to remove the only clone of raft, so that
         // `rf.kill()` does not block.
         drop(self);

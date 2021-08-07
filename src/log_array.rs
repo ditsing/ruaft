@@ -351,10 +351,6 @@ mod tests {
         assert_eq!(0, log[0].command);
     }
 
-    // TODO(ditsing): add invariant checks to restore and write a test.
-    #[test]
-    fn test_restore() {}
-
     #[test]
     fn test_start() {
         let log = make_log_array_range(9, 17);

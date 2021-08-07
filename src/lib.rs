@@ -253,7 +253,8 @@ where
         let index = rf.log.add_command(term, command);
         self.persister.save_state(rf.persisted_state().into());
 
-        let _ = self.new_log_entry.clone().unwrap().send(None);
+        // Several attempts have been made to remove the unwrap below.
+        let _ = self.new_log_entry.as_ref().unwrap().send(None);
 
         log::info!("{:?} started new entry at {} {:?}", self.me, index, term);
         Some((term, index))

@@ -7,7 +7,7 @@ use rand::{thread_rng, Rng};
 
 use crate::daemon_env::Daemon;
 use crate::term_marker::TermMarker;
-use crate::utils::{retry_rpc, RPC_DEADLINE};
+use crate::utils::{retry_rpc, SharedSender, RPC_DEADLINE};
 use crate::{Peer, Raft, RaftState, RemoteRaft, RequestVoteArgs, State, Term};
 
 #[derive(Default)]
@@ -307,7 +307,7 @@ where
         votes: Vec<tokio::task::JoinHandle<Option<bool>>>,
         cancel_token: futures_channel::oneshot::Receiver<()>,
         election: Arc<ElectionState>,
-        new_log_entry: std::sync::mpsc::Sender<Option<Peer>>,
+        new_log_entry: SharedSender<Option<Peer>>,
     ) {
         let quorum = votes.len() >> 1;
         let mut vote_count = 0;

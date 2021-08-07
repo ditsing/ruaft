@@ -20,7 +20,7 @@ use crate::snapshot_holder::SnapshotHolder;
 pub struct KVServer {
     me: AtomicUsize,
     state: Mutex<KVServerState>,
-    rf: Mutex<Raft<UniqueKVOp>>,
+    rf: Raft<UniqueKVOp>,
     keep_running: AtomicBool,
     logger: LocalLogger,
 }
@@ -109,14 +109,14 @@ impl KVServer {
         let ret = Arc::new(Self {
             me: AtomicUsize::new(me),
             state: Default::default(),
-            rf: Mutex::new(Raft::new(
+            rf: Raft::new(
                 servers,
                 me,
                 persister,
                 apply_command,
                 max_state_size_bytes,
                 move |index| snapshot_holder_clone.request_snapshot(index),
-            )),
+            ),
             keep_running: AtomicBool::new(true),
             logger: LocalLogger::inherit(),
         });
@@ -224,7 +224,7 @@ impl KVServer {
                             if let Some(snapshot) = snapshot_holder
                                 .take_snapshot(&this.state.lock(), index)
                             {
-                                this.rf.lock().save_snapshot(snapshot);
+                                this.rf.save_snapshot(snapshot);
                             }
                         }
                     }
@@ -268,7 +268,7 @@ impl KVServer {
             entry.clone()
         };
 
-        let (Term(hold_term), is_leader) = self.rf.lock().get_state();
+        let (Term(hold_term), is_leader) = self.rf.get_state();
         if !is_leader {
             result_holder.condvar.notify_all();
             return Err(CommitError::NotLeader);
@@ -307,7 +307,7 @@ impl KVServer {
                 me: self.me(),
                 unique_id,
             };
-            let start = self.rf.lock().start(op);
+            let start = self.rf.start(op);
             let start_term =
                 start.map_or(Self::UNSEEN_TERM, |(Term(term), _)| {
                     Self::validate_term(term);
@@ -427,7 +427,7 @@ impl KVServer {
     }
 
     pub fn raft(&self) -> Raft<UniqueKVOp> {
-        self.rf.lock().clone()
+        self.rf.clone()
     }
 
     pub fn kill(self: Arc<Self>) {

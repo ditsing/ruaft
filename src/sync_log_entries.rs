@@ -8,7 +8,7 @@ use crate::check_or_record;
 use crate::daemon_env::{Daemon, ErrorKind};
 use crate::index_term::IndexTerm;
 use crate::term_marker::TermMarker;
-use crate::utils::{retry_rpc, RPC_DEADLINE};
+use crate::utils::{retry_rpc, SharedSender, RPC_DEADLINE};
 use crate::{
     AppendEntriesArgs, InstallSnapshotArgs, Peer, Raft, RaftState, RemoteRaft,
     Term, HEARTBEAT_INTERVAL_MILLIS,
@@ -58,6 +58,7 @@ where
     /// and backoff strategy.
     pub(crate) fn run_log_entry_daemon(&mut self) {
         let (tx, rx) = std::sync::mpsc::channel::<Option<Peer>>();
+        let tx = SharedSender::new(tx);
         self.new_log_entry.replace(tx);
 
         // Clone everything that the thread needs.
@@ -156,7 +157,7 @@ where
         rf: Arc<Mutex<RaftState<Command>>>,
         rpc_client: impl RemoteRaft<Command>,
         peer_index: usize,
-        rerun: std::sync::mpsc::Sender<Option<Peer>>,
+        rerun: SharedSender<Option<Peer>>,
         opening: Arc<AtomicUsize>,
         apply_command_signal: Arc<Condvar>,
         term_marker: TermMarker<Command>,

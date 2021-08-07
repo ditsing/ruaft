@@ -62,7 +62,7 @@ pub struct Raft<Command> {
 
     persister: Arc<dyn Persister>,
 
-    new_log_entry: Option<std::sync::mpsc::Sender<Option<Peer>>>,
+    new_log_entry: Option<utils::SharedSender<Option<Peer>>>,
     apply_command_signal: Arc<Condvar>,
     keep_running: Arc<AtomicBool>,
     election: Arc<ElectionState>,
@@ -298,3 +298,18 @@ where
 }
 
 pub(crate) const HEARTBEAT_INTERVAL_MILLIS: u64 = 150;
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_raft_must_sync() {
+        let optional_raft: Option<super::Raft<i32>> = None;
+
+        fn must_sync<T: Sync>(value: T) {
+            drop(value)
+        }
+        must_sync(optional_raft)
+        // The following raft is not Sync.
+        // let optional_raft: Option<super::Raft<std::rc::Rc<i32>>> = None;
+    }
+}

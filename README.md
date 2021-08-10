@@ -5,17 +5,18 @@ Ruaft is a Rust version of [the Raft consensus protocol](https://raft.github.io/
 ## Raft
 
 Raft is the algorithm behind the famous key-value store [etcd](https://github.com/etcd-io/etcd). It helps replicas of a
-distributed application to reach consensus on internal state. Raft maintains a log that consists of entries. Each entry
-carries one piece of data (commonly referred to as a "command") for the application. Once an entry is committed to the
-log, it will never be changed or removed across all replicas. Entries are appended to the end of the log linearly, which
-guarantees that the log never diverges.
+distributed application to reach consensus on internal state. Raft maintains an array of entries, collectively known as
+the log. Each entry carries one piece of data for the application. Once an entry is committed to the log, it will never
+be changed or removed. Entries are appended to the end of the log linearly, which guarantees that the log never diverges
+across replicas. The log as a whole, represents the internal state of the application. Replicas of the same application
+agree on the log entries, and thus agree on the internal state.
 
 ## APIs
 
 Each application replica has a Raft instance that runs side by side with it. To add a log entry to the Raft log, the
-application calls `start()` with the data it wants to store. The log entry is not committed immediately. Instead, when
-the Raft instance is sure that the log entry is agreed upon, it calls the application back via an `apply_command`
-callback, which is supplied by the application.
+application calls `start()` with the data it wants to store (commonly referred to as a "command"). The log entry is not
+committed immediately. Instead, when the Raft instance is sure that the log entry is agreed upon, it calls the
+application back via an `apply_command` callback, which is supplied by the application.
 
 Internally, Raft talks to other replicas of the same application via an RPC interface. From time to time, Raft saves its
 log (and other data) to a permanent storage via a `persister`. The log can grow without bound. To save storage space,
@@ -28,9 +29,8 @@ callback, and a `request_snapshot` callback. More details of those callbacks can
 
 ### Raft RPCs
 
-Ruaft has three RPC handlers: `process_append_entries()`, `process_request_vote()` and
-`process_install_snapshot()`, serving requests from other Raft instances of the same application. These RPC handlers
-should be added to the RPC system that the application uses.
+Ruaft has three RPC handlers: `append_entries()`, `request_vote()` and `install_snapshot()`, serving requests from other
+Raft instances of the same application. These RPC handlers should be added to the RPC system that the application uses.
 
 ### Graceful shutdown
 
@@ -41,7 +41,7 @@ starvation.
 
 ## Code Quality
 
-The implementation is thoroughly tested. I copied (and translated) the tests from an obvious source. To avoid being
+The implementation is thoroughly tested. I copied (and translated) the test sets from an obvious source. To avoid being
 indexed by a search engine, I will not name the source. The testing framework from the same source is also translated
 from the original Go version. The code can be found at the [`labrpc`](https://github.com/ditsing/labrpc) repo.
 

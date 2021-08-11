@@ -1,9 +1,13 @@
+use std::future::Future;
+
 use async_trait::async_trait;
 use labrpc::{Client, Network, ReplyMessage, RequestMessage, Server};
 use parking_lot::Mutex;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
+use futures_util::future::BoxFuture;
+use futures_util::FutureExt;
 use kvraft::{
     GetArgs, GetReply, KVServer, PutAppendArgs, PutAppendReply, RemoteKvraft,
 };
@@ -90,13 +94,13 @@ impl RemoteKvraft for RpcClient {
 
 pub fn make_rpc_handler<Request, Reply, F>(
     func: F,
-) -> Box<dyn Fn(RequestMessage) -> ReplyMessage>
+) -> impl Fn(RequestMessage) -> ReplyMessage
 where
     Request: DeserializeOwned,
     Reply: Serialize,
     F: 'static + Fn(Request) -> Reply,
 {
-    Box::new(move |request| {
+    move |request| {
         let reply = func(
             bincode::deserialize(&request)
                 .expect("Deserialization should not fail"),
@@ -105,12 +109,36 @@ where
         ReplyMessage::from(
             bincode::serialize(&reply).expect("Serialization should not fail"),
         )
-    })
+    }
+}
+
+pub fn make_async_rpc_handler<'a, Request, Reply, F, Fut>(
+    func: F,
+) -> impl Fn(RequestMessage) -> BoxFuture<'a, ReplyMessage>
+where
+    Request: DeserializeOwned + Send,
+    Reply: Serialize,
+    Fut: Future<Output = Reply> + Send + 'a,
+    F: 'a + Send + Clone + FnOnce(Request) -> Fut,
+{
+    move |request| {
+        let func = func.clone();
+        let fut = async move {
+            let request = bincode::deserialize(&request)
+                .expect("Deserialization should not fail");
+            let reply = func(request).await;
+            ReplyMessage::from(
+                bincode::serialize(&reply)
+                    .expect("Serialization should not fail"),
+            )
+        };
+        fut.boxed()
+    }
 }
 
 pub fn register_server<
     Command: 'static + Clone + Serialize + DeserializeOwned + Default,
-    R: 'static + AsRef<Raft<Command>> + Clone,
+    R: 'static + AsRef<Raft<Command>> + Send + Sync + Clone,
     S: AsRef<str>,
 >(
     raft: R,
@@ -150,7 +178,7 @@ pub fn register_server<
     Ok(())
 }
 pub fn register_kv_server<
-    KV: 'static + AsRef<KVServer> + Clone,
+    KV: 'static + AsRef<KVServer> + Send + Sync + Clone,
     S: AsRef<str>,
 >(
     kv: KV,
@@ -162,14 +190,18 @@ pub fn register_kv_server<
     let mut server = Server::make_server(server_name);
 
     let kv_clone = kv.clone();
-    server.register_rpc_handler(
+    server.register_async_rpc_handler(
         GET.to_owned(),
-        make_rpc_handler(move |args| kv_clone.as_ref().get(args)),
+        make_async_rpc_handler(move |args| async move {
+            kv_clone.as_ref().get(args).await
+        }),
     )?;
 
-    server.register_rpc_handler(
+    server.register_async_rpc_handler(
         PUT_APPEND.to_owned(),
-        make_rpc_handler(move |args| kv.as_ref().put_append(args)),
+        make_async_rpc_handler(move |args| async move {
+            kv.as_ref().put_append(args).await
+        }),
     )?;
 
     network.add_server(server_name, server);

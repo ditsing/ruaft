@@ -74,9 +74,7 @@ pub fn thread_init<T: 'static + Log>(logger: T) {
 
 #[doc(hidden)]
 pub fn get() -> LocalLogger {
-    let result = LOCAL_LOGGER.with(|inner| inner.borrow().clone());
-    let _ = result.deref();
-    result
+    LOCAL_LOGGER.with(|inner| inner.borrow().clone())
 }
 
 #[doc(hidden)]
@@ -92,7 +90,9 @@ pub fn reset() {
 impl LocalLogger {
     /// Inherit the logger from the current thread.
     pub fn inherit() -> Self {
-        get()
+        let result = get();
+        let _ = result.deref();
+        result
     }
 
     /// Set the logger of this thread to `self`.

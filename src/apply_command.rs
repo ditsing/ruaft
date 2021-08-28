@@ -75,6 +75,9 @@ where
                             Duration::from_millis(HEARTBEAT_INTERVAL_MILLIS),
                         );
                     }
+                    // Note that between those two nested `if`s, log start is
+                    // always smaller than or equal to commit index, as
+                    // guaranteed by the SNAPSHOT_INDEX_INVARIANT.
                     if rf.last_applied < rf.log.start() {
                         let (index_term, data) = rf.log.snapshot();
                         let messages =

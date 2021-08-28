@@ -52,6 +52,20 @@ impl SnapshotDaemon {
 
     /// Notifies the daemon that the log has grown. It might be a good time to
     /// request a new snapshot.
+    // We cannot simply deliver snapshot requests as one type of commands in the
+    // apply_command daemon. A snapshot should be requested when
+    // 1. a new log entry is applied to the state machine, or
+    // 2. when the log grow out of the limit.
+    //
+    // The first scenario fits naturally into the duties of apply_command. The
+    // second one, i.e. log_grow(), does not. The apply_command daemon does not
+    // get notified when the log grows. Waking up the daemon when the log grow
+    // can be costly.
+    //
+    // Another option is to allow other daemons sending messages to the state
+    // machine. That would require ApplyCommandFunc to be shared by two threads.
+    // Adding more requirements to external interface is also something we would
+    // rather not do.
     pub(crate) fn log_grow(&self, first_index: Index, last_index: Index) {
         if last_index - first_index > Self::MIN_SNAPSHOT_INDEX_INTERVAL {
             self.trigger();

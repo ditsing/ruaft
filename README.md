@@ -4,24 +4,24 @@ Ruaft is a Rust version of [the Raft consensus protocol](https://raft.github.io/
 
 ## Raft
 
-Raft is the algorithm behind the famous key-value store [etcd](https://github.com/etcd-io/etcd). It helps replicas of a
-distributed application to reach consensus on internal state. Raft maintains an array of entries, collectively known as
-the log. Each entry carries one piece of data for the application. Once an entry is committed to the log, it will never
-be changed or removed. Entries are appended to the end of the log linearly, which guarantees that the log never diverges
-across replicas. The log as a whole, represents the internal state of the application. Replicas of the same application
-agree on the log entries, and thus agree on the internal state.
+Raft is the algorithm behind the famous key-value store [etcd](https://github.com/etcd-io/etcd). The algorithm helps
+replicas of a distributed application to reach consensus on its internal state. Raft maintains an array of entries,
+collectively known as the log. Each entry of the log carries one piece of data for the application. Once an entry is
+committed to the log, it will never be changed or removed. Entries are appended to the end of the log linearly, which
+guarantees that the log never diverges across replicas. The log as a whole, represents the internal state of the
+application. Replicas of the same application agree on the log entries, and thus agree on the internal state.
 
 ## APIs
 
 Each application replica has a Raft instance that runs side by side with it. To add a log entry to the Raft log, the
 application calls `start()` with the data it wants to store (commonly referred to as a "command"). The log entry is not
-committed immediately. Instead, when the Raft instance is sure that the log entry is agreed upon, it calls the
-application back via an `apply_command` callback, which is supplied by the application.
+committed immediately. Instead, when the Raft instance is sure that the log entry is agreed upon and committed, it calls
+the application back via an `apply_command` callback, which is supplied by the application.
 
 Internally, Raft talks to other replicas of the same application via an RPC interface. From time to time, Raft saves its
 log (and other data) to a permanent storage via a `persister`. The log can grow without bound. To save storage space,
-Raft periodically asks the application to take a snapshot of its state. Log entries contained in the snapshot will be
-discarded.
+Raft periodically asks the application to take a snapshot of its internal state. Log entries contained in the snapshot
+will be discarded.
 
 An application creates a Raft instance with `new()`, with RPC interfaces for communication, a `persister`,
 a `apply_command`
@@ -36,8 +36,8 @@ Raft instances of the same application. These RPC handlers should be added to th
 
 The `kill()` method provides a clean way to gracefully shutdown a Ruaft instance. It notifies all threads and wait for
 all tasks to complete. `kill()` then checks if there are any panics or assertion failures during the execution. It
-panics the main thread if there is any error. Otherwise `kill()` is guaranteed to return, assuming there is no thread
-starvation.
+panics the main thread if there is any error. If there is no failure, `kill()` is guaranteed to return, assuming there
+is no thread starvation.
 
 ## Code Quality
 
@@ -48,8 +48,8 @@ from the original Go version. The code can be found at the [`labrpc`](https://gi
 ## KV Server
 
 To test the snapshot functionality, I wrote a key-value store that supports `get()`, `put()` and `append()`. The
-complexity is so high that it has its own set of tests. Integration tests in `tests/snapshot_tests.rs` are all based on
-the KV server. The KV server is inspired by the equivalent Go version.
+complexity of the key-value store is so high that it has its own set of tests. For Ruaft, integration tests in
+`tests/snapshot_tests.rs` are all based on the KV server. The KV server is inspired by the equivalent Go version.
 
 ## Daemons
 
@@ -83,5 +83,7 @@ Things would be better after I implement an RPC interface and improve the `persi
 - [x] Add public documentation
 - [x] Add a proper RPC interface to all public methods
 - [x] Allow storing arbitrary information
-- [x] Add more logging.
+- [x] Add more logging
 - [ ] Benchmarks
+- [ ] Support `Prevote`
+- [ ] Run Ruaft on a Raspberry Pi cluster

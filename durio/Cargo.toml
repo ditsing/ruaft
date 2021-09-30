@@ -13,6 +13,7 @@ keywords = ["raft"]
 categories = ["raft"]
 
 [dependencies]
+async-trait = "0.1"
 kvraft = { path = "../kvraft" }
 ruaft = { path = "..", features = ["integration-test"] }
 serde = "1.0"

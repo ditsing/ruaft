@@ -12,7 +12,7 @@ use std::io::ErrorKind;
 use tarpc::client::RpcError;
 
 #[tarpc::service]
-trait RuaftService {
+trait RaftService {
     async fn append_entries(
         args: AppendEntriesArgs<UniqueKVOp>,
     ) -> AppendEntriesReply;
@@ -22,10 +22,10 @@ trait RuaftService {
     async fn request_vote(args: RequestVoteArgs) -> RequestVoteReply;
 }
 
-struct RuaftRpcServer(Arc<Raft<UniqueKVOp>>);
+struct RaftRpcServer(Arc<Raft<UniqueKVOp>>);
 
 #[tarpc::server]
-impl RuaftService for RuaftRpcServer {
+impl RaftService for RaftRpcServer {
     async fn append_entries(
         self,
         _context: Context,
@@ -52,7 +52,7 @@ impl RuaftService for RuaftRpcServer {
 }
 
 #[async_trait]
-impl RemoteRaft<UniqueKVOp> for RuaftServiceClient {
+impl RemoteRaft<UniqueKVOp> for RaftServiceClient {
     async fn request_vote(
         &self,
         args: RequestVoteArgs,

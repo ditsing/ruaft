@@ -1,0 +1,25 @@
+[package]
+name = "durio"
+version = "0.1.0"
+authors = ["Jing Yang <ditsing@gmail.com>"]
+edition = "2018"
+description = "KV store backed by Ruaft, targeting Raspberry Pis."
+documentation = ""
+readme = "README.md"
+homepage = "https://github.com/ditsing/ruaft/tree/master/durio"
+repository = "https://github.com/ditsing/ruaft"
+license = "MIT"
+keywords = ["raft"]
+categories = ["raft"]
+
+[dependencies]
+kvraft = { path = "../kvraft" }
+ruaft = { path = "..", features = ["integration-test"] }
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+tarpc = "0.27"
+tokio = { version = "1.7", features = ["macros", "rt-multi-thread", "time", "parking_lot"] }
+warp = "0.3"
+
+[dev-dependencies]

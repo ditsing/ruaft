@@ -40,6 +40,7 @@ test_utils = { path = "test_utils" }
 
 [workspace]
 members = [
+    "durio",
     "kvraft",
     "linearizability",
     "test_configs",

@@ -1,5 +1,6 @@
 mod kv_service;
 mod raft_service;
+mod utils;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;

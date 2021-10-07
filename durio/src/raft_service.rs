@@ -1,3 +1,5 @@
+use std::future::Future;
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -8,11 +10,9 @@ use ruaft::{
     AppendEntriesArgs, AppendEntriesReply, InstallSnapshotArgs,
     InstallSnapshotReply, Raft, RemoteRaft, RequestVoteArgs, RequestVoteReply,
 };
-use std::io::ErrorKind;
-use tarpc::client::RpcError;
 
 #[tarpc::service]
-trait RaftService {
+pub(crate) trait RaftService {
     async fn append_entries(
         args: AppendEntriesArgs<UniqueKVOp>,
     ) -> AppendEntriesReply;
@@ -22,6 +22,7 @@ trait RaftService {
     async fn request_vote(args: RequestVoteArgs) -> RequestVoteReply;
 }
 
+#[derive(Clone)]
 struct RaftRpcServer(Arc<Raft<UniqueKVOp>>);
 
 #[tarpc::server]
@@ -59,7 +60,7 @@ impl RemoteRaft<UniqueKVOp> for RaftServiceClient {
     ) -> std::io::Result<RequestVoteReply> {
         self.request_vote(Context::current(), args)
             .await
-            .map_err(translate_rpc_error)
+            .map_err(crate::utils::translate_rpc_error)
     }
 
     async fn append_entries(
@@ -68,7 +69,7 @@ impl RemoteRaft<UniqueKVOp> for RaftServiceClient {
     ) -> std::io::Result<AppendEntriesReply> {
         self.append_entries(Context::current(), args)
             .await
-            .map_err(translate_rpc_error)
+            .map_err(crate::utils::translate_rpc_error)
     }
 
     async fn install_snapshot(
@@ -77,18 +78,27 @@ impl RemoteRaft<UniqueKVOp> for RaftServiceClient {
     ) -> std::io::Result<InstallSnapshotReply> {
         self.install_snapshot(Context::current(), args)
             .await
-            .map_err(translate_rpc_error)
+            .map_err(crate::utils::translate_rpc_error)
     }
 }
 
-fn translate_rpc_error(e: RpcError) -> std::io::Error {
-    match e {
-        RpcError::Disconnected => std::io::Error::new(ErrorKind::BrokenPipe, e),
-        RpcError::DeadlineExceeded => {
-            std::io::Error::new(ErrorKind::TimedOut, e)
-        }
-        RpcError::Server(server_error) => {
-            std::io::Error::new(ErrorKind::Other, server_error)
-        }
-    }
+pub(crate) async fn connect_to_raft_service(
+    addr: SocketAddr,
+) -> std::io::Result<impl RemoteRaft<UniqueKVOp>> {
+    let conn = tarpc::serde_transport::tcp::connect(
+        addr,
+        tokio_serde::formats::Json::default,
+    )
+    .await?;
+    let client =
+        RaftServiceClient::new(tarpc::client::Config::default(), conn).spawn();
+    Ok(client)
+}
+
+pub(crate) fn start_raft_service_server(
+    addr: SocketAddr,
+    raft: Arc<Raft<UniqueKVOp>>,
+) -> impl Future<Output = std::io::Result<()>> {
+    let server = RaftRpcServer(raft);
+    crate::utils::start_tarpc_server(addr, server.serve())
 }

@@ -19,6 +19,7 @@ struct PutAppendBody {
 
 #[tokio::main]
 async fn main() {
+    test_utils::init_log("durio").expect("Initiating log should not fail");
     let kv_addr = ([127, 0, 0, 1], 9988).into();
     let raft_addr = ([127, 0, 0, 1], 10001).into();
     run_kv_instance(kv_addr, vec![raft_addr], 0)

@@ -13,7 +13,7 @@ pub(crate) async fn run_kv_instance(
     addr: SocketAddr,
     raft_peers: Vec<SocketAddr>,
     me: usize,
-) -> std::io::Result<()> {
+) -> std::io::Result<Arc<KVServer>> {
     let mut remote_rafts = vec![];
     for (index, raft_peer) in raft_peers.iter().enumerate() {
         let remote_raft = if index == me {
@@ -30,5 +30,7 @@ pub(crate) async fn run_kv_instance(
     let raft = Arc::new(kv_server.raft().clone());
 
     start_raft_service_server(raft_peers[me], raft).await?;
-    start_kv_service_server(addr, kv_server).await
+    start_kv_service_server(addr, kv_server.clone()).await?;
+
+    Ok(kv_server)
 }

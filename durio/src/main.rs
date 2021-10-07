@@ -1,12 +1,16 @@
-mod kv_service;
-mod raft_service;
-mod utils;
-
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use serde_derive::{Deserialize, Serialize};
 use warp::Filter;
+
+use crate::run::run_kv_instance;
+
+mod kv_service;
+mod persister;
+mod raft_service;
+mod run;
+mod utils;
 
 #[derive(Deserialize, Serialize)]
 struct PutAppendBody {
@@ -15,6 +19,10 @@ struct PutAppendBody {
 
 #[tokio::main]
 async fn main() {
+    run_kv_instance(([127, 0, 0, 1], 9988).into(), vec![], 0)
+        .await
+        .expect("Running kv instance should not fail");
+
     let counter = Arc::new(AtomicUsize::new(0));
     let counter_clone = counter.clone();
     let get = warp::path!("kvstore" / "get" / String).map(move |key| {

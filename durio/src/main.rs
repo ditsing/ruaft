@@ -19,7 +19,9 @@ struct PutAppendBody {
 
 #[tokio::main]
 async fn main() {
-    run_kv_instance(([127, 0, 0, 1], 9988).into(), vec![], 0)
+    let kv_addr = ([127, 0, 0, 1], 9988).into();
+    let raft_addr = ([127, 0, 0, 1], 10001).into();
+    run_kv_instance(kv_addr, vec![raft_addr], 0)
         .await
         .expect("Running kv instance should not fail");
 

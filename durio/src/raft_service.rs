@@ -52,13 +52,18 @@ impl RaftService for RaftRpcServer {
     }
 }
 
+pub(crate) struct OptionalRaftServiceClient(Option<RaftServiceClient>);
+
 #[async_trait]
-impl RemoteRaft<UniqueKVOp> for RaftServiceClient {
+impl RemoteRaft<UniqueKVOp> for OptionalRaftServiceClient {
     async fn request_vote(
         &self,
         args: RequestVoteArgs,
     ) -> std::io::Result<RequestVoteReply> {
-        self.request_vote(Context::current(), args)
+        self.0
+            .as_ref()
+            .unwrap()
+            .request_vote(Context::current(), args)
             .await
             .map_err(crate::utils::translate_rpc_error)
     }
@@ -67,7 +72,10 @@ impl RemoteRaft<UniqueKVOp> for RaftServiceClient {
         &self,
         args: AppendEntriesArgs<UniqueKVOp>,
     ) -> std::io::Result<AppendEntriesReply> {
-        self.append_entries(Context::current(), args)
+        self.0
+            .as_ref()
+            .unwrap()
+            .append_entries(Context::current(), args)
             .await
             .map_err(crate::utils::translate_rpc_error)
     }
@@ -76,15 +84,22 @@ impl RemoteRaft<UniqueKVOp> for RaftServiceClient {
         &self,
         args: InstallSnapshotArgs,
     ) -> std::io::Result<InstallSnapshotReply> {
-        self.install_snapshot(Context::current(), args)
+        self.0
+            .as_ref()
+            .unwrap()
+            .install_snapshot(Context::current(), args)
             .await
             .map_err(crate::utils::translate_rpc_error)
     }
 }
 
+pub(crate) fn no_raft_service() -> OptionalRaftServiceClient {
+    OptionalRaftServiceClient(None)
+}
+
 pub(crate) async fn connect_to_raft_service(
     addr: SocketAddr,
-) -> std::io::Result<impl RemoteRaft<UniqueKVOp>> {
+) -> std::io::Result<OptionalRaftServiceClient> {
     let conn = tarpc::serde_transport::tcp::connect(
         addr,
         tokio_serde::formats::Json::default,
@@ -92,7 +107,7 @@ pub(crate) async fn connect_to_raft_service(
     .await?;
     let client =
         RaftServiceClient::new(tarpc::client::Config::default(), conn).spawn();
-    Ok(client)
+    Ok(OptionalRaftServiceClient(Some(client)))
 }
 
 pub(crate) fn start_raft_service_server(

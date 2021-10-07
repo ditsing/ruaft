@@ -5,7 +5,9 @@ use kvraft::KVServer;
 
 use crate::kv_service::start_kv_service_server;
 use crate::persister::Persister;
-use crate::raft_service::{connect_to_raft_service, start_raft_service_server};
+use crate::raft_service::{
+    connect_to_raft_service, no_raft_service, start_raft_service_server,
+};
 
 pub(crate) async fn run_kv_instance(
     addr: SocketAddr,
@@ -13,8 +15,12 @@ pub(crate) async fn run_kv_instance(
     me: usize,
 ) -> std::io::Result<()> {
     let mut remote_rafts = vec![];
-    for raft_peer in &raft_peers {
-        let remote_raft = connect_to_raft_service(*raft_peer).await?;
+    for (index, raft_peer) in raft_peers.iter().enumerate() {
+        let remote_raft = if index == me {
+            no_raft_service()
+        } else {
+            connect_to_raft_service(*raft_peer).await?
+        };
         remote_rafts.push(remote_raft);
     }
 

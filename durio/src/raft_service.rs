@@ -52,17 +52,36 @@ impl RaftService for RaftRpcServer {
     }
 }
 
-pub(crate) struct OptionalRaftServiceClient(Option<RaftServiceClient>);
+pub(crate) struct LazyRaftServiceClient {
+    socket_addr: SocketAddr,
+    once_cell: tokio::sync::OnceCell<RaftServiceClient>,
+}
+
+impl LazyRaftServiceClient {
+    pub(crate) fn new(socket_addr: SocketAddr) -> Self {
+        Self {
+            socket_addr,
+            once_cell: tokio::sync::OnceCell::new(),
+        }
+    }
+
+    pub(crate) async fn get_or_try_init(
+        &self,
+    ) -> std::io::Result<&RaftServiceClient> {
+        self.once_cell
+            .get_or_try_init(|| connect_to_raft_service(self.socket_addr))
+            .await
+    }
+}
 
 #[async_trait]
-impl RemoteRaft<UniqueKVOp> for OptionalRaftServiceClient {
+impl RemoteRaft<UniqueKVOp> for LazyRaftServiceClient {
     async fn request_vote(
         &self,
         args: RequestVoteArgs,
     ) -> std::io::Result<RequestVoteReply> {
-        self.0
-            .as_ref()
-            .unwrap()
+        self.get_or_try_init()
+            .await?
             .request_vote(Context::current(), args)
             .await
             .map_err(crate::utils::translate_rpc_error)
@@ -72,9 +91,8 @@ impl RemoteRaft<UniqueKVOp> for OptionalRaftServiceClient {
         &self,
         args: AppendEntriesArgs<UniqueKVOp>,
     ) -> std::io::Result<AppendEntriesReply> {
-        self.0
-            .as_ref()
-            .unwrap()
+        self.get_or_try_init()
+            .await?
             .append_entries(Context::current(), args)
             .await
             .map_err(crate::utils::translate_rpc_error)
@@ -84,22 +102,17 @@ impl RemoteRaft<UniqueKVOp> for OptionalRaftServiceClient {
         &self,
         args: InstallSnapshotArgs,
     ) -> std::io::Result<InstallSnapshotReply> {
-        self.0
-            .as_ref()
-            .unwrap()
+        self.get_or_try_init()
+            .await?
             .install_snapshot(Context::current(), args)
             .await
             .map_err(crate::utils::translate_rpc_error)
     }
 }
 
-pub(crate) fn no_raft_service() -> OptionalRaftServiceClient {
-    OptionalRaftServiceClient(None)
-}
-
 pub(crate) async fn connect_to_raft_service(
     addr: SocketAddr,
-) -> std::io::Result<OptionalRaftServiceClient> {
+) -> std::io::Result<RaftServiceClient> {
     let conn = tarpc::serde_transport::tcp::connect(
         addr,
         tokio_serde::formats::Json::default,
@@ -107,7 +120,7 @@ pub(crate) async fn connect_to_raft_service(
     .await?;
     let client =
         RaftServiceClient::new(tarpc::client::Config::default(), conn).spawn();
-    Ok(OptionalRaftServiceClient(Some(client)))
+    Ok(client)
 }
 
 pub(crate) fn start_raft_service_server(

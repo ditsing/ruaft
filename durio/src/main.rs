@@ -22,16 +22,20 @@ struct PutAppendBody {
     value: String,
 }
 
+const IP_ONE: [u8; 4] = [10, 1, 1, 198];
+const IP_TWO: [u8; 4] = [10, 1, 1, 51];
+const IP_THREE: [u8; 4] = [10, 1, 1, 56];
+
 lazy_static! {
     static ref KV_ADDRS: Vec<SocketAddr> = vec![
-        ([127, 0, 0, 1], 9986).into(),
-        ([127, 0, 0, 1], 9987).into(),
-        ([127, 0, 0, 1], 9988).into(),
+        (IP_ONE, 9986).into(),
+        (IP_TWO, 9987).into(),
+        (IP_THREE, 9988).into(),
     ];
     static ref RAFT_ADDRS: Vec<SocketAddr> = vec![
-        ([127, 0, 0, 1], 10006).into(),
-        ([127, 0, 0, 1], 10007).into(),
-        ([127, 0, 0, 1], 10008).into(),
+        (IP_ONE, 10006).into(),
+        (IP_TWO, 10007).into(),
+        (IP_THREE, 10008).into(),
     ];
     static ref WEB_ADDRS: Vec<SocketAddr> = vec![
         ([0, 0, 0, 0], 9006).into(),

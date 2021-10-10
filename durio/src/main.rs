@@ -75,8 +75,11 @@ async fn run_web_server(me: usize) {
         .and(warp::body::json())
         .map(move |body: PutAppendBody| {
             counter_2.fetch_add(1, Ordering::SeqCst);
-            put_clerk.put(body.key, body.value);
-            warp::reply::reply()
+            let code = match put_clerk.put(body.key, body.value) {
+                None => warp::http::StatusCode::SERVICE_UNAVAILABLE,
+                Some(_) => warp::http::StatusCode::OK,
+            };
+            warp::reply::with_status(warp::reply(), code)
         });
     let append_clerk = clerk.clone();
     let append = warp::post()
@@ -84,8 +87,11 @@ async fn run_web_server(me: usize) {
         .and(warp::body::json())
         .map(move |body: PutAppendBody| {
             counter_3.fetch_add(1, Ordering::SeqCst);
-            append_clerk.append(body.key, body.value);
-            warp::reply::reply()
+            let code = match append_clerk.append(body.key, body.value) {
+                None => warp::http::StatusCode::SERVICE_UNAVAILABLE,
+                Some(_) => warp::http::StatusCode::OK,
+            };
+            warp::reply::with_status(warp::reply(), code)
         });
 
     let routes = is_leader.or(get).or(put).or(append);

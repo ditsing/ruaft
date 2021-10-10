@@ -1,4 +1,3 @@
-use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -7,9 +6,11 @@ use lazy_static::lazy_static;
 use serde_derive::{Deserialize, Serialize};
 use warp::Filter;
 
+use crate::one_clerk::create_clerk;
 use crate::run::run_kv_instance;
 
 mod kv_service;
+mod one_clerk;
 mod persister;
 mod raft_service;
 mod run;
@@ -17,6 +18,7 @@ mod utils;
 
 #[derive(Deserialize, Serialize)]
 struct PutAppendBody {
+    key: String,
     value: String,
 }
 
@@ -38,51 +40,55 @@ lazy_static! {
     ];
 }
 
+const NOT_READY: &str = "Clerk is not ready";
+
 async fn run_web_server(me: usize) {
     let kv_server = run_kv_instance(KV_ADDRS[me], RAFT_ADDRS.clone(), me)
         .await
         .expect("Running kv instance should not fail");
-    let is_leader_kv_server = kv_server.clone();
 
-    let try_get = warp::path::param().and_then(move |_: u32| {
-        let kv_server = kv_server.clone();
-        async move {
-            let value = kv_server
-                .get(kvraft::GetArgs {
-                    key: "".to_string(),
-                    op: kvraft::GetEnum::AllowDuplicate,
-                    unique_id: Default::default(),
-                })
-                .await
-                .result
-                .expect("Get should not fail");
-            let result: Result<String, Infallible> =
-                Ok(value.unwrap_or_default());
-            result
-        }
-    });
-    let is_leader = warp::path!("kvstore" / "is_leader")
-        .map(move || format!("{:?}", is_leader_kv_server.raft().get_state()));
+    let is_leader = warp::get()
+        .and(warp::path!("kvstore" / "is_leader"))
+        .map(move || format!("{:?}", kv_server.raft().get_state()));
 
     let counter = Arc::new(AtomicUsize::new(0));
-    let counter_clone = counter.clone();
-    let get = warp::path!("kvstore" / "get" / String).map(move |key| {
-        key + "!" + counter.fetch_add(1, Ordering::SeqCst).to_string().as_str()
-    });
-    let put = warp::post()
-        .and(warp::path!("kvstore" / "put" / String))
-        .and(warp::body::json())
-        .map(move |key, _body: PutAppendBody| {
-            counter_clone.fetch_add(1, Ordering::SeqCst);
-            warp::reply::json(&key)
-        });
-    let append = warp::post()
-        .and(warp::path!("kvstore" / "append" / String))
-        .and(warp::body::json())
-        .map(|key, _body: PutAppendBody| warp::reply::json(&key));
+    let counter_2 = counter.clone();
+    let counter_3 = counter.clone();
+    let clerk = create_clerk(KV_ADDRS.clone());
 
-    let routes =
-        warp::get().and(get.or(put).or(append).or(is_leader).or(try_get));
+    let get_clerk = clerk.clone();
+    let get = warp::get()
+        .and(warp::path!("kvstore" / "get" / String))
+        .map(move |key: String| {
+            let counter = counter.fetch_add(1, Ordering::SeqCst).to_string();
+            match get_clerk.get(key.clone()) {
+                Some(value) => {
+                    key + "!" + counter.as_str() + "!" + value.as_str()
+                }
+                None => NOT_READY.to_string(),
+            }
+        });
+
+    let put_clerk = clerk.clone();
+    let put = warp::post()
+        .and(warp::path!("kvstore" / "put"))
+        .and(warp::body::json())
+        .map(move |body: PutAppendBody| {
+            counter_2.fetch_add(1, Ordering::SeqCst);
+            put_clerk.put(body.key, body.value);
+            warp::reply::reply()
+        });
+    let append_clerk = clerk.clone();
+    let append = warp::post()
+        .and(warp::path!("kvstore" / "append"))
+        .and(warp::body::json())
+        .map(move |body: PutAppendBody| {
+            counter_3.fetch_add(1, Ordering::SeqCst);
+            append_clerk.append(body.key, body.value);
+            warp::reply::reply()
+        });
+
+    let routes = is_leader.or(get).or(put).or(append);
     warp::serve(routes).run(WEB_ADDRS[me]).await;
 }
 

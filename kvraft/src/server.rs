@@ -39,6 +39,7 @@ struct KVServerState {
     kv: HashMap<String, String>,
     debug_kv: HashMap<String, String>,
     applied_op: HashMap<ClerkId, (UniqueId, CommitResult)>,
+    #[allow(clippy::type_complexity)]
     #[serde(skip)]
     queries: HashMap<
         UniqueId,

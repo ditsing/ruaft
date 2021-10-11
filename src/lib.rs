@@ -184,6 +184,7 @@ where
         let thread_env = daemon_env.for_thread();
         let thread_pool = tokio::runtime::Builder::new_multi_thread()
             .enable_time()
+            .enable_io()
             .thread_name(format!("raft-instance-{}", me))
             .worker_threads(peer_size)
             .on_thread_start(move || thread_env.clone().attach())

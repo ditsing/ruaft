@@ -27,7 +27,7 @@ pub struct KVServer {
     logger: LocalLogger,
 }
 
-#[derive(Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct UniqueKVOp {
     op: KVOp,
     me: usize,
@@ -51,7 +51,7 @@ struct KVServerState {
     >,
 }
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 enum KVOp {
     NoOp,
     Get(String),

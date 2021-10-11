@@ -86,4 +86,4 @@ Things would be better after I implement an RPC interface and improve the `persi
 - [x] Add more logging
 - [ ] Benchmarks
 - [ ] Support `Prevote`
-- [ ] Run Ruaft on a Raspberry Pi cluster
+- [x] Run Ruaft on a Raspberry Pi cluster

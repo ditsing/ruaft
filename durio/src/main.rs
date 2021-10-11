@@ -101,8 +101,7 @@ async fn run_web_server(socket_addr: SocketAddr, kv_server: Arc<KVServer>) {
 
 fn main() {
     let me: usize = std::env::args()
-        .skip(1)
-        .next()
+        .nth(1)
         .unwrap_or_default()
         .parse()
         .expect("An index of the current instance must be passed in");

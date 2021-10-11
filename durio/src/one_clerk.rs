@@ -36,7 +36,7 @@ impl OneClerk {
         let mut clients = vec![None; socket_addrs.len()];
         while clients.iter().filter(|e| e.is_none()).count() != 0 {
             for (index, socket_addr) in socket_addrs.iter().enumerate() {
-                let result = connect_to_kv_service(socket_addr.clone()).await;
+                let result = connect_to_kv_service(*socket_addr).await;
                 match result {
                     Ok(client) => clients[index] = Some(client),
                     Err(e) => log::error!(
@@ -93,7 +93,7 @@ impl OneClerk {
                 let _ = result.send(value);
             }
         });
-        return tx;
+        tx
     }
 
     fn request(&self, request: ClerkRequest) -> Option<String> {

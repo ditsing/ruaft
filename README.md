@@ -36,10 +36,10 @@ will be discarded.
 To use Ruaft as a backend, an application would need to provide
 
 1. A set of RPC clients that allows one Raft instance to send RPCs to other Raft instances. RPC
-   clients should implement the [`RemoteRaft`][RemoteRaft] trait.
-2. A `persister` that writes binary blobs to permanent storage. It must implement the [`Persister`][Persister] trait.
-3. An `apply_command` function that accepts commands to the application's internal state. The commands must be applied
-   to the application's internal state in order and sequentially.
+   clients should implement the [`RemoteRaft`][remote_raft] trait.
+2. A `persister` that writes binary blobs to permanent storage. It must implement the [`Persister`][persister] trait.
+3. An `apply_command` function that accepts [commands][apply_command] to the application's internal state. The commands
+   must be applied to the application's internal state in order and sequentially.
 4. Optionally, a `request_snapshot` function that takes snapshots on the application's internal state. Snapshots should
    be delivered to [`Raft::save_snapshot()`][save_snapshot] API.
 
@@ -48,7 +48,7 @@ All the above should be passed to the [Raft constructor][lib]. The constructor r
 about to be mentioned.
 
 For each replica, the application must also run an RPC server that accepts the RPCs defined in
-[`RemoteRaft`][RemoteRaft] (`append_entries()`, `request_vote()` and `install_snapshot()`). RPC requests should be
+[`RemoteRaft`][remote_raft] (`append_entries()`, `request_vote()` and `install_snapshot()`). RPC requests should be
 proxied to the corresponding API of the Raft instance. RPC clients provided by the application must be able to talk to
 all RPC servers run in different replicas.
 
@@ -128,7 +128,8 @@ assuming there is no thread starvation.
 [labrpc]: https://github.com/ditsing/librpc
 [tarpc]: https://github.com/google/tarpc
 [lib]: https://github.com/ditsing/ruaft/blob/master/src/lib.rs
-[RemoteRaft]: https://github.com/ditsing/ruaft/blob/master/src/remote_raft.rs
-[Persister]: https://github.com/ditsing/ruaft/blob/master/src/persister.rs
+[apply_command]: https://github.com/ditsing/ruaft/blob/master/src/apply_command.rs
+[persister]: https://github.com/ditsing/ruaft/blob/master/src/persister.rs
+[remote_raft]: https://github.com/ditsing/ruaft/blob/master/src/remote_raft.rs
 [save_snapshot]: https://github.com/ditsing/ruaft/blob/master/src/snapshot.rs
 [snapshot_tests]: https://github.com/ditsing/ruaft/blob/master/tests/snapshot_tests.rs

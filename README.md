@@ -54,28 +54,6 @@ In sub-crates [durio][durio] and the underlying [kvraft][kvraft], you can find e
 above. [`tarpc`][tarpc] is used to generate the RPC servers and clients. The `persister` does not do anything.
 `apply_command` and `request_snapshot` is provided by [kvraft][kvraft].
 
-## Ruaft Internals
-
-### Graceful shutdown
-
-The `kill()` method provides a clean way to gracefully shut down a Ruaft instance. It notifies all threads and wait for
-all tasks to exit. `kill()` then checks if there are any panics or assertion failures during the lifetime of the Raft
-instance. It panics the main thread if there is any error. If there is no failure, `kill()` is guaranteed to return,
-assuming there is no thread starvation.
-
-### Code Quality
-
-The implementation is thoroughly tested. I copied (and translated) the test sets from an obvious source. To avoid being
-indexed by a search engine, I will not name the source. The testing framework from the same source is also translated
-from the original Go version. The code can be found at the [`labrpc`](https://github.com/ditsing/labrpc) repo.
-
-### KV Server
-
-To test the snapshot functionality, I wrote a key-value store that supports `get()`, `put()` and `append()`. The
-complexity of the key-value store is so high that it has its own set of tests. For Ruaft, integration tests in
-[`tests/snapshot_tests.rs`][snapshot_tests] are all based on the KV server. The KV server is inspired by the equivalent
-Go version.
-
 ## Threading Model
 
 Ruaft uses both threads and async thread pools. There are four 'daemon threads' that runs latency-sensitive tasks:
@@ -112,6 +90,26 @@ network, are run on thread pools. We could send as many packets out as possible,
 responses to arrive. To get even more throughput, tasks sent to the same peer can be grouped together. Optimizations
 like that will be added if proven useful.
 
+## Code Quality
+
+The implementation is thoroughly tested. I copied (and translated) the test sets from an obvious source. To avoid being
+indexed by a search engine, I will not name the source. The testing framework from the same source is also translated
+from the original Go version. The code can be found at the [`labrpc`][labrpc] repo.
+
+### KV Server
+
+To test the snapshot functionality, I wrote a key-value store that supports `get()`, `put()` and `append()`. The
+complexity of the key-value store is so high that it has its own set of tests. For Ruaft, integration tests in
+[`tests/snapshot_tests.rs`][snapshot_tests] are all based on the KV server. The KV server is inspired by the equivalent
+Go version. See the [README][kvraft] for more.
+
+### Graceful shutdown
+
+The `kill()` method provides a clean way to gracefully shut down a Ruaft instance. It notifies all threads and wait for
+all tasks to exit. `kill()` then checks if there are any panics or assertion failures during the lifetime of the Raft
+instance. It panics the main thread if there is any error. If there is no failure, `kill()` is guaranteed to return,
+assuming there is no thread starvation.
+
 ## Next steps
 
 - [x] Split the code into multiple files
@@ -125,6 +123,7 @@ like that will be added if proven useful.
 
 [durio]: https://github.com/ditsing/ruaft/tree/master/durio
 [kvraft]: https://github.com/ditsing/ruaft/tree/master/kvraft
+[labrpc]: https://github.com/ditsing/librpc
 [tarpc]: https://github.com/google/tarpc
 [lib]: https://github.com/ditsing/ruaft/blob/master/src/lib.rs
 [RemoteRaft]: https://github.com/ditsing/ruaft/blob/master/src/remote_raft.rs

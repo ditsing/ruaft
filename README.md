@@ -13,7 +13,7 @@ application. Replicas of the same application agree on the log entries, and thus
 
 ## Proof of Concept
 
-[`durio`][durio] is a web-facing distributed key-value store. It is built
+[durio][durio] is a web-facing distributed key-value store. It is built
 on top of Ruaft as a showcase application. It provides a set of JSON APIs to read and write key-value pairs
 consistently across replicas.
 
@@ -53,7 +53,7 @@ proxied to the corresponding API of the Raft instance. RPC clients provided by t
 all RPC servers run in different replicas.
 
 In sub-crates [durio][durio] and the underlying [kvraft][kvraft], you can find examples of all the elements mentioned
-above. [`tarpc`][tarpc] is used to generate the RPC servers and clients. The `persister` does not do anything.
+above. [tarpc][tarpc] is used to generate the RPC servers and clients. The `persister` does not do anything.
 `apply_command` and `request_snapshot` is provided by [kvraft][kvraft].
 
 ## Threading Model
@@ -96,7 +96,7 @@ like that will be added if proven useful.
 
 The implementation is thoroughly tested. I copied (and translated) the test sets from an obvious source. To avoid being
 indexed by a search engine, I will not name the source. The testing framework from the same source is also translated
-from the original Go version. The code can be found at the [`labrpc`][labrpc] repo.
+from the original Go version. The code can be found at the [labrpc][labrpc] repo.
 
 ### KV Server
 

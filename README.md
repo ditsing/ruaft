@@ -44,11 +44,13 @@ To use Ruaft as a backend, an application would need to provide
    be delivered to [`Raft::save_snapshot()`][save_snapshot] API.
 
 All the above should be passed to the [Raft constructor][lib]. The constructor returns a Raft instance that is `Send`,
-`Sync` and implements `Clone`. The Raft instance can be used by the application, as well as the RPC server in the next
-item.
+`Sync` and implements `Clone`. The Raft instance can be used by the application, as well as in the RPC server that is
+about to be mentioned.
 
-5. An RPC server that accepts the RPCs defined in [`RemoteRaft`][RemoteRaft] (`append_entries()`, `request_vote()` and
-   `install_snapshot()`). The RPC requests should be proxied to the corresponding API of the Raft instance.
+For each replica, the application must also run an RPC server that accepts the RPCs defined in
+[`RemoteRaft`][RemoteRaft] (`append_entries()`, `request_vote()` and `install_snapshot()`). RPC requests should be
+proxied to the corresponding API of the Raft instance. RPC clients provided by the application must be able to talk to
+all RPC servers run in different replicas.
 
 In sub-crates [durio][durio] and the underlying [kvraft][kvraft], you can find examples of all the elements mentioned
 above. [`tarpc`][tarpc] is used to generate the RPC servers and clients. The `persister` does not do anything.

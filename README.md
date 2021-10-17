@@ -20,7 +20,7 @@ consistently across replicas.
 
 I have a 3-replica durio service running on Raspberry Pis. See the [README][durio] for more details.
 
-## Raft APIs
+## Application Interafce
 
 Each application replica has a Raft instance that runs side by side with it. To add a log entry to the Raft log, the
 application calls `start()` with the data it wants to store (commonly referred to as a "command"). The log entry is not
@@ -32,7 +32,7 @@ log (and other data) to a permanent storage via a `persister`. The log can grow 
 Raft periodically asks the application to take a snapshot of its internal state. Log entries contained in the snapshot
 will be discarded.
 
-## Building on top of Ruaft
+### Building on top
 
 To use Ruaft as a backend, an application would need to provide
 
@@ -99,7 +99,7 @@ The implementation is thoroughly tested. I copied (and translated) the test sets
 indexed by a search engine, I will not name the source. The testing framework from the same source is also translated
 from the original Go version. The code can be found at the [labrpc][labrpc] repo.
 
-### KV Server
+### KV server
 
 To test the snapshot functionality, I wrote a key-value store that supports `get()`, `put()` and `append()`. The
 complexity of the key-value store is so high that it has its own set of tests. For Ruaft, integration tests in

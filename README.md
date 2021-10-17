@@ -1,6 +1,7 @@
 # Ruaft: Raft implemented in Rust
 
-Ruaft is a Rust version of [the Raft consensus protocol](https://raft.github.io/).
+Ruaft is a Rust version of [the Raft consensus protocol](https://raft.github.io/). Carefully designed, thoroughly
+tested, not yet verified in production.
 
 ## Raft
 

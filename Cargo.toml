@@ -3,7 +3,7 @@ name = "ruaft"
 version = "0.1.0"
 description = "Raft implemented in Rust"
 authors = ["Jing Yang <ditsing@gmail.com>"]
-edition = "2018"
+edition = "2021"
 license = "MIT"
 keywords = ["raft", "consensus-protocol"]
 readme = "README.md"
@@ -24,7 +24,7 @@ parking_lot = "0.11.1"
 rand = "0.8"
 serde = "1.0.116"
 serde_derive = "1.0.116"
-tokio = { version = "1.7", features = ["rt-multi-thread", "time", "parking_lot"] }
+tokio = { version = "1.7", features = ["net", "rt-multi-thread", "time", "parking_lot"] }
 test_utils = { path = "test_utils", optional = true }
 
 [features]

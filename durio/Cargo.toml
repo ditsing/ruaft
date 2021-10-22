@@ -2,7 +2,7 @@
 name = "durio"
 version = "0.1.0"
 authors = ["Jing Yang <ditsing@gmail.com>"]
-edition = "2018"
+edition = "2021"
 description = "KV store backed by Ruaft, targeting Raspberry Pis."
 documentation = ""
 readme = "README.md"

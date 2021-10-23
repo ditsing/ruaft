@@ -78,6 +78,7 @@ where
                     // Note that between those two nested `if`s, log start is
                     // always smaller than or equal to commit index, as
                     // guaranteed by the SNAPSHOT_INDEX_INVARIANT.
+                    assert!(rf.log.start() <= rf.commit_index);
                     if rf.last_applied < rf.log.start() {
                         let (index_term, data) = rf.log.snapshot();
                         let messages =

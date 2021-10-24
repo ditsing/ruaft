@@ -162,7 +162,12 @@ impl<C: 'static + Clone + Default + Send + serde::Serialize> Raft<C> {
                         request_snapshot(log_start.index + 1);
                         snapshot_daemon.current_snapshot.1.wait(&mut snapshot);
                     }
-                    snapshot.clone()
+                    let mut taken_snapshot = Snapshot {
+                        last_included_index: snapshot.last_included_index,
+                        data: vec![],
+                    };
+                    std::mem::swap(&mut taken_snapshot, &mut snapshot);
+                    taken_snapshot
                 };
 
                 let mut rf = rf.lock();

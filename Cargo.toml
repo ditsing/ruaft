@@ -20,10 +20,10 @@ crossbeam-utils = "0.8"
 futures-channel = "0.3.15"
 futures-util = "0.3.15"
 log = "0.4"
-parking_lot = "0.11.1"
+parking_lot = "0.11"
 rand = "0.8"
-serde = "1.0.116"
-serde_derive = "1.0.116"
+serde = "1.0"
+serde_derive = "1.0"
 tokio = { version = "1.7", features = ["net", "rt-multi-thread", "time", "parking_lot"] }
 test_utils = { path = "test_utils", optional = true }
 

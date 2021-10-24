@@ -13,10 +13,10 @@ kvraft = { path = "../kvraft" }
 labrpc = "0.2.1"
 linearizability = { path = "../linearizability" }
 log = "0.4"
-parking_lot = "0.11.1"
+parking_lot = "0.11"
 rand = "0.8"
 ruaft = { path = "..", features = ["integration-test"] }
-serde = "1.0.116"
+serde = "1.0"
 test_utils = { path = "../test_utils" }
 
 [dev-dependencies]

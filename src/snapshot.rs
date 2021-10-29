@@ -34,6 +34,10 @@ impl SnapshotDaemon {
         // The new snapshot can have a last_included_index that is smaller than
         // the current snapshot, if this instance is a follower and the leader
         // has installed a new snapshot on it.
+        // Note some stale snapshots might still fall through the crack, if the
+        // current snapshot has been taken by the snapshot daemon thread,
+        // leaving a default value in curr. In that scenario,
+        // last_included_index is zero, and any snapshots are allowed.
         if curr.last_included_index < snapshot.last_included_index {
             *curr = snapshot;
         }
@@ -162,12 +166,11 @@ impl<C: 'static + Clone + Default + Send + serde::Serialize> Raft<C> {
                         request_snapshot(log_start.index + 1);
                         snapshot_daemon.current_snapshot.1.wait(&mut snapshot);
                     }
-                    let mut taken_snapshot = Snapshot {
-                        last_included_index: snapshot.last_included_index,
-                        data: vec![],
-                    };
-                    std::mem::swap(&mut taken_snapshot, &mut snapshot);
-                    taken_snapshot
+                    // Take the snapshot and set the index to zero in its place.
+                    // This defeats the stale snapshot protection implemented in
+                    // `save_snapshot()`. Stale snapshots are tolerated below.
+                    use std::ops::DerefMut;
+                    std::mem::take(snapshot.deref_mut())
                 };
 
                 let mut rf = rf.lock();

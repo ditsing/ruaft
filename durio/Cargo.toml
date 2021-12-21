@@ -14,9 +14,9 @@ categories = ["raft"]
 
 [dependencies]
 async-trait = "0.1"
-bytes = "1.0"
+bytes = "1.1"
 crossbeam-channel = "0.5.1"
-futures-util = "0.3.15"
+futures-util = "0.3.19"
 kvraft = { path = "../kvraft" }
 lazy_static = "1.4.0"
 log = "0.4"

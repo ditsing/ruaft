@@ -62,7 +62,7 @@ impl<C> LogArray<C> {
     }
 
     /// The end index of the Raft log.
-    pub fn end(&self) -> usize {
+    pub fn end(&self) -> Index {
         self.start() + self.inner.len()
     }
 
@@ -263,7 +263,7 @@ impl<C> LogArray<C> {
     fn check_range_index(&self, index: Index) -> usize {
         assert!(
             index >= self.start() && index <= self.end(),
-            "Accessing end log index {} out of range ({}, {}]",
+            "Accessing end log index {} out of range [{}, {}]",
             index,
             self.start(),
             self.end()

@@ -142,6 +142,7 @@ struct Laps {
     partition_stopped: Duration,
     client_spawn: Duration,
     client_waits: Duration,
+    total_ops: usize,
 }
 
 #[derive(Default)]
@@ -246,6 +247,7 @@ pub fn generic_test(test_params: GenericTestParams) {
             .join()
             .expect("Spawning clients should never fail.");
         let client_spawn = start.elapsed();
+        let mut total_ops = 0;
         for (index, client_result) in client_results.into_iter().enumerate() {
             let (op_count, last_result) =
                 client_result.join().expect("Client should never fail");
@@ -263,6 +265,7 @@ pub fn generic_test(test_params: GenericTestParams) {
                 op_count,
                 min_ops
             );
+            total_ops += op_count;
         }
         let client_waits = start.elapsed();
         laps.push(Laps {
@@ -273,6 +276,7 @@ pub fn generic_test(test_params: GenericTestParams) {
             partition_stopped,
             client_spawn,
             client_waits,
+            total_ops,
         });
     }
 

@@ -140,12 +140,16 @@ fn one_partition() -> Result {
     cfg.begin("Test: no progress in minority (3A)");
     let counter = Arc::new(AtomicUsize::new(0));
     let counter1 = counter.clone();
+    let logger = LocalLogger::inherit();
     std::thread::spawn(move || {
+        logger.attach();
         clerk_minority1.put(KEY, "15");
         counter1.fetch_or(1, Ordering::SeqCst);
     });
     let counter2 = counter.clone();
+    let logger = LocalLogger::inherit();
     std::thread::spawn(move || {
+        logger.attach();
         clerk_minority2.get(KEY);
         counter2.fetch_or(2, Ordering::SeqCst);
     });

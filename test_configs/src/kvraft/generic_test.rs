@@ -133,6 +133,7 @@ fn run_partition(cfg: Arc<Config>, stop: Arc<AtomicBool>) {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 struct Laps {
     clients_started: Duration,

@@ -49,6 +49,7 @@ struct DaemonEnvData {
     daemons: Vec<(Daemon, std::thread::JoinHandle<()>)>,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub(crate) struct Error {
     error_kind: ErrorKind,
@@ -57,6 +58,7 @@ pub(crate) struct Error {
     file_line: &'static str,
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 pub(crate) enum ErrorKind {
     /// The leader sent log entries that do not match a committed log entry.
@@ -185,6 +187,7 @@ impl DaemonEnv {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug)]
 struct StrippedRaftState {
     current_term: Term,

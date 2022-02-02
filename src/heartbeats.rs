@@ -78,6 +78,12 @@ where
 
     const HEARTBEAT_RETRY: usize = 1;
     async fn send_heartbeat(
+        // Here rpc_client must be owned by the returned future. The returned
+        // future is scheduled to run on a thread pool. We do not control when
+        // the future will be run, or when it will be done with the RPC client.
+        // If a reference is passed in, the reference essentially has to be a
+        // static one, i.e. lives forever. Thus we chose to let the future own
+        // the RPC client.
         rpc_client: impl RemoteRaft<Command>,
         args: AppendEntriesArgs<Command>,
         term_watermark: TermMarker<Command>,

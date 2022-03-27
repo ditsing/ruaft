@@ -15,12 +15,12 @@ categories = ["raft"]
 [dependencies]
 async-trait = "0.1"
 bytes = "1.1"
-crossbeam-channel = "0.5.1"
-futures-util = "0.3.19"
+crossbeam-channel = "0.5.4"
+futures-util = "0.3.21"
 kvraft = { path = "../kvraft" }
 lazy_static = "1.4.0"
 log = "0.4"
-parking_lot = "0.11"
+parking_lot = "0.12"
 ruaft = { path = "..", features = ["integration-test"] }
 serde = "1.0"
 serde_derive = "1.0"

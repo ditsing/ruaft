@@ -238,8 +238,7 @@ impl<C> LogArray<C> {
     }
 
     fn last_entry(&self) -> &LogEntry<C> {
-        &self
-            .inner
+        self.inner
             .last()
             .expect("There must be at least one entry in log")
     }

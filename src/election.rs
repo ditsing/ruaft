@@ -129,9 +129,10 @@ where
 
             let mut should_run = None;
             while this.keep_running.load(Ordering::SeqCst) {
-                let mut cancel_handle = should_run
-                    .map(|last_timer_count| this.run_election(last_timer_count))
-                    .flatten();
+                let mut cancel_handle =
+                    should_run.and_then(|last_timer_count| {
+                        this.run_election(last_timer_count)
+                    });
 
                 let mut guard = election.timer.lock();
                 let (timer_count, deadline) = *guard;
@@ -147,10 +148,11 @@ where
                 // by the election, and then reset by someone else, in that
                 // order. We should cancel the election and just wait.
                 if let Some(last_timer_count) = should_run {
-                    assert!(timer_count >= last_timer_count + 1);
+                    let expected_timer_count = last_timer_count + 1;
+                    assert!(timer_count >= expected_timer_count);
                     // If the timer was changed more than once, we know the
                     // last scheduled election should have been cancelled.
-                    if timer_count > last_timer_count + 1 {
+                    if timer_count > expected_timer_count {
                         cancel_handle.take().map(|c| c.send(()));
                     }
                 }

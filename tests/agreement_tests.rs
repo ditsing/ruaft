@@ -237,7 +237,7 @@ fn count() -> config::Result<()> {
     cfg.check_one_leader()?;
     let total = cfg.total_rpcs();
     assert!(
-        (1..=30).contains(&total),
+        (1..=10).contains(&total),
         "too many or few RPCs ({}) to elect initial leader",
         total
     );
@@ -310,7 +310,7 @@ fn count() -> config::Result<()> {
         }
 
         let diff = cfg.total_rpcs() - start_total;
-        if diff > (ITERS + 1 + 3) * 3 {
+        if diff > ITERS + 1 + 3 {
             panic!("too many RPCs ({}) for {} entries", diff, ITERS);
         }
 
@@ -323,7 +323,7 @@ fn count() -> config::Result<()> {
 
     let diff = cfg.total_rpcs() - total;
     assert!(
-        diff < 3 * 20,
+        diff < 20,
         "too many RPCs ({}) for 1 second of idleness",
         diff
     );

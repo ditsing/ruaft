@@ -113,7 +113,6 @@ fn snapshot_recover_many_clients() {
         clients: 20,
         crash: true,
         maxraftstate: Some(1000),
-        min_ops: Some(0),
         ..Default::default()
     })
 }
@@ -154,6 +153,7 @@ fn snapshot_unreliable_recover_partition() {
         ..Default::default()
     })
 }
+
 #[test]
 fn linearizability() {
     init_test_log!();

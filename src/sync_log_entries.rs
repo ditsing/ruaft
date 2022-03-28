@@ -397,16 +397,26 @@ where
         // than start(). Otherwise we won't be able to know the log term of the
         // entry right before next_index.
         if rf.next_index[peer_index] > rf.log.start() {
-            log::debug!(
-                "{:?} building append entries {:?} from {} to {:?}",
-                rf.leader_id,
-                task_number,
-                rf.next_index[peer_index] - 1,
-                Peer(peer_index)
-            );
-            SyncLogEntriesOperation::AppendEntries(Self::build_append_entries(
-                &rf, peer_index,
-            ))
+            if rf.next_index[peer_index] < rf.log.end() {
+                log::debug!(
+                    "{:?} building append entries {:?} from {} to {:?}",
+                    rf.leader_id,
+                    task_number,
+                    rf.next_index[peer_index] - 1,
+                    Peer(peer_index)
+                );
+                SyncLogEntriesOperation::AppendEntries(
+                    Self::build_append_entries(&rf, peer_index),
+                )
+            } else {
+                log::debug!(
+                    "{:?} nothing in append entries {:?} to {:?}",
+                    rf.leader_id,
+                    task_number,
+                    Peer(peer_index)
+                );
+                SyncLogEntriesOperation::None
+            }
         } else {
             log::debug!(
                 "{:?} installing snapshot {:?} at {} to {:?}",

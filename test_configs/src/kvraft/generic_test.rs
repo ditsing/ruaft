@@ -48,8 +48,8 @@ fn appending_client(
     clerk.put(&key, &last);
 
     while !stop.load(Ordering::Acquire) {
-        log::debug!("client {} starting {}.", index, op_count);
         if rng.gen_ratio(1, 2) {
+            log::debug!("client {} appending {}.", index, op_count);
             let value = format!("({}, {}), ", index, op_count);
 
             last.push_str(&value);
@@ -57,6 +57,7 @@ fn appending_client(
 
             op_count += 1;
         } else {
+            log::debug!("client {} getting {}.", index, op_count);
             let value = clerk
                 .get(&key)
                 .unwrap_or_else(|| panic!("Key {} should exist.", index));

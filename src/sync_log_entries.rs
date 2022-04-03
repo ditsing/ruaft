@@ -294,7 +294,7 @@ where
                 // Next index moves towards the log end. This is the only place
                 // where that happens. committed.index should be between log
                 // start and end, guaranteed by check_committed() above.
-                rf.next_index[peer_index] = committed.index;
+                rf.next_index[peer_index] = committed.index + 1;
 
                 // Ignore the error. The log syncing thread must have died.
                 let _ = rerun.send(Some(Peer(peer_index)));

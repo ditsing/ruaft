@@ -370,6 +370,8 @@ where
             // Reset the verify authority daemon before sending heartbeats to
             // followers. This is critical to the correctness of verifying
             // authority.
+            // No verity authority request can go through before the reset is
+            // done, since we are holding the raft lock.
             verify_authority_daemon.reset_state(term);
 
             // Sync all logs now.

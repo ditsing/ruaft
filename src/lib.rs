@@ -19,8 +19,10 @@ pub(crate) use crate::raft_state::State;
 pub use crate::remote_raft::RemoteRaft;
 pub use crate::snapshot::Snapshot;
 use crate::snapshot::{RequestSnapshotFnMut, SnapshotDaemon};
+use crate::verify_authority::VerifyAuthorityDaemon;
 
 mod apply_command;
+mod beat_ticker;
 mod daemon_env;
 mod election;
 mod heartbeats;
@@ -36,6 +38,7 @@ mod snapshot;
 mod sync_log_entries;
 mod term_marker;
 pub mod utils;
+mod verify_authority;
 
 #[derive(
     Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize,
@@ -67,6 +70,7 @@ pub struct Raft<Command> {
     keep_running: Arc<AtomicBool>,
     election: Arc<ElectionState>,
     snapshot_daemon: SnapshotDaemon,
+    verify_authority_daemon: VerifyAuthorityDaemon,
 
     thread_pool: Arc<tokio::runtime::Runtime>,
 
@@ -206,12 +210,15 @@ where
             keep_running: Arc::new(Default::default()),
             election: Arc::new(election),
             snapshot_daemon: Default::default(),
+            verify_authority_daemon: VerifyAuthorityDaemon::create(peer_size),
             thread_pool: Arc::new(thread_pool),
             daemon_env,
             stop_wait_group: WaitGroup::new(),
         };
 
         this.keep_running.store(true, Ordering::SeqCst);
+        // Running in a standalone thread.
+        this.run_verify_authority_daemon();
         // Running in a standalone thread.
         this.run_snapshot_daemon(max_state_size_bytes, request_snapshot);
         // Running in a standalone thread.
@@ -269,6 +276,7 @@ where
         self.new_log_entry.take().map(|n| n.send(None));
         self.apply_command_signal.notify_all();
         self.snapshot_daemon.kill();
+        self.verify_authority_daemon.kill();
         // We cannot easily combine stop_wait_group into DaemonEnv because of
         // shutdown dependencies. The thread pool is not managed by DaemonEnv,
         // but it cannot be shutdown until all daemons are. On the other hand

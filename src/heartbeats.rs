@@ -116,9 +116,10 @@ where
                 rpc_client.append_entries(args.clone())
             })
             .await?;
-        term_watermark.mark(response.term);
         if term == response.term {
             beat_ticker.tick(beat);
+        } else {
+            term_watermark.mark(response.term);
         }
         Ok(())
     }

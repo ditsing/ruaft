@@ -152,6 +152,7 @@ impl VerifyAuthorityDaemon {
         &self,
         current_term: Term,
         commit_index: Index,
+        sentinel_commit_index: Index,
     ) {
         // Opportunistic check: do nothing if we don't have any requests.
         if self.state.lock().queue.is_empty() {
@@ -159,7 +160,14 @@ impl VerifyAuthorityDaemon {
         }
 
         self.clear_committed_requests(current_term, commit_index);
-        self.clear_ticked_requests();
+        // Do not use ticks to clear requests if we have not committed at least
+        // one log entry since the start of the term. At the start of the term,
+        // the leader might not know the commit index of the previous leader.
+        // This holds true even it is guaranteed that all entries committed by
+        // the previous leader will be committed by the current leader.
+        if commit_index >= sentinel_commit_index {
+            self.clear_ticked_requests();
+        }
         self.removed_expired_requests(current_term);
     }
 
@@ -296,12 +304,15 @@ impl<Command: 'static + Send> Raft<Command> {
         let join_handle = std::thread::spawn(move || {
             while keep_running.load(Ordering::Acquire) {
                 parker.park_timeout(Self::BEAT_RECORDING_MAX_PAUSE);
-                let (current_term, commit_index) = {
+                let (current_term, commit_index, sentinel) = {
                     let rf = rf.lock();
-                    (rf.current_term, rf.commit_index)
+                    (rf.current_term, rf.commit_index, rf.sentinel_commit_index)
                 };
-                this_daemon
-                    .run_verify_authority_iteration(current_term, commit_index);
+                this_daemon.run_verify_authority_iteration(
+                    current_term,
+                    commit_index,
+                    sentinel,
+                );
             }
         });
         self.daemon_env

@@ -21,6 +21,7 @@ pub use crate::remote_raft::RemoteRaft;
 pub use crate::snapshot::Snapshot;
 use crate::snapshot::{RequestSnapshotFnMut, SnapshotDaemon};
 use crate::verify_authority::VerifyAuthorityDaemon;
+pub use crate::verify_authority::VerifyAuthorityResult;
 
 mod apply_command;
 mod beat_ticker;

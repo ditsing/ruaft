@@ -12,7 +12,7 @@ use std::time::{Duration, Instant};
 /// The result returned to a verify authority request.
 /// This request is not directly exposed to end users. Instead it is used
 /// internally to implement no-commit read-only requests.
-pub(crate) enum VerifyAuthorityResult {
+pub enum VerifyAuthorityResult {
     Success(Index),
     TermElapsed,
     TimedOut,
@@ -337,10 +337,9 @@ impl<Command: 'static + Send> Raft<Command> {
     /// The application is also free to include any subsequent commits in the
     /// response. Consistency is still guaranteed, because Raft never rolls back
     /// committed commands.
-    #[allow(dead_code)]
-    pub(crate) fn verify_authority_async(
+    pub fn verify_authority_async(
         &self,
-    ) -> Option<impl Future<Output = VerifyAuthorityResult>> {
+    ) -> Option<impl Future<Output = crate::VerifyAuthorityResult>> {
         let (term, commit_index) = {
             let rf = self.inner_state.lock();
             if !rf.is_leader() {

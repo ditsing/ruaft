@@ -3,6 +3,7 @@ use std::time::Duration;
 
 use parking_lot::Mutex;
 
+use crate::beat_ticker::SharedBeatTicker;
 use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, RPC_DEADLINE};
 use crate::{AppendEntriesArgs, Raft, RaftState, RemoteRaft};
@@ -34,6 +35,9 @@ where
                 let rf = self.inner_state.clone();
                 // A function that updates term with responses to heartbeats.
                 let term_marker = self.term_marker();
+                // A function that casts an "authoritative" vote with Ok()
+                // responses to heartbeats.
+                let beat_ticker = self.beat_ticker(peer_index);
                 // RPC client must be cloned into the outer async function.
                 let rpc_client = rpc_client.clone();
                 // Shutdown signal.
@@ -47,6 +51,7 @@ where
                                 rpc_client.clone(),
                                 args,
                                 term_marker.clone(),
+                                beat_ticker.clone(),
                             ));
                         }
                     }
@@ -87,7 +92,10 @@ where
         rpc_client: impl RemoteRaft<Command>,
         args: AppendEntriesArgs<Command>,
         term_watermark: TermMarker<Command>,
+        beat_ticker: SharedBeatTicker,
     ) -> std::io::Result<()> {
+        let term = args.term;
+        let beat = beat_ticker.next_beat();
         // Passing a reference that is moved to the following closure.
         //
         // It won't work if the rpc_client of type Arc is moved into the closure
@@ -109,6 +117,9 @@ where
             })
             .await?;
         term_watermark.mark(response.term);
+        if term == response.term {
+            beat_ticker.tick(beat);
+        }
         Ok(())
     }
 }

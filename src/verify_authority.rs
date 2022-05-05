@@ -281,6 +281,10 @@ impl VerifyAuthorityDaemon {
         }
     }
 
+    pub fn beat_ticker(&self, peer_index: usize) -> SharedBeatTicker {
+        self.beat_tickers[peer_index].clone()
+    }
+
     pub fn kill(&self) {
         if let Some(unparker) = self.unparker.as_ref() {
             unparker.unpark();
@@ -353,5 +357,9 @@ impl<Command: 'static + Send> Raft<Command> {
                 .await
                 .expect("Verify authority daemon never drops senders")
         })
+    }
+
+    pub(crate) fn beat_ticker(&self, peer_index: usize) -> SharedBeatTicker {
+        self.verify_authority_daemon.beat_ticker(peer_index)
     }
 }

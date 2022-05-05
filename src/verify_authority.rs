@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 /// This request is not directly exposed to end users. Instead it is used
 /// internally to implement no-commit read-only requests.
 pub(crate) enum VerifyAuthorityResult {
-    Success,
+    Success(Index),
     TermElapsed,
     TimedOut,
 }
@@ -113,9 +113,9 @@ impl VerifyAuthorityDaemon {
     ) -> Option<tokio::sync::oneshot::Receiver<VerifyAuthorityResult>> {
         // The inflight beats are sent at least for `current_term`. This is
         // guaranteed by the fact that we immediately increase beats for all
-        // peers after being elected. It further guarantees that the newest
-        // beats we get here are at least as new as the phantom beats created by
-        // `Self::reset_state()`.
+        // peers after being elected, before releasing the "elected" message to
+        // the rest of the Raft system. The newest beats we get here are at
+        // least as new as the phantom beats created by `Self::reset_state()`.
         let beats_moment = self
             .beat_tickers
             .iter()
@@ -188,7 +188,9 @@ impl VerifyAuthorityDaemon {
                 state.queue.push_front(head);
                 break;
             }
-            let _ = head.sender.send(VerifyAuthorityResult::Success);
+            let _ = head
+                .sender
+                .send(VerifyAuthorityResult::Success(head.commit_index));
             state.start.0 += 1;
         }
     }
@@ -223,7 +225,9 @@ impl VerifyAuthorityDaemon {
                 for (index, beat) in token.beats_moment.iter().enumerate() {
                     assert!(self.beat_tickers[index].ticked() >= *beat);
                 }
-                let _ = token.sender.send(VerifyAuthorityResult::Success);
+                let _ = token
+                    .sender
+                    .send(VerifyAuthorityResult::Success(token.commit_index));
             }
             // Move the queue starting point.
             state.start = new_start;
@@ -306,6 +310,18 @@ impl<Command: 'static + Send> Raft<Command> {
 
     /// Create a verify authority request. Returns None if we are not the
     /// leader.
+    ///
+    /// A successful verification allows the application to respond to read-only
+    /// requests that arrived before this function is called. The answer must
+    /// include all commands at or before a certain index, which is returned to
+    /// the application with the successful verification result. The index is
+    /// in fact the commit index at the moment this function was called. It is
+    /// guaranteed that no other commands could possibly have been committed at
+    /// the moment this function was called.
+    ///
+    /// The application is also free to include any subsequent commits in the
+    /// response. Consistency is still guaranteed, because Raft never rolls back
+    /// committed commands.
     #[allow(dead_code)]
     pub(crate) fn verify_authority_async(
         &self,

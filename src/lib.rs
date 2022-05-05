@@ -11,6 +11,7 @@ use crate::apply_command::ApplyCommandFnMut;
 pub use crate::apply_command::ApplyCommandMessage;
 use crate::daemon_env::{DaemonEnv, ThreadEnv};
 use crate::election::ElectionState;
+use crate::heartbeats::HeartbeatsDaemon;
 use crate::index_term::IndexTerm;
 use crate::persister::PersistedRaftState;
 pub use crate::persister::Persister;
@@ -71,6 +72,7 @@ pub struct Raft<Command> {
     election: Arc<ElectionState>,
     snapshot_daemon: SnapshotDaemon,
     verify_authority_daemon: VerifyAuthorityDaemon,
+    heartbeats_daemon: HeartbeatsDaemon,
 
     thread_pool: Arc<tokio::runtime::Runtime>,
 
@@ -211,6 +213,7 @@ where
             election: Arc::new(election),
             snapshot_daemon: Default::default(),
             verify_authority_daemon: VerifyAuthorityDaemon::create(peer_size),
+            heartbeats_daemon: HeartbeatsDaemon::create(),
             thread_pool: Arc::new(thread_pool),
             daemon_env,
             stop_wait_group: WaitGroup::new(),

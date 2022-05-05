@@ -352,6 +352,7 @@ impl<Command: 'static + Send> Raft<Command> {
         let receiver = self
             .verify_authority_daemon
             .verify_authority_async(term, commit_index);
+        self.heartbeats_daemon.trigger();
         receiver.map(|receiver| async move {
             receiver
                 .await

@@ -8,6 +8,22 @@ use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, RPC_DEADLINE};
 use crate::{AppendEntriesArgs, Raft, RaftState, RemoteRaft};
 
+#[derive(Clone)]
+pub(crate) struct HeartbeatsDaemon {
+    sender: tokio::sync::broadcast::Sender<()>,
+}
+
+impl HeartbeatsDaemon {
+    pub fn create() -> Self {
+        let (sender, _) = tokio::sync::broadcast::channel(1);
+        Self { sender }
+    }
+
+    pub fn trigger(&self) {
+        let _ = self.sender.send(());
+    }
+}
+
 // Command must be
 // 0. 'static: Raft<Command> must be 'static, it is moved to another thread.
 // 1. clone: they are copied to the persister.
@@ -38,6 +54,8 @@ where
                 // A function that casts an "authoritative" vote with Ok()
                 // responses to heartbeats.
                 let beat_ticker = self.beat_ticker(peer_index);
+                // A on-demand trigger to sending a heartbeat.
+                let mut trigger = self.heartbeats_daemon.sender.subscribe();
                 // RPC client must be cloned into the outer async function.
                 let rpc_client = rpc_client.clone();
                 // Shutdown signal.
@@ -45,7 +63,11 @@ where
                 self.thread_pool.spawn(async move {
                     let mut interval = tokio::time::interval(interval);
                     while keep_running.load(Ordering::SeqCst) {
-                        interval.tick().await;
+                        let tick = interval.tick();
+                        let trigger = trigger.recv();
+                        futures_util::pin_mut!(tick, trigger);
+                        let _ =
+                            futures_util::future::select(tick, trigger).await;
                         if let Some(args) = Self::build_heartbeat(&rf) {
                             tokio::spawn(Self::send_heartbeat(
                                 rpc_client.clone(),

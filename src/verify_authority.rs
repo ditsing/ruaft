@@ -196,9 +196,19 @@ impl VerifyAuthorityDaemon {
                 state.queue.push_front(head);
                 break;
             }
+            // At the start of the term, the previous leader might have exposed
+            // all entries before the sentinel commit to clients. If a request
+            // arrived before the sentinel commit is committed, its commit index
+            // (token.commit_index) might be inaccurate. Thus we cannot allow
+            // the client to return any state before the sentinel index.
+            //
+            // We did not choose the sentinel index but opted for a more strict
+            // commit index, because the index is committed anyway. It should be
+            // delivered to the application really quickly. We paid the price
+            // with latency but made the request more fresh.
             let _ = head
                 .sender
-                .send(VerifyAuthorityResult::Success(head.commit_index));
+                .send(VerifyAuthorityResult::Success(commit_index));
             state.start.0 += 1;
         }
     }

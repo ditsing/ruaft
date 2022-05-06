@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 /// The result returned to a verify authority request.
 /// This request is not directly exposed to end users. Instead it is used
 /// internally to implement no-commit read-only requests.
+#[derive(Debug)]
 pub enum VerifyAuthorityResult {
     Success(Index),
     TermElapsed,
@@ -20,6 +21,7 @@ pub enum VerifyAuthorityResult {
 
 /// Token stored in the internal queue for authority verification. Each token
 /// represents one verification request.
+#[derive(Debug)]
 struct VerifyAuthorityToken {
     commit_index: Index,
     beats_moment: Vec<Beat>,
@@ -27,7 +29,7 @@ struct VerifyAuthorityToken {
     sender: tokio::sync::oneshot::Sender<VerifyAuthorityResult>,
 }
 
-#[derive(Clone, Copy, Default, Eq, Ord, PartialOrd, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialOrd, PartialEq)]
 struct QueueIndex(usize);
 
 /// The state of this daemon, should bee protected by a mutex.

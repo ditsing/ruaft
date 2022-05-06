@@ -229,8 +229,9 @@ impl VerifyAuthorityDaemon {
             let first_not_ticked_index = state.queue.partition_point(|token| {
                 token.beats_moment[peer_index] <= ticked
             });
-            assert!(first_not_ticked_index >= state.covered[peer_index].0);
-            state.covered[peer_index].0 = first_not_ticked_index;
+            let new_covered = first_not_ticked_index + state.start.0;
+            assert!(new_covered >= state.covered[peer_index].0);
+            state.covered[peer_index].0 = new_covered;
 
             // Count the requests that has more than N / 2 votes. We always have
             // the vote from ourselves, but the value is 0 in `covered` array.

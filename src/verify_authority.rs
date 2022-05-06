@@ -111,6 +111,7 @@ impl VerifyAuthorityDaemon {
         current_term: Term,
         commit_index: Index,
     ) -> Option<tokio::sync::oneshot::Receiver<VerifyAuthorityResult>> {
+        let mut state = self.state.lock();
         // The inflight beats are sent at least for `current_term`. This is
         // guaranteed by the fact that we immediately increase beats for all
         // peers after being elected, before releasing the "elected" message to
@@ -130,7 +131,6 @@ impl VerifyAuthorityDaemon {
         // `state.term` could be greater than `current_term`, if we lost
         // leadership but are elected leader again in a following term.
         // In both cases, we cannot confirm the leadership at `current_term`.
-        let mut state = self.state.lock();
         if state.term != current_term {
             return None;
         }

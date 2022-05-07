@@ -418,6 +418,9 @@ impl<Command: 'static + Send> Raft<Command> {
         let (term, commit_index) = {
             let rf = self.inner_state.lock();
             if !rf.is_leader() {
+                // Returning none instead of `Pending::Ready(TermElapsed)`,
+                // because that requires a separate struct that implements
+                // Future, which is tedious to write.
                 return None;
             }
 

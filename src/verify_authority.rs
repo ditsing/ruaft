@@ -243,9 +243,13 @@ impl VerifyAuthorityDaemon {
             // All requests before `new_start` is now verified.
             let verified = new_start.0 - state.start.0;
             for token in state.queue.drain(..verified) {
+                let mut cnt = 0;
                 for (index, beat) in token.beats_moment.iter().enumerate() {
-                    assert!(self.beat_tickers[index].ticked() >= *beat);
+                    if self.beat_tickers[index].ticked() >= *beat {
+                        cnt += 1;
+                    }
                 }
+                assert!(cnt + cnt + 1 >= self.beat_tickers.len());
                 let _ = token
                     .sender
                     .send(VerifyAuthorityResult::Success(token.commit_index));

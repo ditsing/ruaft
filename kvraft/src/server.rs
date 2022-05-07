@@ -299,15 +299,8 @@ impl KVServer {
             let (sender, receiver) = futures::channel::oneshot::channel();
             // The mutex guard is moved into this scope and dropped here.
             let mut state = state;
-            match state.index_subscribers.entry(index) {
-                Entry::Occupied(mut occupied) => {
-                    occupied.get_mut().push((key, sender))
-                }
-                Entry::Vacant(vacant) => {
-                    let queue = vec![(key, sender)];
-                    vacant.insert(queue);
-                }
-            };
+            let queue = state.index_subscribers.entry(index).or_default();
+            queue.push((key, sender));
             receiver
         };
 

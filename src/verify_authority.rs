@@ -240,6 +240,15 @@ impl VerifyAuthorityDaemon {
             let mid = sorted_covered.len() / 2 + 1;
             let new_start = sorted_covered[mid];
 
+            // `state.start` could have been moved by other means, e.g. by a
+            // subsequent commit of the same term after the beat is issued.
+            // Then the relevant verify authority requests have been processed.
+            // If all ticked requests have been processed, nothing needs to be
+            // done. Skip to the next iteration.
+            if new_start <= state.start {
+                continue;
+            }
+
             // All requests before `new_start` is now verified.
             let verified = new_start.0 - state.start.0;
             for token in state.queue.drain(..verified) {

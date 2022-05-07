@@ -208,6 +208,26 @@ impl VerifyAuthorityDaemon {
         commit_index: Index,
     ) {
         let mut state = self.state.lock();
+        // We might skip some requests that could have been cleared, if we did
+        // not react to the commit notification fast enough, and missed a
+        // commit. This is about the case where in the last iteration
+        // `commit_index` was `ci`, but in this iteration it becomes `ci + 2`
+        // (or even larger), skipping `ci + 1`.
+        //
+        // Obviously skipping a commit is a problem if `ci + 2` and `ci + 1` are
+        // both committed by us in this term. The requests that are cleared by
+        // `+1` will be cleared by `+2` anyway. Similarly it is not a problem if
+        // neither are committed by us in this term, since `+1` will not clear
+        // any requests.
+        //
+        // If `+2` is not committed by us, but `+1` is, we lose the opportunity
+        // to use `+1` to clear requests. The chances of losing this opportunity
+        // are slim, because between `+1` and `+2`, there has to be a missed
+        // heartbeat interval, and a new commit (`+2`) from another leader. We
+        // have plenty of time to run this method before `+2` reaches us.
+        //
+        // Overall it is acceptable to simplify the implementation and risk
+        // losing the mentioned opportunity.
         if current_term != state.term {
             return;
         }

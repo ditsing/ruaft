@@ -55,17 +55,17 @@ impl BeatTicker {
         Beat(count)
     }
 
-    /// Returns the newest request ID.
+    /// Returns the newest beat (request ID).
     pub fn current_beat(&self) -> Beat {
         Beat(self.beat_count.load(Ordering::Acquire))
     }
 
-    /// Marks a beat as successful.
-    pub fn tick(&self, count: Beat) {
-        self.ticked.fetch_max(count.0, Ordering::AcqRel);
+    /// Marks a beat (request) as successful.
+    pub fn tick(&self, beat: Beat) {
+        self.ticked.fetch_max(beat.0, Ordering::AcqRel);
     }
 
-    /// Returns the last successful request ID.
+    /// Returns the last successful beat (request ID).
     pub fn ticked(&self) -> Beat {
         Beat(self.ticked.load(Ordering::Acquire))
     }

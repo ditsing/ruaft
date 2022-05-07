@@ -75,6 +75,24 @@ impl VerifyAuthorityState {
 }
 
 #[derive(Clone)]
+pub(crate) struct DaemonBeatTicker {
+    beat_ticker: SharedBeatTicker,
+    unparker: Unparker,
+}
+
+impl DaemonBeatTicker {
+    pub fn next_beat(&self) -> Beat {
+        let beat = self.beat_ticker.next_beat();
+        beat
+    }
+
+    pub fn tick(&self, beat: Beat) {
+        self.beat_ticker.tick(beat);
+        self.unparker.unpark();
+    }
+}
+
+#[derive(Clone)]
 pub(crate) struct VerifyAuthorityDaemon {
     state: Arc<Mutex<VerifyAuthorityState>>,
     beat_tickers: Vec<SharedBeatTicker>,
@@ -307,8 +325,11 @@ impl VerifyAuthorityDaemon {
         }
     }
 
-    pub fn beat_ticker(&self, peer_index: usize) -> SharedBeatTicker {
-        self.beat_tickers[peer_index].clone()
+    pub fn beat_ticker(&self, peer_index: usize) -> DaemonBeatTicker {
+        DaemonBeatTicker {
+            beat_ticker: self.beat_tickers[peer_index].clone(),
+            unparker: self.unparker.clone().unwrap(),
+        }
     }
 
     pub fn kill(&self) {
@@ -395,7 +416,7 @@ impl<Command: 'static + Send> Raft<Command> {
         })
     }
 
-    pub(crate) fn beat_ticker(&self, peer_index: usize) -> SharedBeatTicker {
+    pub(crate) fn beat_ticker(&self, peer_index: usize) -> DaemonBeatTicker {
         self.verify_authority_daemon.beat_ticker(peer_index)
     }
 }

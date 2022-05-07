@@ -3,9 +3,9 @@ use std::time::Duration;
 
 use parking_lot::Mutex;
 
-use crate::beat_ticker::SharedBeatTicker;
 use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, RPC_DEADLINE};
+use crate::verify_authority::DaemonBeatTicker;
 use crate::{AppendEntriesArgs, Raft, RaftState, RemoteRaft};
 
 #[derive(Clone)]
@@ -114,7 +114,7 @@ where
         rpc_client: impl RemoteRaft<Command>,
         args: AppendEntriesArgs<Command>,
         term_watermark: TermMarker<Command>,
-        beat_ticker: SharedBeatTicker,
+        beat_ticker: DaemonBeatTicker,
     ) -> std::io::Result<()> {
         let term = args.term;
         let beat = beat_ticker.next_beat();

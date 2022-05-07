@@ -4,12 +4,12 @@ use std::time::Duration;
 
 use parking_lot::{Condvar, Mutex};
 
-use crate::beat_ticker::SharedBeatTicker;
 use crate::check_or_record;
 use crate::daemon_env::{Daemon, ErrorKind};
 use crate::index_term::IndexTerm;
 use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, SharedSender, RPC_DEADLINE};
+use crate::verify_authority::DaemonBeatTicker;
 use crate::{
     AppendEntriesArgs, InstallSnapshotArgs, Peer, Raft, RaftState, RemoteRaft,
     Term, HEARTBEAT_INTERVAL_MILLIS,
@@ -170,7 +170,7 @@ where
         opening: Arc<AtomicUsize>,
         apply_command_signal: Arc<Condvar>,
         term_marker: TermMarker<Command>,
-        beat_ticker: SharedBeatTicker,
+        beat_ticker: DaemonBeatTicker,
         task_number: TaskNumber,
     ) {
         if opening.swap(0, Ordering::SeqCst) == 0 {
@@ -458,7 +458,7 @@ where
     async fn append_entries(
         rpc_client: &dyn RemoteRaft<Command>,
         args: AppendEntriesArgs<Command>,
-        beat_ticker: SharedBeatTicker,
+        beat_ticker: DaemonBeatTicker,
     ) -> std::io::Result<SyncLogEntriesResult> {
         let term = args.term;
         let beat = beat_ticker.next_beat();
@@ -501,7 +501,7 @@ where
     async fn install_snapshot(
         rpc_client: &dyn RemoteRaft<Command>,
         args: InstallSnapshotArgs,
-        beat_ticker: SharedBeatTicker,
+        beat_ticker: DaemonBeatTicker,
     ) -> std::io::Result<SyncLogEntriesResult> {
         let term = args.term;
         let beat = beat_ticker.next_beat();

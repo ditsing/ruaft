@@ -8,7 +8,10 @@ use rand::{thread_rng, Rng};
 use crate::daemon_env::Daemon;
 use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, SharedSender, RPC_DEADLINE};
-use crate::{Peer, Raft, RaftState, RemoteRaft, RequestVoteArgs, State, Term};
+use crate::verify_authority::VerifyAuthorityDaemon;
+use crate::{
+    Peer, Persister, Raft, RaftState, RemoteRaft, RequestVoteArgs, State, Term,
+};
 
 #[derive(Default)]
 pub(crate) struct ElectionState {
@@ -69,7 +72,7 @@ impl ElectionState {
 // 3. serialize: they are converted to bytes to persist.
 impl<Command> Raft<Command>
 where
-    Command: 'static + Clone + Send + serde::Serialize,
+    Command: 'static + Clone + Default + Send + serde::Serialize,
 {
     /// Runs the election timer daemon that triggers elections.
     ///
@@ -277,6 +280,8 @@ where
             rx,
             self.election.clone(),
             self.new_log_entry.clone().unwrap(),
+            self.verify_authority_daemon.clone(),
+            self.persister.clone(),
         ));
         Some(tx)
     }
@@ -302,6 +307,7 @@ where
         None
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn count_vote_util_cancelled(
         me: Peer,
         term: Term,
@@ -310,6 +316,8 @@ where
         cancel_token: futures_channel::oneshot::Receiver<()>,
         election: Arc<ElectionState>,
         new_log_entry: SharedSender<Option<Peer>>,
+        verify_authority_daemon: VerifyAuthorityDaemon,
+        persister: Arc<dyn Persister>,
     ) {
         let quorum = votes.len() >> 1;
         let mut vote_count = 0;
@@ -363,6 +371,21 @@ where
             for item in rf.current_step.iter_mut() {
                 *item = 0;
             }
+            // Reset the verify authority daemon before sending heartbeats to
+            // followers. This is critical to the correctness of verifying
+            // authority.
+            // No verity authority request can go through before the reset is
+            // done, since we are holding the raft lock.
+            verify_authority_daemon.reset_state(term);
+
+            if rf.commit_index != rf.log.last_index_term().index {
+                rf.sentinel_commit_index =
+                    rf.log.add_command(term, Default::default());
+                persister.save_state(rf.persisted_state().into());
+            } else {
+                rf.sentinel_commit_index = rf.commit_index;
+            }
+
             // Sync all logs now.
             let _ = new_log_entry.send(None);
         }

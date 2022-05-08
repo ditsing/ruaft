@@ -24,7 +24,7 @@ parking_lot = "0.12"
 rand = "0.8"
 serde = "1.0"
 serde_derive = "1.0"
-tokio = { version = "1.7", features = ["net", "rt-multi-thread", "time", "parking_lot"] }
+tokio = { version = "1.7", features = ["net", "rt-multi-thread", "sync", "time", "parking_lot"] }
 test_utils = { path = "test_utils", optional = true }
 
 [features]

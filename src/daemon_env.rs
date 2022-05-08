@@ -41,6 +41,7 @@ pub(crate) enum Daemon {
     ElectionTimer,
     SyncLogEntries,
     ApplyCommand,
+    VerifyAuthority,
 }
 
 #[derive(Debug, Default)]

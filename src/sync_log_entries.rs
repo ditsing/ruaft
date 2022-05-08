@@ -9,6 +9,7 @@ use crate::daemon_env::{Daemon, ErrorKind};
 use crate::index_term::IndexTerm;
 use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, SharedSender, RPC_DEADLINE};
+use crate::verify_authority::DaemonBeatTicker;
 use crate::{
     AppendEntriesArgs, InstallSnapshotArgs, Peer, Raft, RaftState, RemoteRaft,
     Term, HEARTBEAT_INTERVAL_MILLIS,
@@ -101,6 +102,7 @@ where
                                 openings[i].0.clone(),
                                 this.apply_command_signal.clone(),
                                 this.term_marker(),
+                                this.beat_ticker(i),
                                 TaskNumber(task_number),
                             ));
                         }
@@ -168,6 +170,7 @@ where
         opening: Arc<AtomicUsize>,
         apply_command_signal: Arc<Condvar>,
         term_marker: TermMarker<Command>,
+        beat_ticker: DaemonBeatTicker,
         task_number: TaskNumber,
     ) {
         if opening.swap(0, Ordering::SeqCst) == 0 {
@@ -181,7 +184,8 @@ where
                 let term = args.term;
                 let prev_log_index = args.prev_log_index;
                 let match_index = args.prev_log_index + args.entries.len();
-                let succeeded = Self::append_entries(&rpc_client, args).await;
+                let succeeded =
+                    Self::append_entries(&rpc_client, args, beat_ticker).await;
 
                 (term, prev_log_index, match_index, succeeded)
             }
@@ -189,7 +193,9 @@ where
                 let term = args.term;
                 let prev_log_index = args.last_included_index;
                 let match_index = args.last_included_index;
-                let succeeded = Self::install_snapshot(&rpc_client, args).await;
+                let succeeded =
+                    Self::install_snapshot(&rpc_client, args, beat_ticker)
+                        .await;
 
                 (term, prev_log_index, match_index, succeeded)
             }
@@ -452,8 +458,10 @@ where
     async fn append_entries(
         rpc_client: &dyn RemoteRaft<Command>,
         args: AppendEntriesArgs<Command>,
+        beat_ticker: DaemonBeatTicker,
     ) -> std::io::Result<SyncLogEntriesResult> {
         let term = args.term;
+        let beat = beat_ticker.next_beat();
         let reply = retry_rpc(
             Self::APPEND_ENTRIES_RETRY,
             RPC_DEADLINE,
@@ -461,6 +469,7 @@ where
         )
         .await?;
         Ok(if reply.term == term {
+            beat_ticker.tick(beat);
             if let Some(committed) = reply.committed {
                 if reply.success {
                     SyncLogEntriesResult::Archived(committed)
@@ -492,8 +501,10 @@ where
     async fn install_snapshot(
         rpc_client: &dyn RemoteRaft<Command>,
         args: InstallSnapshotArgs,
+        beat_ticker: DaemonBeatTicker,
     ) -> std::io::Result<SyncLogEntriesResult> {
         let term = args.term;
+        let beat = beat_ticker.next_beat();
         let reply = retry_rpc(
             Self::INSTALL_SNAPSHOT_RETRY,
             RPC_DEADLINE,
@@ -501,6 +512,7 @@ where
         )
         .await?;
         Ok(if reply.term == term {
+            beat_ticker.tick(beat);
             if let Some(committed) = reply.committed {
                 SyncLogEntriesResult::Archived(committed)
             } else {

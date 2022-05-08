@@ -357,6 +357,11 @@ impl VerifyAuthorityDaemon {
     }
 
     pub fn kill(&self) {
+        let term = self.state.lock().term;
+        // Fail all inflight verify authority requests. It is important to do
+        // this so that the RPC framework could drop requests served by us and
+        // release all references to the Raft instance.
+        self.reset_state(term);
         self.condvar.notify_all();
     }
 }
@@ -415,6 +420,11 @@ impl<Command: 'static + Send> Raft<Command> {
     pub fn verify_authority_async(
         &self,
     ) -> Option<impl Future<Output = crate::VerifyAuthorityResult>> {
+        // Fail the request if we have been killed.
+        if !self.keep_running.load(Ordering::Acquire) {
+            return None;
+        }
+
         let (term, commit_index) = {
             let rf = self.inner_state.lock();
             if !rf.is_leader() {

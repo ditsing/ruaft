@@ -425,7 +425,7 @@ impl<Command: 'static + Send> Raft<Command> {
             return None;
         }
 
-        let (term, commit_index) = {
+        let (term, commit_index, last_index) = {
             let rf = self.inner_state.lock();
             if !rf.is_leader() {
                 // Returning none instead of `Pending::Ready(TermElapsed)`,
@@ -434,12 +434,17 @@ impl<Command: 'static + Send> Raft<Command> {
                 return None;
             }
 
-            (rf.current_term, rf.commit_index)
+            (
+                rf.current_term,
+                rf.commit_index,
+                rf.log.last_index_term().index,
+            )
         };
         let receiver = self
             .verify_authority_daemon
             .verify_authority_async(term, commit_index);
-        self.heartbeats_daemon.trigger();
+        let force_heartbeat = commit_index == last_index;
+        self.heartbeats_daemon.trigger(force_heartbeat);
         receiver.map(|receiver| async move {
             receiver
                 .await

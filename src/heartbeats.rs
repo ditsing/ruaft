@@ -1,5 +1,6 @@
-use std::sync::atomic::Ordering;
-use std::time::Duration;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 
@@ -10,17 +11,40 @@ use crate::{AppendEntriesArgs, Raft, RaftState, RemoteRaft};
 
 #[derive(Clone)]
 pub(crate) struct HeartbeatsDaemon {
+    start: Instant,
+    last_trigger: Arc<AtomicU64>,
     sender: tokio::sync::broadcast::Sender<()>,
 }
 
 impl HeartbeatsDaemon {
+    const HEARTBEAT_MAX_DELAY_MILLIS: u64 = 30;
+
     pub fn create() -> Self {
         let (sender, _) = tokio::sync::broadcast::channel(1);
-        Self { sender }
+        Self {
+            start: Instant::now(),
+            last_trigger: Arc::new(AtomicU64::new(0)),
+            sender,
+        }
     }
 
-    pub fn trigger(&self) {
-        let _ = self.sender.send(());
+    pub fn trigger(&self, force: bool) {
+        let now = self.start.elapsed().as_millis();
+        // u64 is big enough for more than 500 million years.
+        let now_lower_bits = (now & (u64::MAX) as u128) as u64;
+        let last_trigger = self.last_trigger.load(Ordering::Acquire);
+        let next_trigger =
+            last_trigger.wrapping_add(Self::HEARTBEAT_MAX_DELAY_MILLIS);
+
+        // Do not trigger heartbeats too frequently, unless we are forced.
+        if force || next_trigger < now_lower_bits {
+            let previous_trigger = self
+                .last_trigger
+                .fetch_max(now_lower_bits, Ordering::AcqRel);
+            if last_trigger == previous_trigger {
+                let _ = self.sender.send(());
+            }
+        }
     }
 }
 

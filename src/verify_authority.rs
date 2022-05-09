@@ -81,8 +81,7 @@ pub(crate) struct DaemonBeatTicker {
 
 impl DaemonBeatTicker {
     pub fn next_beat(&self) -> Beat {
-        let beat = self.beat_ticker.next_beat();
-        beat
+        self.beat_ticker.next_beat()
     }
 
     pub fn tick(&self, beat: Beat) {
@@ -371,7 +370,7 @@ impl<Command: 'static + Send> Raft<Command> {
 
     /// Create a thread and runs the verify authority daemon.
     pub(crate) fn run_verify_authority_daemon(&self) {
-        let me = self.me.clone();
+        let me = self.me;
         let keep_running = self.keep_running.clone();
         let daemon_env = self.daemon_env.clone();
         let this_daemon = self.verify_authority_daemon.clone();

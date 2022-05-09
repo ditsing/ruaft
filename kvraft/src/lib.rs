@@ -1,5 +1,8 @@
 pub use client::Clerk;
-pub use common::{GetArgs, GetReply, PutAppendArgs, PutAppendReply};
+pub use common::{
+    CommitSentinelArgs, CommitSentinelReply, GetArgs, GetReply, PutAppendArgs,
+    PutAppendReply,
+};
 pub use remote_kvraft::RemoteKvraft;
 pub use server::KVServer;
 pub use server::UniqueKVOp;

@@ -72,16 +72,9 @@ pub struct PutAppendReply {
     pub result: Result<(), KVError>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub enum GetEnum {
-    AllowDuplicate,
-    NoDuplicate,
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GetArgs {
     pub key: String,
-    pub op: GetEnum,
 
     pub unique_id: UniqueId,
 }
@@ -94,6 +87,16 @@ pub struct GetReply {
 #[derive(Clone, Debug, Default)]
 pub struct KVRaftOptions {
     pub max_retry: Option<usize>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CommitSentinelArgs {
+    pub unique_id: UniqueId,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CommitSentinelReply {
+    pub result: Result<(), KVError>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -124,6 +127,12 @@ impl ValidReply for PutAppendReply {
 }
 
 impl ValidReply for GetReply {
+    fn is_reply_valid(&self) -> bool {
+        self.result.is_reply_valid()
+    }
+}
+
+impl ValidReply for CommitSentinelReply {
     fn is_reply_valid(&self) -> bool {
         self.result.is_reply_valid()
     }

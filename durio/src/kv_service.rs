@@ -6,13 +6,15 @@ use async_trait::async_trait;
 use tarpc::context::Context;
 
 use kvraft::{
-    GetArgs, GetReply, KVServer, PutAppendArgs, PutAppendReply, RemoteKvraft,
+    CommitSentinelArgs, CommitSentinelReply, GetArgs, GetReply, KVServer,
+    PutAppendArgs, PutAppendReply, RemoteKvraft,
 };
 
 #[tarpc::service]
 pub(crate) trait KVService {
     async fn get(args: GetArgs) -> GetReply;
     async fn put_append(args: PutAppendArgs) -> PutAppendReply;
+    async fn commit_sentinel(args: CommitSentinelArgs) -> CommitSentinelReply;
 }
 
 #[derive(Clone)]
@@ -31,6 +33,14 @@ impl KVService for KVRpcServer {
     ) -> PutAppendReply {
         self.0.put_append(args).await
     }
+
+    async fn commit_sentinel(
+        self,
+        _context: Context,
+        args: CommitSentinelArgs,
+    ) -> CommitSentinelReply {
+        self.0.commit_sentinel(args).await
+    }
 }
 
 #[async_trait]
@@ -46,6 +56,15 @@ impl RemoteKvraft for KVServiceClient {
         args: PutAppendArgs,
     ) -> std::io::Result<PutAppendReply> {
         self.put_append(Context::current(), args)
+            .await
+            .map_err(crate::utils::translate_rpc_error)
+    }
+
+    async fn commit_sentinel(
+        &self,
+        args: CommitSentinelArgs,
+    ) -> std::io::Result<CommitSentinelReply> {
+        self.commit_sentinel(Context::current(), args)
             .await
             .map_err(crate::utils::translate_rpc_error)
     }

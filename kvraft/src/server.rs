@@ -9,6 +9,7 @@ use futures::FutureExt;
 use parking_lot::Mutex;
 use serde_derive::{Deserialize, Serialize};
 
+use crate::{CommitSentinelArgs, CommitSentinelReply};
 use ruaft::{
     ApplyCommandMessage, Index, Persister, Raft, RemoteRaft, Term,
     VerifyAuthorityResult,
@@ -17,7 +18,7 @@ use test_utils::log_with;
 use test_utils::thread_local_logger::LocalLogger;
 
 use crate::common::{
-    ClerkId, GetArgs, GetEnum, GetReply, KVError, PutAppendArgs, PutAppendEnum,
+    ClerkId, GetArgs, GetReply, KVError, PutAppendArgs, PutAppendEnum,
     PutAppendReply, UniqueId,
 };
 use crate::snapshot_holder::SnapshotHolder;
@@ -430,29 +431,27 @@ impl KVServer {
 
     const DEFAULT_TIMEOUT: Duration = Duration::from_secs(1);
 
-    pub async fn commit_sentinel(&self, args: GetArgs) -> GetReply {
-        assert_eq!(args.op, GetEnum::NoDuplicate);
+    pub async fn commit_sentinel(
+        &self,
+        args: CommitSentinelArgs,
+    ) -> CommitSentinelReply {
         let result_fut = self.block_for_commit(
             args.unique_id,
-            KVOp::Get(args.key),
+            KVOp::Get(String::new()),
             Self::DEFAULT_TIMEOUT,
         );
         let result = match result_fut.await {
-            Ok(CommitResult::Get(result)) => Ok(result),
+            Ok(CommitResult::Get(_)) => Ok(()),
             Ok(CommitResult::Put) => Err(KVError::Conflict),
             Ok(CommitResult::Append) => Err(KVError::Conflict),
             Err(CommitError::Duplicate(_)) => Err(KVError::Conflict),
             Err(CommitError::NotMe(_)) => Err(KVError::Conflict),
             Err(e) => Err(e.into()),
         };
-        GetReply { result }
+        CommitSentinelReply { result }
     }
 
     pub async fn get(&self, args: GetArgs) -> GetReply {
-        if args.op == GetEnum::NoDuplicate {
-            return self.commit_sentinel(args).await;
-        }
-        assert_eq!(args.op, GetEnum::AllowDuplicate);
         let result = self.block_for_read(args.key).await;
         GetReply { result }
     }

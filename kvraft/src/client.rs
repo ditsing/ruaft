@@ -4,8 +4,9 @@ use std::sync::Once;
 use std::time::Duration;
 
 use crate::common::{
-    GetArgs, GetEnum, GetReply, KVError, KVRaftOptions, PutAppendArgs,
-    PutAppendEnum, PutAppendReply, UniqueIdSequence, ValidReply,
+    CommitSentinelArgs, CommitSentinelReply, GetArgs, GetReply, KVError,
+    KVRaftOptions, PutAppendArgs, PutAppendEnum, PutAppendReply,
+    UniqueIdSequence, ValidReply,
 };
 use crate::RemoteKvraft;
 
@@ -90,13 +91,14 @@ impl ClerkInner {
 
     fn commit_sentinel(&mut self) {
         loop {
-            let args = GetArgs {
-                key: "".to_string(),
-                op: GetEnum::NoDuplicate,
+            let args = CommitSentinelArgs {
                 unique_id: self.unique_id.zero(),
             };
-            let reply: Option<GetReply> =
-                self.retry_rpc(|remote, args| remote.get(args), args, Some(1));
+            let reply: Option<CommitSentinelReply> = self.retry_rpc(
+                |remote, args| remote.commit_sentinel(args),
+                args,
+                Some(1),
+            );
             if let Some(reply) = reply {
                 match reply.result {
                     Ok(_) => {
@@ -174,7 +176,6 @@ impl ClerkInner {
     ) -> Option<Option<String>> {
         let args = GetArgs {
             key,
-            op: GetEnum::AllowDuplicate,
             unique_id: self.unique_id.inc(),
         };
         let reply: GetReply = self.retry_rpc(

@@ -9,7 +9,8 @@ use serde::Serialize;
 use futures_util::future::BoxFuture;
 use futures_util::FutureExt;
 use kvraft::{
-    GetArgs, GetReply, KVServer, PutAppendArgs, PutAppendReply, RemoteKvraft,
+    CommitSentinelArgs, CommitSentinelReply, GetArgs, GetReply, KVServer,
+    PutAppendArgs, PutAppendReply, RemoteKvraft,
 };
 use ruaft::{
     AppendEntriesArgs, AppendEntriesReply, InstallSnapshotArgs,
@@ -77,6 +78,7 @@ impl<Command: 'static + Send + Serialize> ruaft::RemoteRaft<Command>
 
 const GET: &str = "KVServer.Get";
 const PUT_APPEND: &str = "KVServer.PutAppend";
+const COMMIT_SENTINEL: &str = "KVServer.CommitSentinel";
 
 #[async_trait]
 impl RemoteKvraft for RpcClient {
@@ -89,6 +91,13 @@ impl RemoteKvraft for RpcClient {
         args: PutAppendArgs,
     ) -> std::io::Result<PutAppendReply> {
         self.call_rpc(PUT_APPEND, args).await
+    }
+
+    async fn commit_sentinel(
+        &self,
+        args: CommitSentinelArgs,
+    ) -> std::io::Result<CommitSentinelReply> {
+        self.call_rpc(COMMIT_SENTINEL, args).await
     }
 }
 
@@ -197,10 +206,18 @@ pub fn register_kv_server<
         }),
     )?;
 
+    let kv_clone = kv.clone();
     server.register_async_rpc_handler(
         PUT_APPEND.to_owned(),
         make_async_rpc_handler(move |args| async move {
-            kv.as_ref().put_append(args).await
+            kv_clone.as_ref().put_append(args).await
+        }),
+    )?;
+
+    server.register_async_rpc_handler(
+        COMMIT_SENTINEL.to_owned(),
+        make_async_rpc_handler(move |args| async move {
+            kv.as_ref().commit_sentinel(args).await
         }),
     )?;
 

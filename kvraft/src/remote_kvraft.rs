@@ -1,6 +1,9 @@
 use async_trait::async_trait;
 
-use crate::common::{GetArgs, GetReply, PutAppendArgs, PutAppendReply};
+use crate::common::{
+    CommitSentinelArgs, CommitSentinelReply, GetArgs, GetReply, PutAppendArgs,
+    PutAppendReply,
+};
 
 #[async_trait]
 pub trait RemoteKvraft: Send + Sync + 'static {
@@ -10,4 +13,9 @@ pub trait RemoteKvraft: Send + Sync + 'static {
         &self,
         args: PutAppendArgs,
     ) -> std::io::Result<PutAppendReply>;
+
+    async fn commit_sentinel(
+        &self,
+        args: CommitSentinelArgs,
+    ) -> std::io::Result<CommitSentinelReply>;
 }

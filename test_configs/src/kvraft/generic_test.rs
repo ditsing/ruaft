@@ -299,7 +299,7 @@ pub fn generic_test(test_params: GenericTestParams) {
         let start = Instant::now();
         log::info!("Searching for linearization arrangements ...");
         assert!(
-            linearizability::check_operations_timeout::<KvModel>(&ops, None),
+            linearizability::check_operations_timeout::<KvModel>(ops, None),
             "History {:?} is not linearizable,",
             ops,
         );

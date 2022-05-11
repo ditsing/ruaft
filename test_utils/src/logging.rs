@@ -59,7 +59,7 @@ pub fn init_log(module: &str) -> std::io::Result<PathBuf> {
 
     let module = match module.rfind("::") {
         Some(pos) => &module[..pos],
-        None => &module,
+        None => module,
     };
 
     let env = env_logger::Env::default().default_filter_or("info");

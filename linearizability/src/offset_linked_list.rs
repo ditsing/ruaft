@@ -168,12 +168,12 @@ mod tests {
             leg = list.succ(leg).unwrap();
         }
         list.lift(leg);
-        assert_char_list_eq(&list, &"bcefhilmnopqrstuvwxyz");
+        assert_char_list_eq(&list, "bcefhilmnopqrstuvwxyz");
 
         list.unlift(NodeRef(0));
         list.unlift(NodeRef(3));
         list.unlift(NodeRef(10));
-        assert_char_list_eq(&list, &"abcdefhiklmnopqrstuvwxyz");
+        assert_char_list_eq(&list, "abcdefhiklmnopqrstuvwxyz");
     }
 
     #[test]

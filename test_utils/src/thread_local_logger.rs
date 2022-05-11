@@ -101,6 +101,7 @@ impl LocalLogger {
     }
 }
 
+#[allow(clippy::derivable_impls)]
 impl Default for LocalLogger {
     fn default() -> Self {
         #[cfg(not(feature = "must-log"))]

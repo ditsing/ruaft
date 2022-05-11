@@ -55,6 +55,7 @@ struct KVServerState {
             >,
         ),
     >,
+    #[allow(clippy::type_complexity)]
     #[serde(skip)]
     index_subscribers: HashMap<
         Index,

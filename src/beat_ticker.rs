@@ -4,8 +4,12 @@ use std::sync::Arc;
 
 /// A beat is one request sent to a peer with a success response.
 /// The `usize` within is the unique ID of the request.
+#[cfg(not(test))]
 #[derive(Debug, Eq, Ord, PartialOrd, PartialEq)]
 pub(crate) struct Beat(usize);
+#[cfg(test)]
+#[derive(Debug, Eq, Ord, PartialOrd, PartialEq)]
+pub(crate) struct Beat(pub(crate) usize);
 
 /// A `BeatTicker` issues unique request IDs and records successful runs.
 ///

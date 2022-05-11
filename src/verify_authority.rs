@@ -455,3 +455,82 @@ impl<Command: 'static + Send> Raft<Command> {
         self.verify_authority_daemon.beat_ticker(peer_index)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const PEER_SIZE: usize = 5;
+    const TERM: Term = Term(3);
+    const COMMIT_INDEX: Index = 8;
+    fn init_daemon() -> VerifyAuthorityDaemon {
+        let daemon = VerifyAuthorityDaemon::create(PEER_SIZE);
+
+        daemon.reset_state(TERM);
+
+        const CURRENT_BEATS: [usize; 5] = [11, 9, 7, 5, 3];
+        const TICKED: [usize; 5] = [0, 3, 1, 4, 2];
+        for (index, beat_ticker) in daemon.beat_tickers.iter().enumerate() {
+            for _ in 1..(PEER_SIZE - index) * 2 {
+                beat_ticker.next_beat();
+            }
+            beat_ticker.tick(Beat(index * 3 % PEER_SIZE));
+
+            assert_eq!(Beat(CURRENT_BEATS[index]), beat_ticker.current_beat());
+            assert_eq!(Beat(TICKED[index]), beat_ticker.ticked());
+        }
+
+        daemon
+    }
+
+    #[test]
+    fn test_verify_authority_async() {
+        let daemon = init_daemon();
+        let ticket = daemon.verify_authority_async(TERM, COMMIT_INDEX);
+        ticket.expect("Getting ticket should not fail immediately");
+
+        {
+            let state = daemon.state.lock();
+            assert_eq!(1, state.queue.len());
+            let token = state.queue.get(0).unwrap();
+            assert_eq!(
+                [Beat(11), Beat(9), Beat(7), Beat(5), Beat(3)],
+                token.beats_moment.as_slice()
+            );
+            assert_eq!(COMMIT_INDEX, token.commit_index);
+        }
+
+        daemon.beat_ticker(4).next_beat();
+        daemon.beat_ticker(2).next_beat();
+        daemon.verify_authority_async(TERM, COMMIT_INDEX + 10);
+
+        {
+            let state = daemon.state.lock();
+            assert_eq!(2, state.queue.len());
+            let token = state.queue.get(1).unwrap();
+            assert_eq!(
+                [Beat(11), Beat(9), Beat(8), Beat(5), Beat(4)],
+                token.beats_moment.as_slice()
+            );
+            assert_eq!(COMMIT_INDEX + 10, token.commit_index);
+        }
+    }
+    #[test]
+    fn test_verify_authority_async_term_mismatch() {
+        let daemon = init_daemon();
+        let ticket =
+            daemon.verify_authority_async(Term(TERM.0 + 1), COMMIT_INDEX);
+        assert!(
+            ticket.is_none(),
+            "Should not issue a ticket for future terms"
+        );
+
+        let ticket =
+            daemon.verify_authority_async(Term(TERM.0 - 1), COMMIT_INDEX);
+        assert!(ticket.is_none(), "Should not issue a ticket for past terms");
+        {
+            let state = daemon.state.lock();
+            assert_eq!(0, state.queue.len());
+        }
+    }
+}

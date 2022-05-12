@@ -461,8 +461,11 @@ mod tests {
     use super::*;
 
     const PEER_SIZE: usize = 5;
+    const PAST_TERM: Term = Term(2);
     const TERM: Term = Term(3);
+    const NEXT_TERM: Term = Term(4);
     const COMMIT_INDEX: Index = 8;
+
     fn init_daemon() -> VerifyAuthorityDaemon {
         let daemon = VerifyAuthorityDaemon::create(PEER_SIZE);
 
@@ -496,6 +499,7 @@ mod tests {
                 .try_recv()
                 .expect("The receiver should be ready with the result");
             assert_eq!(result, $e);
+            Some(receiver);
         }};
     }
 
@@ -506,6 +510,7 @@ mod tests {
                 .try_recv()
                 .expect_err("The receiver should not be ready");
             assert_eq!(err, tokio::sync::oneshot::error::TryRecvError::Empty);
+            Some(receiver)
         }};
     }
 
@@ -561,6 +566,62 @@ mod tests {
     }
 
     #[test]
+    fn test_clear_committed_requests() {
+        let daemon = init_daemon();
+        let t0 = daemon.verify_authority_async(TERM, COMMIT_INDEX - 2);
+        let t1 = daemon.verify_authority_async(TERM, COMMIT_INDEX - 1);
+        let t2 = daemon.verify_authority_async(TERM, COMMIT_INDEX);
+        let t3 = daemon.verify_authority_async(TERM, COMMIT_INDEX - 2);
+        let t4 = daemon.verify_authority_async(TERM, COMMIT_INDEX + 1);
+        // Run one iteration: no new commit, no new tick, for last term.
+        daemon.run_verify_authority_iteration(
+            PAST_TERM,
+            COMMIT_INDEX,
+            COMMIT_INDEX,
+        );
+        // Tokens should stay as-is.
+        assert_queue_len!(&daemon, 5);
+
+        // Run one iteration: no new commit, no new tick, for next term.
+        daemon.run_verify_authority_iteration(
+            NEXT_TERM,
+            COMMIT_INDEX,
+            COMMIT_INDEX,
+        );
+        // Tokens should stay as-is.
+        assert_queue_len!(&daemon, 5);
+
+        daemon.run_verify_authority_iteration(TERM, COMMIT_INDEX, COMMIT_INDEX);
+        assert_queue_len!(&daemon, 3);
+        {
+            let queue = &daemon.state.lock().queue;
+            assert_eq!(queue[0].commit_index, COMMIT_INDEX);
+            // We can reply SUCCESS to this token, but it is not at the beginning of
+            // the queue, so we left it as-is.
+            assert_eq!(queue[1].commit_index, COMMIT_INDEX - 2);
+            assert_eq!(queue[2].commit_index, COMMIT_INDEX + 1);
+        }
+
+        assert_ticket_ready!(t0, VerifyAuthorityResult::Success(COMMIT_INDEX));
+        assert_ticket_ready!(t1, VerifyAuthorityResult::Success(COMMIT_INDEX));
+        let t2 = assert_ticket_pending!(t2);
+        let t3 = assert_ticket_pending!(t3);
+        let t4 = assert_ticket_pending!(t4);
+
+        daemon.run_verify_authority_iteration(
+            TERM,
+            COMMIT_INDEX + 2,
+            // Clears the queue even if the sentinel is not committed.
+            COMMIT_INDEX + 3,
+        );
+        assert_queue_len!(&daemon, 0);
+        let at_index = COMMIT_INDEX + 2;
+        assert_ticket_ready!(t2, VerifyAuthorityResult::Success(at_index));
+        assert_ticket_ready!(t3, VerifyAuthorityResult::Success(at_index));
+        assert_ticket_ready!(t4, VerifyAuthorityResult::Success(at_index));
+    }
+
+    #[test]
     fn test_remove_expired_requests() {
         let daemon = init_daemon();
         let t0 = daemon.verify_authority_async(TERM, COMMIT_INDEX);
@@ -583,9 +644,8 @@ mod tests {
         }
 
         // Run one iteration: no new commit, no new tick, for last term.
-        let past_term = Term(TERM.0 - 1);
         daemon.run_verify_authority_iteration(
-            past_term,
+            PAST_TERM,
             COMMIT_INDEX,
             COMMIT_INDEX,
         );
@@ -598,9 +658,8 @@ mod tests {
         assert_queue_len!(&daemon, 5);
 
         // Run one iteration: no new commit, no new tick, for next term.
-        let next_term = Term(TERM.0 + 1);
         daemon.run_verify_authority_iteration(
-            next_term,
+            NEXT_TERM,
             COMMIT_INDEX,
             COMMIT_INDEX,
         );

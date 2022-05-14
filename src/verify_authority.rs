@@ -860,4 +860,101 @@ mod tests {
         assert_ticket_pending!(t3);
         assert_ticket_pending!(t4);
     }
+
+    #[test]
+    fn test_run_verify_authority_iteration() {
+        let daemon = init_daemon();
+
+        // Run of last term.
+        daemon.reset_state(PAST_TERM);
+        let _t0 = daemon.verify_authority_async(PAST_TERM, COMMIT_INDEX - 2);
+        let _t1 = daemon.verify_authority_async(PAST_TERM, COMMIT_INDEX - 1);
+        let _t2 = daemon.verify_authority_async(PAST_TERM, COMMIT_INDEX);
+        daemon.run_verify_authority_iteration(
+            PAST_TERM,
+            COMMIT_INDEX - 1,
+            COMMIT_INDEX - 1,
+        );
+
+        // Run of current term.
+        daemon.reset_state(TERM);
+        let beat_ticker0 = daemon.beat_tickers[0].clone();
+        let beat_ticker1 = daemon.beat_tickers[1].clone();
+        let beat_ticker2 = daemon.beat_tickers[2].clone();
+        let beat_ticker3 = daemon.beat_tickers[3].clone();
+        let beat_ticker4 = daemon.beat_tickers[4].clone();
+
+        // New request t0.
+        let t0 = daemon.verify_authority_async(TERM, COMMIT_INDEX - 1);
+        // t0 has two votes.
+        beat_ticker0.tick(beat_ticker0.next_beat());
+        beat_ticker1.tick(beat_ticker1.next_beat());
+        assert_queue_len!(&daemon, 1);
+
+        // Do nothing since sentinel is not committed yet.
+        daemon.run_verify_authority_iteration(
+            TERM,
+            COMMIT_INDEX - 1,
+            COMMIT_INDEX,
+        );
+        assert_queue_len!(&daemon, 1);
+
+        // New request t1.
+        let t1 = daemon.verify_authority_async(TERM, COMMIT_INDEX);
+        // t1 has one vote.
+        beat_ticker1.tick(beat_ticker1.next_beat());
+        assert_queue_len!(&daemon, 2);
+
+        // Clear t0 but not t1.
+        daemon.run_verify_authority_iteration(TERM, COMMIT_INDEX, COMMIT_INDEX);
+        assert_queue_len!(&daemon, 1);
+        // Cleared by the committed sentinel.
+        assert_ticket_ready!(t0, VerifyAuthorityResult::Success(COMMIT_INDEX));
+
+        // New requests t2 and t3.
+        let t2 = daemon.verify_authority_async(TERM, COMMIT_INDEX + 1);
+        // t1 has two notes, t2 has one.
+        beat_ticker2.tick(beat_ticker2.next_beat());
+        let t3 = daemon.verify_authority_async(TERM, COMMIT_INDEX + 1);
+        // t1 has three votes, t2 has two, t3 has one.
+        beat_ticker3.tick(beat_ticker3.next_beat());
+        assert_queue_len!(&daemon, 3);
+
+        // Clear t1 and t2 because they are ticked.
+        daemon.run_verify_authority_iteration(TERM, COMMIT_INDEX, COMMIT_INDEX);
+        assert_queue_len!(&daemon, 1);
+        // Note t0 and t1 have different commit indexes.
+        assert_ticket_ready!(t1, VerifyAuthorityResult::Success(COMMIT_INDEX));
+        assert_ticket_ready!(
+            t2,
+            VerifyAuthorityResult::Success(COMMIT_INDEX + 1)
+        );
+
+        // New request.
+        let t4 = daemon.verify_authority_async(TERM, COMMIT_INDEX + 1);
+        // t3 has two votes, t4 has one.
+        beat_ticker4.tick(beat_ticker4.next_beat());
+
+        // Make t3 and t4 expire.
+        {
+            let mut state = daemon.state.lock();
+            let t3 =
+                state.queue.front_mut().expect("Queue should not be empty");
+            t3.rough_time = Instant::now() - Duration::from_secs(1);
+            let t4 = state.queue.back_mut().expect("Queue should not be empty");
+            t4.rough_time = Instant::now() - Duration::from_secs(1);
+        }
+        // Run for the next term.
+        daemon.run_verify_authority_iteration(
+            NEXT_TERM,
+            COMMIT_INDEX + 2,
+            COMMIT_INDEX + 2,
+        );
+        assert_queue_len!(&daemon, 0);
+        assert_ticket_ready!(
+            t3,
+            VerifyAuthorityResult::Success(COMMIT_INDEX + 1)
+        );
+        assert_ticket_ready!(t4, VerifyAuthorityResult::TimedOut);
+    }
 }

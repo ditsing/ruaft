@@ -471,13 +471,13 @@ mod tests {
 
         daemon.reset_state(TERM);
 
-        const CURRENT_BEATS: [usize; 5] = [11, 9, 7, 5, 3];
-        const TICKED: [usize; 5] = [0, 3, 1, 4, 2];
+        const CURRENT_BEATS: [u64; 5] = [11, 9, 7, 5, 3];
+        const TICKED: [u64; 5] = [0, 3, 1, 4, 2];
         for (index, beat_ticker) in daemon.beat_tickers.iter().enumerate() {
             for _ in 1..(PEER_SIZE - index) * 2 {
                 beat_ticker.next_beat();
             }
-            beat_ticker.tick(Beat(index * 3 % PEER_SIZE));
+            beat_ticker.tick(Beat((index * 3 % PEER_SIZE) as u64));
 
             assert_eq!(Beat(CURRENT_BEATS[index]), beat_ticker.current_beat());
             assert_eq!(Beat(TICKED[index]), beat_ticker.ticked());
@@ -573,7 +573,7 @@ mod tests {
         let t2 = daemon.verify_authority_async(TERM, COMMIT_INDEX);
 
         daemon.reset_state(NEXT_TERM);
-        const CURRENT_BEATS: [usize; 5] = [12, 10, 8, 6, 4];
+        const CURRENT_BEATS: [u64; 5] = [12, 10, 8, 6, 4];
         for (index, beat_ticker) in daemon.beat_tickers.iter().enumerate() {
             assert_eq!(CURRENT_BEATS[index], beat_ticker.current_beat().0);
         }

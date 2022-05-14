@@ -1,15 +1,15 @@
 use std::ops::Deref;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 /// A beat is one request sent to a peer with a success response.
 /// The `usize` within is the unique ID of the request.
 #[cfg(not(test))]
 #[derive(Debug, Eq, Ord, PartialOrd, PartialEq)]
-pub(crate) struct Beat(usize);
+pub(crate) struct Beat(u64);
 #[cfg(test)]
 #[derive(Debug, Eq, Ord, PartialOrd, PartialEq)]
-pub(crate) struct Beat(pub(crate) usize);
+pub(crate) struct Beat(pub(crate) u64);
 
 /// A `BeatTicker` issues unique request IDs and records successful runs.
 ///
@@ -31,13 +31,8 @@ pub(crate) struct Beat(pub(crate) usize);
 /// confirmed the leader status after `T`, we can be sure that at time `T` we
 /// were the leader.
 pub(crate) struct BeatTicker {
-    // Beat count might overflow after 25 days at 2000 QPS to a single peer, if
-    // we assume usize is 32-bit.
-    // This should not be a problem because:
-    // 1. usize is usually 64-bit.
-    // 2. 2000 QPS is an overestimate.
-    beat_count: AtomicUsize,
-    ticked: AtomicUsize,
+    beat_count: AtomicU64,
+    ticked: AtomicU64,
 }
 
 impl BeatTicker {
@@ -46,15 +41,15 @@ impl BeatTicker {
     /// value of successful request will start at ID 0.
     fn create() -> Self {
         Self {
-            beat_count: AtomicUsize::new(1),
-            ticked: AtomicUsize::new(0),
+            beat_count: AtomicU64::new(1),
+            ticked: AtomicU64::new(0),
         }
     }
 
     /// Issues the next unique request ID.
     pub fn next_beat(&self) -> Beat {
         let count = self.beat_count.fetch_add(1, Ordering::AcqRel);
-        assert_ne!(count, usize::MAX, "BeatTicker count overflow");
+        assert_ne!(count, u64::MAX, "BeatTicker count overflow");
         Beat(count)
     }
 

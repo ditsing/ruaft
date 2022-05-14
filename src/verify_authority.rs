@@ -566,6 +566,25 @@ mod tests {
     }
 
     #[test]
+    fn test_reset_state() {
+        let daemon = init_daemon();
+        let t0 = daemon.verify_authority_async(TERM, COMMIT_INDEX - 2);
+        let t1 = daemon.verify_authority_async(TERM, COMMIT_INDEX - 1);
+        let t2 = daemon.verify_authority_async(TERM, COMMIT_INDEX);
+
+        daemon.reset_state(NEXT_TERM);
+        const CURRENT_BEATS: [usize; 5] = [12, 10, 8, 6, 4];
+        for (index, beat_ticker) in daemon.beat_tickers.iter().enumerate() {
+            assert_eq!(CURRENT_BEATS[index], beat_ticker.current_beat().0);
+        }
+
+        assert_queue_len!(&daemon, 0);
+        assert_ticket_ready!(t0, VerifyAuthorityResult::TermElapsed);
+        assert_ticket_ready!(t1, VerifyAuthorityResult::TermElapsed);
+        assert_ticket_ready!(t2, VerifyAuthorityResult::TermElapsed);
+    }
+
+    #[test]
     fn test_clear_committed_requests() {
         let daemon = init_daemon();
         let t0 = daemon.verify_authority_async(TERM, COMMIT_INDEX - 2);

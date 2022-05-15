@@ -95,7 +95,7 @@ impl ClerkInner {
             let reply: Option<CommitSentinelReply> = self.retry_rpc(
                 |remote, args| remote.commit_sentinel(args),
                 args,
-                Some(1),
+                None,
             );
             if let Some(reply) = reply {
                 match reply.result {
@@ -110,7 +110,12 @@ impl ClerkInner {
                         // committed more than just the sentinel.
                         self.unique_id = UniqueIdSequence::new();
                     }
-                    Err(_) => {}
+                    Err(e) => {
+                        panic!(
+                            "Unexpected error with indefinite retry: {:?}",
+                            e
+                        );
+                    }
                 };
             };
         }

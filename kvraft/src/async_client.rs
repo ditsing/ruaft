@@ -92,7 +92,7 @@ impl AsyncClient {
                 .retry_rpc(
                     |remote, args| remote.commit_sentinel(args),
                     args,
-                    Some(1),
+                    None,
                 )
                 .await;
             if let Some(reply) = reply {
@@ -106,10 +106,12 @@ impl AsyncClient {
                         // committed more than just the sentinel.
                         // Do nothing.
                     }
-                    // Technically we do not need to create new unique ID
-                    // sequence if the error is TimeOut or NotLeader. But it
-                    // does not hurt to refresh anyway.
-                    Err(_) => {}
+                    Err(e) => {
+                        panic!(
+                            "Unexpected error with indefinite retry: {:?}",
+                            e
+                        );
+                    }
                 };
             };
         }

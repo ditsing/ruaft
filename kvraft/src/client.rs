@@ -163,21 +163,14 @@ impl ClerkInner {
     /// This function returns None when
     /// 1. No KVServer can be reached, or
     /// 2. No KVServer claimed to be the leader, or
-    /// 3. When the KVServer committed the request but it was not passed
-    /// back to the clerk. We must retry with a new unique_id.
     ///
-    /// In all 3 cases the request can be retried.
-    ///
-    /// This function do not expect a Conflict request with the same unique_id.
+    /// In both cases the request can be retried.
     pub fn get(
         &mut self,
         key: String,
         options: KVRaftOptions,
     ) -> Option<Option<String>> {
-        let args = GetArgs {
-            key,
-            unique_id: self.unique_id.inc(),
-        };
+        let args = GetArgs { key };
         let reply: GetReply = self.retry_rpc(
             |remote, args| remote.get(args),
             args,
@@ -185,6 +178,7 @@ impl ClerkInner {
         )?;
         match reply.result {
             Ok(val) => Some(val),
+            Err(KVError::Expired) => panic!("Get requests do not expire."),
             Err(KVError::Conflict) => panic!("We should never see a conflict."),
             _ => None,
         }

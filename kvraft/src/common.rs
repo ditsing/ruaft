@@ -75,8 +75,6 @@ pub struct PutAppendReply {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct GetArgs {
     pub key: String,
-
-    pub unique_id: UniqueId,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

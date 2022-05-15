@@ -43,7 +43,7 @@ impl UniqueIdSequence {
         }
     }
 
-    pub fn inc(&mut self) -> UniqueId {
+    pub fn inc(&self) -> UniqueId {
         let seq = self.sequence_id.fetch_add(1, Ordering::Relaxed);
         UniqueId {
             clerk_id: self.clerk_id,

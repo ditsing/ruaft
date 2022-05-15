@@ -27,11 +27,9 @@ impl Clerk {
         let inner = self.init_once();
 
         let key = key.as_ref();
-        loop {
-            if let Some(val) = inner.get(key.to_owned(), Default::default()) {
-                return val;
-            }
-        }
+        inner
+            .get(key.to_owned(), Default::default())
+            .expect("Get should never return error with unlimited retry.")
     }
 
     pub fn put<K: AsRef<str>, V: AsRef<str>>(&mut self, key: K, value: V) {

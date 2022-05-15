@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
@@ -7,11 +8,10 @@ use lazy_static::lazy_static;
 use serde_derive::{Deserialize, Serialize};
 use warp::Filter;
 
-use crate::one_clerk::create_clerk;
+use crate::kv_service::create_async_clerk;
 use crate::run::run_kv_instance;
 
 mod kv_service;
-mod one_clerk;
 mod persister;
 mod raft_service;
 mod run;
@@ -45,28 +45,32 @@ lazy_static! {
     ];
 }
 
-const NOT_READY: &str = "Clerk is not ready";
-
 async fn run_web_server(socket_addr: SocketAddr, kv_server: Arc<KVServer>) {
     let is_leader = warp::get()
         .and(warp::path!("kvstore" / "is_leader"))
-        .map(move || format!("{:?}", kv_server.raft().get_state()));
+        .and_then(move || {
+            let kv_server = kv_server.clone();
+            async move {
+                let ret: Result<String, Infallible> =
+                    Ok(format!("{:?}", kv_server.raft().get_state()));
+                ret
+            }
+        });
 
+    let clerk = Arc::new(create_async_clerk(KV_ADDRS.clone()).await);
     let counter = Arc::new(AtomicUsize::new(0));
-    let counter_2 = counter.clone();
-    let counter_3 = counter.clone();
-    let clerk = create_clerk(KV_ADDRS.clone());
 
     let get_clerk = clerk.clone();
     let get = warp::get()
         .and(warp::path!("kvstore" / "get" / String))
-        .map(move |key: String| {
+        .and_then(move |key: String| {
             let counter = counter.fetch_add(1, Ordering::SeqCst).to_string();
-            match get_clerk.get(key.clone()) {
-                Some(value) => {
-                    key + "!" + counter.as_str() + "!" + value.as_str()
-                }
-                None => NOT_READY.to_string(),
+            let get_clerk = get_clerk.clone();
+            async move {
+                let value = get_clerk.get(&key).await.unwrap_or_default();
+                let ret: Result<String, Infallible> =
+                    Ok(key + "!" + counter.as_str() + "!" + value.as_str());
+                ret
             }
         });
 
@@ -74,25 +78,26 @@ async fn run_web_server(socket_addr: SocketAddr, kv_server: Arc<KVServer>) {
     let put = warp::post()
         .and(warp::path!("kvstore" / "put"))
         .and(warp::body::json())
-        .map(move |body: PutAppendBody| {
-            counter_2.fetch_add(1, Ordering::SeqCst);
-            let code = match put_clerk.put(body.key, body.value) {
-                None => warp::http::StatusCode::SERVICE_UNAVAILABLE,
-                Some(_) => warp::http::StatusCode::OK,
-            };
-            warp::reply::with_status(warp::reply(), code)
+        .and_then(move |body: PutAppendBody| {
+            let put_clerk = put_clerk.clone();
+            async move {
+                put_clerk.put(body.key, body.value).await;
+                let ret: Result<String, Infallible> = Ok("OK".to_string());
+                ret
+            }
         });
+
     let append_clerk = clerk.clone();
     let append = warp::post()
         .and(warp::path!("kvstore" / "append"))
         .and(warp::body::json())
-        .map(move |body: PutAppendBody| {
-            counter_3.fetch_add(1, Ordering::SeqCst);
-            let code = match append_clerk.append(body.key, body.value) {
-                None => warp::http::StatusCode::SERVICE_UNAVAILABLE,
-                Some(_) => warp::http::StatusCode::OK,
-            };
-            warp::reply::with_status(warp::reply(), code)
+        .and_then(move |body: PutAppendBody| {
+            let append_clerk = append_clerk.clone();
+            async move {
+                append_clerk.append(body.key, body.value).await;
+                let ret: Result<String, Infallible> = Ok("OK".to_string());
+                ret
+            }
         });
 
     let routes = is_leader.or(get).or(put).or(append);

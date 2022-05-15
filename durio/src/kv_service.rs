@@ -6,8 +6,8 @@ use async_trait::async_trait;
 use tarpc::context::Context;
 
 use kvraft::{
-    CommitSentinelArgs, CommitSentinelReply, GetArgs, GetReply, KVServer,
-    PutAppendArgs, PutAppendReply, RemoteKvraft,
+    AsyncClerk, CommitSentinelArgs, CommitSentinelReply, GetArgs, GetReply,
+    KVServer, PutAppendArgs, PutAppendReply, RemoteKvraft,
 };
 
 #[tarpc::service]
@@ -70,7 +70,6 @@ impl RemoteKvraft for KVServiceClient {
     }
 }
 
-#[allow(dead_code)]
 pub(crate) async fn connect_to_kv_service(
     addr: SocketAddr,
 ) -> std::io::Result<KVServiceClient> {
@@ -82,6 +81,35 @@ pub(crate) async fn connect_to_kv_service(
     let client =
         KVServiceClient::new(tarpc::client::Config::default(), conn).spawn();
     Ok(client)
+}
+
+pub async fn connect_to_kv_services(
+    socket_addrs: Vec<SocketAddr>,
+) -> Vec<impl RemoteKvraft> {
+    log::info!("Starting clerk creation ...");
+    let mut clients = vec![None; socket_addrs.len()];
+    while clients.iter().filter(|e| e.is_none()).count() != 0 {
+        for (index, socket_addr) in socket_addrs.iter().enumerate() {
+            if clients[index].is_some() {
+                continue;
+            }
+            let result = connect_to_kv_service(*socket_addr).await;
+            match result {
+                Ok(client) => clients[index] = Some(client),
+                Err(e) => {
+                    log::error!("Error connecting to {:?}: {}", socket_addr, e)
+                }
+            }
+        }
+        log::info!("Clerk clients are {:?}", clients);
+    }
+
+    log::info!("Done clerk creation ...");
+    clients.into_iter().map(|e| e.unwrap()).collect()
+}
+
+pub async fn create_async_clerk(socket_addrs: Vec<SocketAddr>) -> AsyncClerk {
+    AsyncClerk::new(connect_to_kv_services(socket_addrs).await)
 }
 
 pub(crate) fn start_kv_service_server(

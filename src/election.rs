@@ -21,8 +21,8 @@ pub(crate) struct ElectionState {
     signal: Condvar,
 }
 
-const ELECTION_TIMEOUT_BASE_MILLIS: u64 = 150;
-const ELECTION_TIMEOUT_VAR_MILLIS: u64 = 250;
+const ELECTION_TIMEOUT_BASE_MILLIS: u64 = 200;
+const ELECTION_TIMEOUT_VAR_MILLIS: u64 = 200;
 impl ElectionState {
     pub(crate) fn create() -> Self {
         Self {

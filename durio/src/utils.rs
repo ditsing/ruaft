@@ -5,6 +5,18 @@ use futures_util::StreamExt;
 use tarpc::client::RpcError;
 use tarpc::server::{Channel, Serve};
 
+pub(crate) fn deadline_forever() -> std::time::SystemTime {
+    std::time::SystemTime::now()
+        // This is the maximum deadline allowed by tarpc / tokio_util.
+        + std::time::Duration::from_secs(2 * 365 * 24 * 60 * 60)
+}
+
+pub(crate) fn context() -> tarpc::context::Context {
+    let mut context = tarpc::context::Context::current();
+    context.deadline = deadline_forever();
+    context
+}
+
 pub(crate) fn translate_rpc_error(e: RpcError) -> std::io::Error {
     match e {
         RpcError::Disconnected => std::io::Error::new(ErrorKind::BrokenPipe, e),

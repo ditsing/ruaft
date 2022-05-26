@@ -82,7 +82,7 @@ impl RemoteRaft<UniqueKVOp> for LazyRaftServiceClient {
     ) -> std::io::Result<RequestVoteReply> {
         self.get_or_try_init()
             .await?
-            .request_vote(Context::current(), args)
+            .request_vote(crate::utils::context(), args)
             .await
             .map_err(crate::utils::translate_rpc_error)
     }
@@ -93,7 +93,7 @@ impl RemoteRaft<UniqueKVOp> for LazyRaftServiceClient {
     ) -> std::io::Result<AppendEntriesReply> {
         self.get_or_try_init()
             .await?
-            .append_entries(Context::current(), args)
+            .append_entries(crate::utils::context(), args)
             .await
             .map_err(crate::utils::translate_rpc_error)
     }
@@ -104,7 +104,7 @@ impl RemoteRaft<UniqueKVOp> for LazyRaftServiceClient {
     ) -> std::io::Result<InstallSnapshotReply> {
         self.get_or_try_init()
             .await?
-            .install_snapshot(Context::current(), args)
+            .install_snapshot(crate::utils::context(), args)
             .await
             .map_err(crate::utils::translate_rpc_error)
     }

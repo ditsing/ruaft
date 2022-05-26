@@ -46,7 +46,7 @@ impl KVService for KVRpcServer {
 #[async_trait]
 impl RemoteKvraft for KVServiceClient {
     async fn get(&self, args: GetArgs) -> std::io::Result<GetReply> {
-        self.get(Context::current(), args)
+        self.get(crate::utils::context(), args)
             .await
             .map_err(crate::utils::translate_rpc_error)
     }
@@ -55,7 +55,7 @@ impl RemoteKvraft for KVServiceClient {
         &self,
         args: PutAppendArgs,
     ) -> std::io::Result<PutAppendReply> {
-        self.put_append(Context::current(), args)
+        self.put_append(crate::utils::context(), args)
             .await
             .map_err(crate::utils::translate_rpc_error)
     }
@@ -64,7 +64,7 @@ impl RemoteKvraft for KVServiceClient {
         &self,
         args: CommitSentinelArgs,
     ) -> std::io::Result<CommitSentinelReply> {
-        self.commit_sentinel(Context::current(), args)
+        self.commit_sentinel(crate::utils::context(), args)
             .await
             .map_err(crate::utils::translate_rpc_error)
     }

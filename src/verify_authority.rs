@@ -8,7 +8,8 @@ use parking_lot::{Condvar, Mutex};
 
 use crate::beat_ticker::{Beat, SharedBeatTicker};
 use crate::daemon_env::Daemon;
-use crate::{Index, Raft, Term, HEARTBEAT_INTERVAL_MILLIS};
+use crate::heartbeats::HEARTBEAT_INTERVAL_MILLIS;
+use crate::{Index, Raft, Term};
 
 /// The result returned to a verify authority request.
 /// This request is not directly exposed to end users. Instead it is used

@@ -2,7 +2,8 @@ use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use crate::daemon_env::Daemon;
-use crate::{Index, Raft, Snapshot, HEARTBEAT_INTERVAL_MILLIS};
+use crate::heartbeats::HEARTBEAT_INTERVAL_MILLIS;
+use crate::{Index, Raft, Snapshot};
 
 pub enum ApplyCommandMessage<Command> {
     Snapshot(Snapshot),

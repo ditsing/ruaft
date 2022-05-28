@@ -6,13 +6,14 @@ use parking_lot::{Condvar, Mutex};
 
 use crate::check_or_record;
 use crate::daemon_env::{Daemon, ErrorKind};
+use crate::heartbeats::HEARTBEAT_INTERVAL_MILLIS;
 use crate::index_term::IndexTerm;
 use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, SharedSender, RPC_DEADLINE};
 use crate::verify_authority::DaemonBeatTicker;
 use crate::{
     AppendEntriesArgs, InstallSnapshotArgs, Peer, Raft, RaftState, RemoteRaft,
-    Term, HEARTBEAT_INTERVAL_MILLIS,
+    Term,
 };
 
 #[repr(align(64))]

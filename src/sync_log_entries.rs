@@ -1,12 +1,11 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
 
 use parking_lot::{Condvar, Mutex};
 
 use crate::check_or_record;
 use crate::daemon_env::{Daemon, ErrorKind};
-use crate::heartbeats::HEARTBEAT_INTERVAL_MILLIS;
+use crate::heartbeats::HEARTBEAT_INTERVAL;
 use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, SharedSender, RPC_DEADLINE};
 use crate::verify_authority::DaemonBeatTicker;
@@ -346,10 +345,7 @@ where
                 term_marker.mark(term);
             }
             Err(_) => {
-                tokio::time::sleep(Duration::from_millis(
-                    HEARTBEAT_INTERVAL_MILLIS,
-                ))
-                .await;
+                tokio::time::sleep(HEARTBEAT_INTERVAL).await;
                 // Ignore the error. The log syncing thread must have died.
                 let _ = rerun.send(Some(Peer(peer_index)));
             }

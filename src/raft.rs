@@ -1,6 +1,5 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Duration;
 
 use crossbeam_utils::sync::WaitGroup;
 use parking_lot::{Condvar, Mutex};
@@ -9,7 +8,7 @@ use serde_derive::{Deserialize, Serialize};
 use crate::apply_command::ApplyCommandFnMut;
 use crate::daemon_env::{DaemonEnv, ThreadEnv};
 use crate::election::ElectionState;
-use crate::heartbeats::{HeartbeatsDaemon, HEARTBEAT_INTERVAL_MILLIS};
+use crate::heartbeats::{HeartbeatsDaemon, HEARTBEAT_INTERVAL};
 use crate::persister::PersistedRaftState;
 use crate::snapshot::{RequestSnapshotFnMut, SnapshotDaemon};
 use crate::verify_authority::VerifyAuthorityDaemon;
@@ -142,9 +141,7 @@ where
         this.run_apply_command_daemon(apply_command);
         // One off function that schedules many little tasks, running on the
         // internal thread pool.
-        this.schedule_heartbeats(Duration::from_millis(
-            HEARTBEAT_INTERVAL_MILLIS,
-        ));
+        this.schedule_heartbeats(HEARTBEAT_INTERVAL);
         // The last step is to start running election timer.
         this.run_election_timer();
         this
@@ -203,9 +200,7 @@ where
             .expect(
                 "All references to the thread pool should have been dropped.",
             )
-            .shutdown_timeout(Duration::from_millis(
-                HEARTBEAT_INTERVAL_MILLIS * 2,
-            ));
+            .shutdown_timeout(HEARTBEAT_INTERVAL * 2);
         // DaemonEnv must be shutdown after the thread pool, since there might
         // be tasks logging errors in the pool.
         self.daemon_env.shutdown();

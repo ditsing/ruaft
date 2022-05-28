@@ -1,8 +1,7 @@
 use std::sync::atomic::Ordering;
-use std::time::Duration;
 
 use crate::daemon_env::Daemon;
-use crate::heartbeats::HEARTBEAT_INTERVAL_MILLIS;
+use crate::heartbeats::HEARTBEAT_INTERVAL;
 use crate::{Index, Raft, Snapshot};
 
 pub enum ApplyCommandMessage<Command> {
@@ -71,10 +70,7 @@ where
                     if rf.last_applied >= rf.commit_index {
                         // We have applied all committed log entries, wait until
                         // new log entries are committed.
-                        condvar.wait_for(
-                            &mut rf,
-                            Duration::from_millis(HEARTBEAT_INTERVAL_MILLIS),
-                        );
+                        condvar.wait_for(&mut rf, HEARTBEAT_INTERVAL);
                     }
                     // Note that between those two nested `if`s, log start is
                     // always smaller than or equal to commit index, as

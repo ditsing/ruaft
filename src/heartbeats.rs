@@ -9,7 +9,7 @@ use crate::utils::{retry_rpc, RPC_DEADLINE};
 use crate::verify_authority::DaemonBeatTicker;
 use crate::{AppendEntriesArgs, Raft, RaftState, RemoteRaft};
 
-pub(crate) const HEARTBEAT_INTERVAL_MILLIS: u64 = 150;
+pub(crate) const HEARTBEAT_INTERVAL: Duration = Duration::from_millis(150);
 
 #[derive(Clone)]
 pub(crate) struct HeartbeatsDaemon {

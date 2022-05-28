@@ -8,7 +8,7 @@ use parking_lot::{Condvar, Mutex};
 
 use crate::beat_ticker::{Beat, SharedBeatTicker};
 use crate::daemon_env::Daemon;
-use crate::heartbeats::HEARTBEAT_INTERVAL_MILLIS;
+use crate::heartbeats::HEARTBEAT_INTERVAL;
 use crate::{Index, Raft, Term};
 
 /// The result returned to a verify authority request.
@@ -313,7 +313,7 @@ impl VerifyAuthorityDaemon {
     }
 
     const VERIFY_AUTHORITY_REQUEST_EXPIRATION: Duration =
-        Duration::from_millis(HEARTBEAT_INTERVAL_MILLIS * 2);
+        Duration::from_millis(HEARTBEAT_INTERVAL.as_millis() as u64 * 2);
 
     /// Remove expired requests if we are no longer the leader.
     /// If we have lost leadership, we are unlikely to receive confirmations

@@ -1,7 +1,7 @@
 use serde_derive::{Deserialize, Serialize};
 
 use crate::index_term::IndexTerm;
-use crate::{Index, LogEntry, Term};
+use crate::{Index, LogEntry, LogEntryEnum, Term};
 
 /// A log array that stores a tail of the whole Raft log.
 ///
@@ -149,16 +149,21 @@ impl<C> LogArray<C> {
 
 // Mutations
 impl<C> LogArray<C> {
-    /// Add a new entry to the Raft log, with term and command. The new index is
-    /// returned.
-    pub fn add_command(&mut self, term: Term, command: C) -> Index {
+    /// Add a new entry to the Raft log. The new index is returned.
+    pub fn add_entry(&mut self, term: Term, entry: LogEntryEnum<C>) -> Index {
         let index = self.end();
         self.push(LogEntry {
             index,
             term,
-            command,
+            command: entry,
         });
         index
+    }
+
+    /// Add a new entry to the Raft log, with term and command. The new index is
+    /// returned.
+    pub fn add_command(&mut self, term: Term, command: C) -> Index {
+        self.add_entry(term, LogEntryEnum::Command(command))
     }
 
     /// Push a LogEntry into the Raft log. The index of the log entry must match
@@ -292,12 +297,12 @@ impl<C> LogArray<C> {
     }
 }
 
-impl<C: Default> LogArray<C> {
+impl<C> LogArray<C> {
     fn build_first_entry(index: Index, term: Term) -> LogEntry<C> {
         LogEntry {
             index,
             term,
-            command: C::default(),
+            command: LogEntryEnum::Noop,
         }
     }
 }
@@ -326,7 +331,7 @@ mod tests {
             ret.push(LogEntry {
                 term: Term(i / 3),
                 index: i,
-                command: (end - i) as i32,
+                command: LogEntryEnum::Command((end - i) as i32),
             })
         }
 
@@ -347,7 +352,7 @@ mod tests {
 
         assert_eq!(1, log.end());
         assert_eq!((0, Term(0)), log.first_index_term().into());
-        assert_eq!(0, log[0].command);
+        assert_eq!(LogEntryEnum::Noop, log[0].command);
     }
 
     #[test]
@@ -392,19 +397,19 @@ mod tests {
         let last = log.at(end - 1);
         assert_eq!(end - 1, last.index);
         assert_eq!(5, last.term.0);
-        assert_eq!(1, last.command);
+        assert_eq!(LogEntryEnum::Command(1), last.command);
 
         let first = log.at(start);
         assert_eq!(start, first.index);
         assert_eq!(2, first.term.0);
-        assert_eq!(9, first.command);
+        assert_eq!(LogEntryEnum::Command(9), first.command);
 
         assert!(start < 12);
         assert!(end > 12);
         let middle = log.at(12);
         assert_eq!(12, middle.index);
         assert_eq!(4, middle.term.0);
-        assert_eq!(5, middle.command);
+        assert_eq!(LogEntryEnum::Command(5), middle.command);
 
         let at_before_start = catch_unwind(|| {
             log.at(start - 1);
@@ -480,7 +485,7 @@ mod tests {
         let (_, end, mut log) = default_log_array();
         let index = log.add_command(Term(8), 9);
         assert_eq!(8, log.at(index).term.0);
-        assert_eq!(9, log.at(index).command);
+        assert_eq!(LogEntryEnum::Command(9), log.at(index).command);
         assert_eq!(index, end);
         assert_eq!(index + 1, log.end());
     }
@@ -491,10 +496,10 @@ mod tests {
         log.push(LogEntry {
             term: Term(8),
             index: end,
-            command: 1,
+            command: LogEntryEnum::Command(1),
         });
         assert_eq!(8, log.at(end).term.0);
-        assert_eq!(1, log.at(end).command);
+        assert_eq!(LogEntryEnum::Command(1), log.at(end).command);
         assert_eq!(end + 1, log.end());
     }
 
@@ -505,7 +510,7 @@ mod tests {
         log.push(LogEntry {
             term: Term(8),
             index: end - 1,
-            command: 1,
+            command: LogEntryEnum::Command(1),
         });
     }
 
@@ -516,7 +521,7 @@ mod tests {
         log.push(LogEntry {
             term: Term(8),
             index: end + 1,
-            command: 1,
+            command: LogEntryEnum::Command(1),
         });
     }
 
@@ -572,7 +577,7 @@ mod tests {
         log.shift(offset, vec![]);
 
         assert_eq!((offset, Term(3)), log.first_index_term().into());
-        assert_eq!(0, log[offset].command);
+        assert_eq!(LogEntryEnum::Noop, log[offset].command);
 
         let all = log.all();
         assert_eq!(end - offset, all.len());
@@ -624,7 +629,7 @@ mod tests {
         assert_eq!(vec![1, 2], log.snapshot);
         assert_eq!(88, log[88].index);
         assert_eq!(99, log[88].term.0);
-        assert_eq!(0, log[88].command);
+        assert_eq!(LogEntryEnum::Noop, log[88].command);
 
         assert_eq!(end - start, dump.len());
     }
@@ -698,13 +703,13 @@ mod tests {
         log.push(LogEntry {
             term: Term(3),
             index: 2,
-            command: 3,
+            command: LogEntryEnum::Command(3),
         });
         log.add_command(Term(4), 20);
         log.push(LogEntry {
             term: Term(4),
             index: 4,
-            command: 7,
+            command: LogEntryEnum::Command(7),
         });
 
         for i in 0..100 {
@@ -718,7 +723,7 @@ mod tests {
 
         assert_eq!(8, log.at(8).index);
         assert_eq!(5, log[8].term.0);
-        assert_eq!(7, log[4].command);
+        assert_eq!(LogEntryEnum::Command(7), log[4].command);
 
         log.truncate(50);
         // End changed, start does not.
@@ -727,7 +732,7 @@ mod tests {
 
         assert_eq!((49, Term(5)), log.last_index_term().into());
         assert_eq!(49, log.at(49).index);
-        assert_eq!(44, log[49].command);
+        assert_eq!(LogEntryEnum::Command(44), log[49].command);
         assert_eq!(5, log.at(5).term.0);
         // Cannot assert 50 is out of range. log is mut and cannot be used in
         // catch_unwind().

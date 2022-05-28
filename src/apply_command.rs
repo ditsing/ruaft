@@ -2,11 +2,11 @@ use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use crate::daemon_env::Daemon;
-use crate::{Index, Raft, Snapshot, HEARTBEAT_INTERVAL_MILLIS};
+use crate::{Index, LogEntryEnum, Raft, Snapshot, HEARTBEAT_INTERVAL_MILLIS};
 
 pub enum ApplyCommandMessage<Command> {
     Snapshot(Snapshot),
-    Command(Index, Command),
+    Command(Index, Option<Command>),
 }
 
 pub trait ApplyCommandFnMut<Command>:
@@ -99,9 +99,16 @@ where
                             .between(index, last_one)
                             .iter()
                             .map(|entry| {
+                                let command = match &entry.command {
+                                    LogEntryEnum::Command(command) => {
+                                        Some(command.clone())
+                                    }
+                                    LogEntryEnum::TermChange => None,
+                                    LogEntryEnum::Noop => None,
+                                };
                                 ApplyCommandMessage::Command(
                                     entry.index,
-                                    entry.command.clone(),
+                                    command,
                                 )
                             })
                             .collect();

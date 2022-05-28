@@ -393,7 +393,7 @@ impl Config {
     ) {
         let (index, command) =
             if let ApplyCommandMessage::Command(index, command) = message {
-                (index, command)
+                (index, command.unwrap_or(0))
             } else {
                 // Ignore snapshots.
                 return;

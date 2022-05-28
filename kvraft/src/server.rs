@@ -252,11 +252,13 @@ impl KVServer {
                             this.restore_state(state);
                         }
                         ApplyCommandMessage::Command(index, command) => {
-                            this.apply_op(
-                                command.unique_id,
-                                command.me,
-                                command.op,
-                            );
+                            if let Some(command) = command {
+                                this.apply_op(
+                                    command.unique_id,
+                                    command.me,
+                                    command.op,
+                                );
+                            }
                             this.process_read_requests(index);
                             if let Some(snapshot) = snapshot_holder
                                 .take_snapshot(&this.state.lock(), index)

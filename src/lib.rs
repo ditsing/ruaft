@@ -51,11 +51,18 @@ struct Peer(usize);
 
 pub type Index = usize;
 
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+enum LogEntryEnum<Command> {
+    TermChange,
+    Noop,
+    Command(Command),
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 struct LogEntry<Command> {
     index: Index,
     term: Term,
-    command: Command,
+    command: LogEntryEnum<Command>,
 }
 
 #[derive(Clone)]

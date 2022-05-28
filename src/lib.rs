@@ -1,15 +1,15 @@
 pub use crate::apply_command::ApplyCommandMessage;
 pub use crate::log_array::Index;
-pub(crate) use crate::log_array::LogEntry;
 pub use crate::messages::*;
 pub use crate::persister::Persister;
-pub(crate) use crate::raft::Peer;
 pub use crate::raft::{Raft, Term};
-pub(crate) use crate::raft_state::RaftState;
-pub(crate) use crate::raft_state::State;
 pub use crate::remote_raft::RemoteRaft;
 pub use crate::snapshot::Snapshot;
 pub use crate::verify_authority::VerifyAuthorityResult;
+
+pub(crate) use crate::raft::Peer;
+pub(crate) use crate::raft_state::RaftState;
+pub(crate) use crate::raft_state::State;
 
 mod apply_command;
 mod beat_ticker;

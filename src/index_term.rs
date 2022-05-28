@@ -1,6 +1,7 @@
 use serde_derive::{Deserialize, Serialize};
 
-use crate::{Index, LogEntry, Term};
+use crate::log_array::LogEntry;
+use crate::{Index, Term};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 pub(crate) struct IndexTerm {

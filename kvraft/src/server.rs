@@ -124,7 +124,7 @@ impl KVServer {
         let snapshot_holder_clone = snapshot_holder.clone();
         let ret = Arc::new(Self {
             me,
-            state: Default::default(),
+            state: Mutex::new(KVServerState::default()),
             rf: Raft::new(
                 servers,
                 me,

@@ -13,7 +13,6 @@ use crate::{
     Peer, Persister, Raft, RaftState, RemoteRaft, RequestVoteArgs, State, Term,
 };
 
-#[derive(Default)]
 pub(crate) struct ElectionState {
     // Timer will be removed upon shutdown or elected.
     timer: Mutex<(usize, Option<Instant>)>,

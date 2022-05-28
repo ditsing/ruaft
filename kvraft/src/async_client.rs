@@ -23,7 +23,7 @@ impl AsyncClerk {
 
     pub async fn get<K: AsRef<str>>(&self, key: K) -> Option<String> {
         self.inner
-            .get(key.as_ref().to_owned(), Default::default())
+            .get(key.as_ref().to_owned(), KVRaftOptions::default())
             .await
             .expect("Get should never return error with unlimited retry.")
     }
@@ -32,7 +32,7 @@ impl AsyncClerk {
         let key = key.as_ref();
         let value = value.as_ref();
         self.inner
-            .put(key.to_owned(), value.to_owned(), Default::default())
+            .put(key.to_owned(), value.to_owned(), KVRaftOptions::default())
             .await
             .expect("Put should never return error with unlimited retry.")
     }
@@ -41,7 +41,7 @@ impl AsyncClerk {
         let key = key.as_ref();
         let value = value.as_ref();
         self.inner
-            .append(key.to_owned(), value.to_owned(), Default::default())
+            .append(key.to_owned(), value.to_owned(), KVRaftOptions::default())
             .await
             .expect("Append should never return error with unlimited retry.")
     }
@@ -318,7 +318,7 @@ mod tests {
         let fake_remote_kvraft0 = FakeRemoteKvraft {
             peer_size: 5,
             id: 0,
-            data: Arc::new(Default::default()),
+            data: Arc::new(Mutex::new(HashMap::new())),
         };
         fake_remote_kvraft0
             .data

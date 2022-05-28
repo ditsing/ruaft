@@ -30,7 +30,7 @@ struct VerifyAuthorityToken {
     sender: tokio::sync::oneshot::Sender<VerifyAuthorityResult>,
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, Ord, PartialOrd, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialOrd, PartialEq)]
 struct QueueIndex(usize);
 
 /// The state of this daemon, should bee protected by a mutex.
@@ -52,7 +52,7 @@ impl VerifyAuthorityState {
     pub fn create(peer_count: usize) -> Self {
         VerifyAuthorityState {
             term: Term(0),
-            queue: Default::default(),
+            queue: VecDeque::new(),
             start: QueueIndex(0),
             covered: vec![QueueIndex(0); peer_count],
         }

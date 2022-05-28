@@ -14,7 +14,7 @@ pub struct Snapshot {
     pub data: Vec<u8>,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub(crate) struct SnapshotDaemon {
     unparker: Option<Unparker>,
     current_snapshot: Arc<(Mutex<Snapshot>, Condvar)>,
@@ -25,6 +25,14 @@ pub trait RequestSnapshotFnMut: 'static + Send + FnMut(Index) {}
 impl<T: 'static + Send + FnMut(Index)> RequestSnapshotFnMut for T {}
 
 impl SnapshotDaemon {
+    /// Create a new snapshot daemon.
+    pub fn create() -> Self {
+        Self {
+            unparker: None,
+            current_snapshot: Default::default(),
+        }
+    }
+
     /// Saves the snapshot into the staging area of the daemon, before it is
     /// applied to the log.
     ///

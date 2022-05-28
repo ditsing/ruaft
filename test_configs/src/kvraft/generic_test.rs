@@ -105,7 +105,7 @@ fn linearizability_client(
             call_op = KvInput {
                 op: KvOp::Get,
                 key,
-                value: Default::default(),
+                value: String::new(),
             };
             return_op = result;
         }

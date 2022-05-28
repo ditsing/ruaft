@@ -28,7 +28,7 @@ impl Clerk {
 
         let key = key.as_ref();
         inner
-            .get(key.to_owned(), Default::default())
+            .get(key.to_owned(), KVRaftOptions::default())
             .expect("Get should never return error with unlimited retry.")
     }
 
@@ -38,7 +38,7 @@ impl Clerk {
         let key = key.as_ref();
         let value = value.as_ref();
         inner
-            .put(key.to_owned(), value.to_owned(), Default::default())
+            .put(key.to_owned(), value.to_owned(), KVRaftOptions::default())
             .expect("Put should never return error with unlimited retry.")
     }
 
@@ -48,7 +48,7 @@ impl Clerk {
         let key = key.as_ref();
         let value = value.as_ref();
         inner
-            .append(key.to_owned(), value.to_owned(), Default::default())
+            .append(key.to_owned(), value.to_owned(), KVRaftOptions::default())
             .expect("Append should never return error with unlimited retry.")
     }
 

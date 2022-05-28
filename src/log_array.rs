@@ -1,7 +1,7 @@
 use serde_derive::{Deserialize, Serialize};
 
 use crate::index_term::IndexTerm;
-use crate::{Index, LogEntry, LogEntryEnum, Term};
+use crate::Term;
 
 /// A log array that stores a tail of the whole Raft log.
 ///
@@ -26,7 +26,23 @@ use crate::{Index, LogEntry, LogEntryEnum, Term};
 /// index, a term and a snapshot.
 ///
 /// All APIs **will** panic if the given index(es) are out of bound.
-///
+
+pub type Index = usize;
+
+#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+enum LogEntryEnum<Command> {
+    TermChange,
+    Noop,
+    Command(Command),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct LogEntry<Command> {
+    pub index: Index,
+    pub term: Term,
+    command: LogEntryEnum<Command>,
+}
+
 /// NOT THREAD SAFE.
 #[derive(Clone, Serialize, Deserialize)]
 pub(crate) struct LogArray<C> {
@@ -50,6 +66,16 @@ impl<C: Default> LogArray<C> {
         };
         ret.check_one_element();
         ret
+    }
+}
+
+impl<C> LogEntry<C> {
+    pub fn command(&self) -> Option<&C> {
+        match &self.command {
+            LogEntryEnum::TermChange => None,
+            LogEntryEnum::Noop => None,
+            LogEntryEnum::Command(command) => Some(command),
+        }
     }
 }
 
@@ -150,7 +176,7 @@ impl<C> LogArray<C> {
 // Mutations
 impl<C> LogArray<C> {
     /// Add a new entry to the Raft log. The new index is returned.
-    pub fn add_entry(&mut self, term: Term, entry: LogEntryEnum<C>) -> Index {
+    fn add_entry(&mut self, term: Term, entry: LogEntryEnum<C>) -> Index {
         let index = self.end();
         self.push(LogEntry {
             index,
@@ -164,6 +190,11 @@ impl<C> LogArray<C> {
     /// returned.
     pub fn add_command(&mut self, term: Term, command: C) -> Index {
         self.add_entry(term, LogEntryEnum::Command(command))
+    }
+
+    /// Add a new term change entry to the Raft log. The new index is returned.
+    pub fn add_term_change_entry(&mut self, term: Term) -> Index {
+        self.add_entry(term, LogEntryEnum::TermChange)
     }
 
     /// Push a LogEntry into the Raft log. The index of the log entry must match
@@ -486,6 +517,16 @@ mod tests {
         let index = log.add_command(Term(8), 9);
         assert_eq!(8, log.at(index).term.0);
         assert_eq!(LogEntryEnum::Command(9), log.at(index).command);
+        assert_eq!(index, end);
+        assert_eq!(index + 1, log.end());
+    }
+
+    #[test]
+    fn test_add_term_change() {
+        let (_, end, mut log) = default_log_array();
+        let index = log.add_term_change_entry(Term(8));
+        assert_eq!(8, log.at(index).term.0);
+        assert_eq!(LogEntryEnum::TermChange, log.at(index).command);
         assert_eq!(index, end);
         assert_eq!(index + 1, log.end());
     }
@@ -823,5 +864,29 @@ mod tests {
             .validate(Term(last_term + 1))
             .expect_err("Validation should have failed");
         assert!(matches!(err, ValidationError::IndexMismatch(8, _)));
+    }
+
+    #[test]
+    fn test_log_entry_command() {
+        let entry = LogEntry::<i32> {
+            index: 0,
+            term: Term(0),
+            command: LogEntryEnum::TermChange,
+        };
+        assert_eq!(None, entry.command());
+
+        let entry = LogEntry::<i32> {
+            index: 0,
+            term: Term(0),
+            command: LogEntryEnum::Noop,
+        };
+        assert_eq!(None, entry.command());
+
+        let entry = LogEntry::<i32> {
+            index: 0,
+            term: Term(0),
+            command: LogEntryEnum::Command(1),
+        };
+        assert_eq!(Some(1), entry.command().cloned());
     }
 }

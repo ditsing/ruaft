@@ -13,6 +13,8 @@ use crate::daemon_env::{DaemonEnv, ThreadEnv};
 use crate::election::ElectionState;
 use crate::heartbeats::HeartbeatsDaemon;
 use crate::index_term::IndexTerm;
+pub use crate::log_array::Index;
+pub(crate) use crate::log_array::LogEntry;
 use crate::persister::PersistedRaftState;
 pub use crate::persister::Persister;
 pub(crate) use crate::raft_state::RaftState;
@@ -48,22 +50,6 @@ mod verify_authority;
 pub struct Term(pub usize);
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize)]
 struct Peer(usize);
-
-pub type Index = usize;
-
-#[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-enum LogEntryEnum<Command> {
-    TermChange,
-    Noop,
-    Command(Command),
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-struct LogEntry<Command> {
-    index: Index,
-    term: Term,
-    command: LogEntryEnum<Command>,
-}
 
 #[derive(Clone)]
 pub struct Raft<Command> {

@@ -10,8 +10,7 @@ use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, SharedSender, RPC_DEADLINE};
 use crate::verify_authority::VerifyAuthorityDaemon;
 use crate::{
-    LogEntryEnum, Peer, Persister, Raft, RaftState, RemoteRaft,
-    RequestVoteArgs, State, Term,
+    Peer, Persister, Raft, RaftState, RemoteRaft, RequestVoteArgs, State, Term,
 };
 
 #[derive(Default)]
@@ -380,8 +379,7 @@ where
             verify_authority_daemon.reset_state(term);
 
             if rf.commit_index != rf.log.last_index_term().index {
-                rf.sentinel_commit_index =
-                    rf.log.add_entry(term, LogEntryEnum::TermChange);
+                rf.sentinel_commit_index = rf.log.add_term_change_entry(term);
                 persister.save_state(rf.persisted_state().into());
             } else {
                 rf.sentinel_commit_index = rf.commit_index;

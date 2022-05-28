@@ -6,8 +6,7 @@ use parking_lot::Mutex;
 #[cfg(all(not(test), feature = "integration-test"))]
 use test_utils::thread_local_logger::{self, LocalLogger};
 
-use crate::index_term::IndexTerm;
-use crate::{Peer, RaftState, State, Term};
+use crate::{IndexTerm, Peer, RaftState, State, Term};
 
 /// A convenient macro to record errors.
 #[macro_export]

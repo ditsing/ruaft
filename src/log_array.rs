@@ -1,7 +1,6 @@
 use serde_derive::{Deserialize, Serialize};
 
-use crate::index_term::IndexTerm;
-use crate::Term;
+use crate::{IndexTerm, Term};
 
 /// A log array that stores a tail of the whole Raft log.
 ///

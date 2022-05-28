@@ -1,9 +1,8 @@
 use serde_derive::{Deserialize, Serialize};
 
-use crate::index_term::IndexTerm;
 use crate::log_array::LogEntry;
 use crate::raft::{Peer, Term};
-use crate::Index;
+use crate::{Index, IndexTerm};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RequestVoteArgs {

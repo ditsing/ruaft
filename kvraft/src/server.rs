@@ -377,11 +377,11 @@ impl KVServer {
                 unique_id,
             };
             let start = log_with!(self.logger, self.rf.start(op));
-            let start_term =
-                start.map_or(Self::UNSEEN_TERM, |(Term(term), _)| {
-                    Self::validate_term(term);
-                    term
-                });
+            let start_term = start.map_or(Self::UNSEEN_TERM, |index_term| {
+                let Term(term) = index_term.term;
+                Self::validate_term(term);
+                term
+            });
             let set = result_holder.term.compare_exchange(
                 Self::ATTEMPTING_TERM,
                 start_term,

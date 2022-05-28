@@ -1,4 +1,5 @@
 pub use crate::apply_command::ApplyCommandMessage;
+pub use crate::index_term::IndexTerm;
 pub use crate::log_array::Index;
 pub use crate::messages::*;
 pub use crate::persister::Persister;

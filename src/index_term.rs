@@ -4,7 +4,7 @@ use crate::log_array::LogEntry;
 use crate::{Index, Term};
 
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-pub(crate) struct IndexTerm {
+pub struct IndexTerm {
     pub index: Index,
     pub term: Term,
 }
@@ -26,15 +26,16 @@ impl From<IndexTerm> for (Index, Term) {
 
 impl From<(Index, Term)> for IndexTerm {
     fn from(index_term: (Index, Term)) -> Self {
-        IndexTerm {
-            index: index_term.0,
-            term: index_term.1,
-        }
+        Self::pack(index_term.0, index_term.1)
     }
 }
 
 impl IndexTerm {
     pub fn unpack(&self) -> (Index, Term) {
         (self.index, self.term)
+    }
+
+    pub fn pack(index: Index, term: Term) -> Self {
+        Self { index, term }
     }
 }

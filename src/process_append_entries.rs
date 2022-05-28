@@ -1,7 +1,7 @@
 use crate::daemon_env::ErrorKind;
-use crate::index_term::IndexTerm;
 use crate::{
-    check_or_record, AppendEntriesArgs, AppendEntriesReply, Raft, State,
+    check_or_record, AppendEntriesArgs, AppendEntriesReply, IndexTerm, Raft,
+    State,
 };
 
 // Command must be

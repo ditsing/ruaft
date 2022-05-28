@@ -13,7 +13,7 @@ use crate::heartbeats::{HeartbeatsDaemon, HEARTBEAT_INTERVAL_MILLIS};
 use crate::persister::PersistedRaftState;
 use crate::snapshot::{RequestSnapshotFnMut, SnapshotDaemon};
 use crate::verify_authority::VerifyAuthorityDaemon;
-use crate::{utils, Index, Persister, RaftState, RemoteRaft};
+use crate::{utils, IndexTerm, Persister, RaftState, RemoteRaft};
 
 #[derive(
     Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize,
@@ -165,7 +165,7 @@ where
     /// Returns `None` if we are not the leader. The log entry may not have been
     /// committed to the log when this method returns. When and if it is
     /// committed, the `apply_command` callback will be called.
-    pub fn start(&self, command: Command) -> Option<(Term, Index)> {
+    pub fn start(&self, command: Command) -> Option<IndexTerm> {
         let mut rf = self.inner_state.lock();
         let term = rf.current_term;
         if !rf.is_leader() {
@@ -179,7 +179,7 @@ where
         let _ = self.new_log_entry.as_ref().unwrap().send(None);
 
         log::info!("{:?} started new entry at {} {:?}", self.me, index, term);
-        Some((term, index))
+        Some(IndexTerm::pack(index, term))
     }
 
     /// Cleanly shutdown this instance. This function never blocks forever. It

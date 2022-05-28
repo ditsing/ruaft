@@ -208,8 +208,8 @@ impl Config {
                 let state = self.state.lock();
                 if state.connected[cnt] {
                     if let Some(raft) = &state.rafts[cnt] {
-                        if let Some((_, index)) = raft.start(cmd) {
-                            first_index.replace(index);
+                        if let Some(index_term) = raft.start(cmd) {
+                            first_index.replace(index_term.index);
                         }
                     }
                 }
@@ -336,8 +336,9 @@ impl Config {
     ) -> Option<(usize, usize)> {
         self.state.lock().rafts[leader]
             .as_ref()
-            .map(|raft| raft.start(cmd).map(|(term, index)| (term.0, index)))
             .unwrap()
+            .start(cmd)
+            .map(|index_term| (index_term.term.0, index_term.index))
     }
 
     pub fn is_connected(&self, index: usize) -> bool {

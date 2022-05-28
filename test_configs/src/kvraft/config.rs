@@ -5,10 +5,10 @@ use parking_lot::Mutex;
 use rand::seq::SliceRandom;
 use rand::thread_rng;
 
-use crate::{register_kv_server, register_server, Persister, RpcClient};
-
 use kvraft::Clerk;
 use kvraft::KVServer;
+
+use crate::{register_kv_server, register_server, Persister, RpcClient};
 
 struct ConfigState {
     kv_servers: Vec<Option<Arc<KVServer>>>,

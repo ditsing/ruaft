@@ -2,6 +2,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
 use scopeguard::defer;
+
 use test_configs::kvraft::config::make_config;
 use test_configs::kvraft::generic_test::{
     generic_test, spawn_clients, GenericTestParams,

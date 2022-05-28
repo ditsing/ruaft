@@ -1,13 +1,13 @@
 use std::future::Future;
 
 use async_trait::async_trait;
+use futures_util::future::BoxFuture;
+use futures_util::FutureExt;
 use labrpc::{Client, Network, ReplyMessage, RequestMessage, Server};
 use parking_lot::Mutex;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use futures_util::future::BoxFuture;
-use futures_util::FutureExt;
 use kvraft::{
     CommitSentinelArgs, CommitSentinelReply, GetArgs, GetReply, KVServer,
     PutAppendArgs, PutAppendReply, RemoteKvraft,
@@ -232,13 +232,13 @@ mod tests {
 
     use bytes::Bytes;
 
-    use ruaft::{ApplyCommandMessage, RemoteRaft, Term};
-
-    use super::*;
     use ruaft::utils::integration_test::{
         make_append_entries_args, make_request_vote_args,
         unpack_append_entries_reply, unpack_request_vote_reply,
     };
+    use ruaft::{ApplyCommandMessage, RemoteRaft, Term};
+
+    use super::*;
 
     struct DoNothingPersister;
     impl ruaft::Persister for DoNothingPersister {

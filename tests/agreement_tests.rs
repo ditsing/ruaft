@@ -1,6 +1,8 @@
 #![allow(clippy::identity_op)]
+
 use rand::{thread_rng, Rng};
 use scopeguard::defer;
+
 use test_configs::utils::{sleep_election_timeouts, sleep_millis};
 use test_configs::{make_config, raft::config};
 

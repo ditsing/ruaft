@@ -24,11 +24,11 @@
 /// logger to all sub-threads. Unfortunately we do not have access to methods
 /// like `std::thread::spawn()`, thus the copying can only be done manually.
 use std::cell::RefCell;
+use std::fmt::Formatter;
+use std::ops::Deref;
 use std::sync::{Arc, Once};
 
 use log::{Log, Metadata, Record};
-use std::fmt::Formatter;
-use std::ops::Deref;
 
 struct GlobalLogger;
 #[cfg(not(feature = "must-log"))]

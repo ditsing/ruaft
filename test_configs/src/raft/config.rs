@@ -8,9 +8,10 @@ use anyhow::{anyhow, bail};
 use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
 
+use ruaft::{ApplyCommandMessage, Persister, Raft, Term};
+
 use crate::register_server;
 use crate::utils::{sleep_millis, NO_SNAPSHOT};
-use ruaft::{ApplyCommandMessage, Persister, Raft, Term};
 
 struct ConfigState {
     rafts: Vec<Option<Raft<i32>>>,

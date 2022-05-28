@@ -5,15 +5,16 @@ use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
+
+use kvraft::Clerk;
+use linearizability::{KvInput, KvModel, KvOp, KvOutput, Operation};
 use test_utils::thread_local_logger::LocalLogger;
 
-use linearizability::{KvInput, KvModel, KvOp, KvOutput, Operation};
-
-use super::config::{make_config, Config};
 use crate::utils::{
     sleep_election_timeouts, sleep_millis, LONG_ELECTION_TIMEOUT_MILLIS,
 };
-use kvraft::Clerk;
+
+use super::config::{make_config, Config};
 
 pub fn spawn_clients<T, Func>(
     config: Arc<Config>,

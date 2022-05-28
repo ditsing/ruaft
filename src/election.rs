@@ -72,7 +72,7 @@ impl ElectionState {
 // 3. serialize: they are converted to bytes to persist.
 impl<Command> Raft<Command>
 where
-    Command: 'static + Clone + Default + Send + serde::Serialize,
+    Command: 'static + Clone + Send + serde::Serialize,
 {
     /// Runs the election timer daemon that triggers elections.
     ///

@@ -30,7 +30,7 @@ pub struct KVServer {
     logger: LocalLogger,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct UniqueKVOp {
     op: KVOp,
     me: usize,
@@ -64,16 +64,9 @@ struct KVServerState {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 enum KVOp {
-    NoOp,
     Get(String),
     Put(String, String),
     Append(String, String),
-}
-
-impl Default for KVOp {
-    fn default() -> Self {
-        KVOp::NoOp
-    }
 }
 
 struct ResultHolder {
@@ -173,7 +166,6 @@ impl KVServer {
         }
 
         let result = match op {
-            KVOp::NoOp => return,
             KVOp::Get(key) => CommitResult::Get(kv.get(&key).cloned()),
             KVOp::Put(key, value) => {
                 kv.insert(key, value);

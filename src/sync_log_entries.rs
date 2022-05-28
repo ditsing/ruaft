@@ -39,10 +39,9 @@ struct TaskNumber(usize);
 // 1. clone: they are copied to the persister.
 // 2. send: Arc<Mutex<Vec<LogEntry<Command>>>> must be send, it is moved to another thread.
 // 3. serialize: they are converted to bytes to persist.
-// 4. default: a default value is used as the first element of log.
 impl<Command> Raft<Command>
 where
-    Command: 'static + Clone + Send + serde::Serialize + Default,
+    Command: 'static + Clone + Send + serde::Serialize,
 {
     /// Runs a daemon thread that syncs log entries to peers.
     ///

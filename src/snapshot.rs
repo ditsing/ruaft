@@ -87,7 +87,7 @@ impl SnapshotDaemon {
     }
 }
 
-impl<C: 'static + Clone + Default + Send + serde::Serialize> Raft<C> {
+impl<C: 'static + Clone + Send + serde::Serialize> Raft<C> {
     /// Saves the snapshot into a staging area before it is applied to the log.
     ///
     /// Does nothing if the snapshot has a lower index than any snapshot before.

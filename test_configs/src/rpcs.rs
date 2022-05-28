@@ -146,7 +146,7 @@ where
 }
 
 pub fn register_server<
-    Command: 'static + Clone + Serialize + DeserializeOwned + Default,
+    Command: 'static + Clone + Serialize + DeserializeOwned,
     R: 'static + AsRef<Raft<Command>> + Send + Sync + Clone,
     S: AsRef<str>,
 >(

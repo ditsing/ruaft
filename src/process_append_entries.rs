@@ -7,11 +7,7 @@ use crate::{
 // Command must be
 // 1. clone: they are copied to the persister.
 // 2. serialize: they are converted to bytes to persist.
-// 3. default: a default value is used as the first element of the log.
-impl<Command> Raft<Command>
-where
-    Command: Clone + serde::Serialize + Default,
-{
+impl<Command: Clone + serde::Serialize> Raft<Command> {
     pub fn process_append_entries(
         &self,
         args: AppendEntriesArgs<Command>,

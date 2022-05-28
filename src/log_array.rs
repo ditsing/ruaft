@@ -57,7 +57,7 @@ pub(crate) enum ValidationError {
     FutureTerm(Term, Index, Vec<IndexTerm>),
 }
 
-impl<C: Default> LogArray<C> {
+impl<C> LogArray<C> {
     /// Create the initial Raft log with no user-supplied commands.
     pub fn create() -> LogArray<C> {
         let ret = LogArray {
@@ -224,7 +224,7 @@ impl<C> LogArray<C> {
     }
 }
 
-impl<C: Default> LogArray<C> {
+impl<C> LogArray<C> {
     /// Shift the start of the array to `index`, and store a new snapshot that
     /// covers all commands before and at `index`.
     pub fn shift(&mut self, index: Index, snapshot: Vec<u8>) {

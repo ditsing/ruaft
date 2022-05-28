@@ -30,7 +30,7 @@ pub(crate) struct RaftState<Command> {
     pub sentinel_commit_index: Index,
 }
 
-impl<Command: Default> RaftState<Command> {
+impl<Command> RaftState<Command> {
     pub fn create(peer_size: usize, me: Peer) -> Self {
         RaftState {
             current_term: Term(0),

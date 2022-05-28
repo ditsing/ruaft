@@ -132,12 +132,8 @@ pub struct InstallSnapshotReply {
 // 5. default, because we need an element for the first entry.
 impl<Command> Raft<Command>
 where
-    Command: 'static
-        + Clone
-        + serde::Serialize
-        + serde::de::DeserializeOwned
-        + Send
-        + Default,
+    Command:
+        'static + Clone + serde::Serialize + serde::de::DeserializeOwned + Send,
 {
     /// Create a new raft instance.
     ///
@@ -241,7 +237,7 @@ where
 // 4. default: a default value is used as the first element of log.
 impl<Command> Raft<Command>
 where
-    Command: 'static + Clone + Send + serde::Serialize + Default,
+    Command: 'static + Clone + Send + serde::Serialize,
 {
     /// Adds a new command to the log, returns its index and the current term.
     ///

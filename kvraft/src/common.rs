@@ -8,7 +8,6 @@ pub type ClerkId = u64;
     Clone,
     Copy,
     Debug,
-    Default,
     Hash,
     Ord,
     PartialOrd,

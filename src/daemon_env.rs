@@ -3,10 +3,11 @@ use std::sync::{Arc, Weak};
 
 use parking_lot::Mutex;
 
-use crate::index_term::IndexTerm;
-use crate::{Peer, RaftState, State, Term};
 #[cfg(all(not(test), feature = "integration-test"))]
 use test_utils::thread_local_logger::{self, LocalLogger};
+
+use crate::index_term::IndexTerm;
+use crate::{Peer, RaftState, State, Term};
 
 /// A convenient macro to record errors.
 #[macro_export]

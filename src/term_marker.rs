@@ -1,10 +1,10 @@
 use std::sync::Arc;
 
 use parking_lot::Mutex;
+use serde::Serialize;
 
 use crate::election::ElectionState;
 use crate::{Persister, Raft, RaftState, State, Term};
-use serde::Serialize;
 
 /// A closure that updates the `Term` of the `RaftState`.
 #[derive(Clone)]

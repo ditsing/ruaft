@@ -3,10 +3,11 @@ use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
-use kvraft::KVServer;
 use lazy_static::lazy_static;
 use serde_derive::{Deserialize, Serialize};
 use warp::Filter;
+
+use kvraft::KVServer;
 
 use crate::kv_service::create_async_clerk;
 use crate::run::run_kv_instance;

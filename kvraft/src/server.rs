@@ -9,7 +9,6 @@ use futures::FutureExt;
 use parking_lot::Mutex;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::{CommitSentinelArgs, CommitSentinelReply};
 use ruaft::{
     ApplyCommandMessage, Index, Persister, Raft, RemoteRaft, Term,
     VerifyAuthorityResult,
@@ -18,8 +17,8 @@ use test_utils::log_with;
 use test_utils::thread_local_logger::LocalLogger;
 
 use crate::common::{
-    ClerkId, GetArgs, GetReply, KVError, PutAppendArgs, PutAppendEnum,
-    PutAppendReply, UniqueId,
+    ClerkId, CommitSentinelArgs, CommitSentinelReply, GetArgs, GetReply,
+    KVError, PutAppendArgs, PutAppendEnum, PutAppendReply, UniqueId,
 };
 use crate::snapshot_holder::SnapshotHolder;
 

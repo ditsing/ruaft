@@ -1,12 +1,14 @@
-use crate::beat_ticker::{Beat, SharedBeatTicker};
-use crate::daemon_env::Daemon;
-use crate::{Index, Raft, Term, HEARTBEAT_INTERVAL_MILLIS};
-use parking_lot::{Condvar, Mutex};
 use std::collections::VecDeque;
 use std::future::Future;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+
+use parking_lot::{Condvar, Mutex};
+
+use crate::beat_ticker::{Beat, SharedBeatTicker};
+use crate::daemon_env::Daemon;
+use crate::{Index, Raft, Term, HEARTBEAT_INTERVAL_MILLIS};
 
 /// The result returned to a verify authority request.
 /// This request is not directly exposed to end users. Instead it is used

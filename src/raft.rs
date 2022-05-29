@@ -41,7 +41,7 @@ pub struct Raft<Command> {
     pub(crate) verify_authority_daemon: VerifyAuthorityDaemon,
     pub(crate) heartbeats_daemon: HeartbeatsDaemon,
 
-    pub(crate) thread_pool: Arc<tokio::runtime::Runtime>,
+    pub(crate) thread_pool: utils::ThreadPoolHolder,
 
     pub(crate) daemon_env: DaemonEnv,
     pub(crate) stop_wait_group: WaitGroup,
@@ -117,7 +117,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             snapshot_daemon: SnapshotDaemon::create(),
             verify_authority_daemon: VerifyAuthorityDaemon::create(peer_size),
             heartbeats_daemon: HeartbeatsDaemon::create(),
-            thread_pool: Arc::new(thread_pool),
+            thread_pool: utils::ThreadPoolHolder::new(thread_pool),
             daemon_env,
             stop_wait_group: WaitGroup::new(),
         };
@@ -184,7 +184,8 @@ impl<Command: ReplicableCommand> Raft<Command> {
         // -> DaemonEnv. The first and third cannot be combined with the second
         // in the middle.
         self.stop_wait_group.wait();
-        std::sync::Arc::try_unwrap(self.thread_pool)
+        self.thread_pool
+            .take()
             .expect(
                 "All references to the thread pool should have been dropped.",
             )

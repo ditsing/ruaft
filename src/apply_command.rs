@@ -2,7 +2,7 @@ use std::sync::atomic::Ordering;
 
 use crate::daemon_env::Daemon;
 use crate::heartbeats::HEARTBEAT_INTERVAL;
-use crate::{Index, Raft, Snapshot};
+use crate::{Index, Raft, ReplicableCommand, Snapshot};
 
 pub enum ApplyCommandMessage<Command> {
     Snapshot(Snapshot),
@@ -19,10 +19,8 @@ impl<Command, T: 'static + Send + FnMut(ApplyCommandMessage<Command>)>
 {
 }
 
-impl<Command> Raft<Command>
-where
-    Command: 'static + Clone + Send,
-{
+// Command: 'static + Clone + Send,
+impl<Command: ReplicableCommand> Raft<Command> {
     /// Runs a daemon thread that sends committed log entries to the
     /// application via a callback `apply_command`.
     ///

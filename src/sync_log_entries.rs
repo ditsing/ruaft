@@ -3,15 +3,14 @@ use std::sync::Arc;
 
 use parking_lot::{Condvar, Mutex};
 
-use crate::check_or_record;
 use crate::daemon_env::{Daemon, ErrorKind};
 use crate::heartbeats::HEARTBEAT_INTERVAL;
 use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, SharedSender, RPC_DEADLINE};
 use crate::verify_authority::DaemonBeatTicker;
 use crate::{
-    AppendEntriesArgs, IndexTerm, InstallSnapshotArgs, Peer, Raft, RaftState,
-    RemoteRaft, Term,
+    check_or_record, AppendEntriesArgs, IndexTerm, InstallSnapshotArgs, Peer,
+    Raft, RaftState, RemoteRaft, ReplicableCommand, Term,
 };
 
 #[repr(align(64))]
@@ -38,10 +37,7 @@ struct TaskNumber(usize);
 // 1. clone: they are copied to the persister.
 // 2. send: Arc<Mutex<Vec<LogEntry<Command>>>> must be send, it is moved to another thread.
 // 3. serialize: they are converted to bytes to persist.
-impl<Command> Raft<Command>
-where
-    Command: 'static + Clone + Send + serde::Serialize,
-{
+impl<Command: ReplicableCommand> Raft<Command> {
     /// Runs a daemon thread that syncs log entries to peers.
     ///
     /// This daemon watches the `new_log_entry` channel. Each item delivered by

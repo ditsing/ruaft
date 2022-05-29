@@ -10,7 +10,8 @@ use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, SharedSender, RPC_DEADLINE};
 use crate::verify_authority::VerifyAuthorityDaemon;
 use crate::{
-    Peer, Persister, Raft, RaftState, RemoteRaft, RequestVoteArgs, State, Term,
+    Peer, Persister, Raft, RaftState, RemoteRaft, ReplicableCommand,
+    RequestVoteArgs, State, Term,
 };
 
 pub(crate) struct ElectionState {
@@ -69,10 +70,7 @@ impl ElectionState {
 // 1. clone: they are copied to the persister.
 // 2. send: Arc<Mutex<Vec<LogEntry<Command>>>> must be send, it is moved to another thread.
 // 3. serialize: they are converted to bytes to persist.
-impl<Command> Raft<Command>
-where
-    Command: 'static + Clone + Send + serde::Serialize,
-{
+impl<Command: ReplicableCommand> Raft<Command> {
     /// Runs the election timer daemon that triggers elections.
     ///
     /// The daemon holds a counter and an optional deadline in a mutex. Each

@@ -12,7 +12,9 @@ use crate::heartbeats::{HeartbeatsDaemon, HEARTBEAT_INTERVAL};
 use crate::persister::PersistedRaftState;
 use crate::snapshot::{RequestSnapshotFnMut, SnapshotDaemon};
 use crate::verify_authority::VerifyAuthorityDaemon;
-use crate::{utils, IndexTerm, Persister, RaftState, RemoteRaft};
+use crate::{
+    utils, IndexTerm, Persister, RaftState, RemoteRaft, ReplicableCommand,
+};
 
 #[derive(
     Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize,
@@ -45,17 +47,7 @@ pub struct Raft<Command> {
     pub(crate) stop_wait_group: WaitGroup,
 }
 
-// Commands must be
-// 0. 'static: they have to live long enough for thread pools.
-// 1. clone: they are put in vectors and request messages.
-// 2. serializable: they are sent over RPCs and persisted.
-// 3. deserializable: they are restored from storage.
-// 4. send: they are referenced in futures.
-impl<Command> Raft<Command>
-where
-    Command:
-        'static + Clone + serde::Serialize + serde::de::DeserializeOwned + Send,
-{
+impl<Command: ReplicableCommand> Raft<Command> {
     /// Create a new raft instance.
     ///
     /// Each instance will create at least 4 + (number of peers) threads. The
@@ -153,10 +145,7 @@ where
 // 1. clone: they are copied to the persister.
 // 2. send: Arc<Mutex<Vec<LogEntry<Command>>>> must be send, it is moved to another thread.
 // 3. serialize: they are converted to bytes to persist.
-impl<Command> Raft<Command>
-where
-    Command: 'static + Clone + Send + serde::Serialize,
-{
+impl<Command: ReplicableCommand> Raft<Command> {
     /// Adds a new command to the log, returns its index and the current term.
     ///
     /// Returns `None` if we are not the leader. The log entry may not have been

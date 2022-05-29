@@ -5,6 +5,7 @@ pub use crate::messages::*;
 pub use crate::persister::Persister;
 pub use crate::raft::{Raft, Term};
 pub use crate::remote_raft::RemoteRaft;
+pub use crate::replicable_command::ReplicableCommand;
 pub use crate::snapshot::Snapshot;
 pub use crate::verify_authority::VerifyAuthorityResult;
 
@@ -27,6 +28,7 @@ mod process_request_vote;
 mod raft;
 mod raft_state;
 mod remote_raft;
+mod replicable_command;
 mod snapshot;
 mod sync_log_entries;
 mod term_marker;

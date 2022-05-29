@@ -7,7 +7,9 @@ use parking_lot::Mutex;
 use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, RPC_DEADLINE};
 use crate::verify_authority::DaemonBeatTicker;
-use crate::{AppendEntriesArgs, Raft, RaftState, RemoteRaft};
+use crate::{
+    AppendEntriesArgs, Raft, RaftState, RemoteRaft, ReplicableCommand,
+};
 
 pub(crate) const HEARTBEAT_INTERVAL: Duration = Duration::from_millis(150);
 
@@ -55,10 +57,7 @@ impl HeartbeatsDaemon {
 // 1. clone: they are copied to the persister.
 // 2. send: Arc<Mutex<Vec<LogEntry<Command>>>> must be send, it is moved to another thread.
 // 3. serialize: they are converted to bytes to persist.
-impl<Command> Raft<Command>
-where
-    Command: 'static + Clone + Send + serde::Serialize,
-{
+impl<Command: ReplicableCommand> Raft<Command> {
     /// Schedules tasks that send heartbeats to peers.
     ///
     /// One task is scheduled for each peer. The task sleeps for a duration

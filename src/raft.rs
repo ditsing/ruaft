@@ -112,7 +112,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             persister,
             new_log_entry: None,
             apply_command_signal: Default::default(),
-            keep_running: Default::default(),
+            keep_running: Arc::new(AtomicBool::new(true)),
             election: Arc::new(election),
             snapshot_daemon: SnapshotDaemon::create(),
             verify_authority_daemon: VerifyAuthorityDaemon::create(peer_size),
@@ -122,7 +122,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
             stop_wait_group: WaitGroup::new(),
         };
 
-        this.keep_running.store(true, Ordering::SeqCst);
         // Running in a standalone thread.
         this.run_verify_authority_daemon();
         // Running in a standalone thread.

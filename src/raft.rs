@@ -111,7 +111,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             me: Peer(me),
             persister,
             new_log_entry: None,
-            apply_command_signal: Default::default(),
+            apply_command_signal: Arc::new(Condvar::new()),
             keep_running: Arc::new(AtomicBool::new(true)),
             election: Arc::new(election),
             snapshot_daemon: SnapshotDaemon::create(),

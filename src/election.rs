@@ -120,7 +120,8 @@ impl<Command: ReplicableCommand> Raft<Command> {
     /// eventually realize the term they were competing for has passed and quit.
     pub(crate) fn run_election_timer(&self) {
         let this = self.clone();
-        let join_handle = std::thread::spawn(move || {
+
+        let election_daemon = move || {
             // Note: do not change this to `let _ = ...`.
             let _guard = this.daemon_env.for_scope();
             log::info!("{:?} election timer daemon running ...", this.me);
@@ -210,9 +211,9 @@ impl<Command: ReplicableCommand> Raft<Command> {
             // Making sure the rest of `this` is dropped before the wait group.
             drop(this);
             drop(stop_wait_group);
-        });
+        };
         self.daemon_env
-            .watch_daemon(Daemon::ElectionTimer, join_handle);
+            .watch_daemon(Daemon::ElectionTimer, election_daemon);
     }
 
     fn run_election(

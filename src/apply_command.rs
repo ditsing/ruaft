@@ -57,7 +57,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
         let snapshot_daemon = self.snapshot_daemon.clone();
         let daemon_env = self.daemon_env.clone();
         let stop_wait_group = self.stop_wait_group.clone();
-        let join_handle = std::thread::spawn(move || {
+        let apply_command_daemon = move || {
             // Note: do not change this to `let _ = ...`.
             let _guard = daemon_env.for_scope();
             log::info!("{:?} apply command daemon running ...", me);
@@ -116,8 +116,8 @@ impl<Command: ReplicableCommand> Raft<Command> {
             log::info!("{:?} apply command daemon done.", me);
 
             drop(stop_wait_group);
-        });
+        };
         self.daemon_env
-            .watch_daemon(Daemon::ApplyCommand, join_handle);
+            .watch_daemon(Daemon::ApplyCommand, apply_command_daemon);
     }
 }

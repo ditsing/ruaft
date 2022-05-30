@@ -61,7 +61,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
 
         // Clone everything that the thread needs.
         let this = self.clone();
-        let join_handle = std::thread::spawn(move || {
+        let sync_log_entry_daemon = move || {
             // Note: do not change this to `let _ = ...`.
             let _guard = this.daemon_env.for_scope();
 
@@ -110,9 +110,9 @@ impl<Command: ReplicableCommand> Raft<Command> {
             // Making sure the rest of `this` is dropped before the wait group.
             drop(this);
             drop(stop_wait_group);
-        });
+        };
         self.daemon_env
-            .watch_daemon(Daemon::SyncLogEntries, join_handle);
+            .watch_daemon(Daemon::SyncLogEntries, sync_log_entry_daemon);
     }
 
     /// Syncs log entries to a peer once, requests a new sync if that fails.

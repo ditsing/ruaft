@@ -119,11 +119,18 @@ impl DaemonEnv {
 
     /// Register a daemon thread to make sure it is correctly shutdown when the
     /// Raft instance is killed.
-    pub fn watch_daemon(
-        &self,
-        daemon: Daemon,
-        thread: std::thread::JoinHandle<()>,
-    ) {
+    pub fn watch_daemon<F, T>(&self, daemon: Daemon, func: F)
+    where
+        F: FnOnce() -> T,
+        F: Send + 'static,
+        T: Send + 'static,
+    {
+        let thread = std::thread::Builder::new()
+            .name(format!("ruaft-daemon-{:?}", daemon))
+            .spawn(move || {
+                func();
+            })
+            .expect("Creating daemon thread should never fail");
         self.data.lock().daemons.push((daemon, thread));
     }
 
@@ -358,14 +365,12 @@ mod tests {
     #[test]
     fn test_watch_daemon_shutdown() {
         let daemon_env = DaemonEnv::create();
-        let panic_thread = std::thread::spawn(|| {
+        daemon_env.watch_daemon(Daemon::ApplyCommand, || {
             panic!("message with type &str");
         });
-        daemon_env.watch_daemon(Daemon::ApplyCommand, panic_thread);
-        let another_panic_thread = std::thread::spawn(|| {
+        daemon_env.watch_daemon(Daemon::Snapshot, || {
             panic!("message with type {:?}", "debug string");
         });
-        daemon_env.watch_daemon(Daemon::Snapshot, another_panic_thread);
 
         let result = std::thread::spawn(move || {
             daemon_env.shutdown();

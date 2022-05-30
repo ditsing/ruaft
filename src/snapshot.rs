@@ -146,7 +146,7 @@ impl<C: 'static + Clone + Send + serde::Serialize> Raft<C> {
         let stop_wait_group = self.stop_wait_group.clone();
 
         log::info!("{:?} snapshot daemon running ...", me);
-        let join_handle = std::thread::spawn(move || loop {
+        let snapshot_daemon = move || loop {
             // Note: do not change this to `let _ = ...`.
             let _guard = daemon_env.for_scope();
 
@@ -223,7 +223,8 @@ impl<C: 'static + Clone + Send + serde::Serialize> Raft<C> {
                     rf.log.snapshot().1,
                 );
             }
-        });
-        self.daemon_env.watch_daemon(Daemon::Snapshot, join_handle);
+        };
+        self.daemon_env
+            .watch_daemon(Daemon::Snapshot, snapshot_daemon);
     }
 }

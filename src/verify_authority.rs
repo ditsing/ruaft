@@ -380,7 +380,7 @@ impl<Command: 'static + Send> Raft<Command> {
         let rf = self.inner_state.clone();
         let stop_wait_group = self.stop_wait_group.clone();
 
-        let join_handle = std::thread::spawn(move || {
+        let verify_authority_daemon = move || {
             // Note: do not change this to `let _ = ...`.
             let _guard = daemon_env.for_scope();
 
@@ -400,9 +400,9 @@ impl<Command: 'static + Send> Raft<Command> {
             log::info!("{:?} verify authority daemon done.", me);
 
             drop(stop_wait_group);
-        });
+        };
         self.daemon_env
-            .watch_daemon(Daemon::VerifyAuthority, join_handle);
+            .watch_daemon(Daemon::VerifyAuthority, verify_authority_daemon);
     }
 
     /// Create a verify authority request. Returns None if we are not the

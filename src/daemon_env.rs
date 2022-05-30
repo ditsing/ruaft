@@ -125,10 +125,13 @@ impl DaemonEnv {
         F: Send + 'static,
         T: Send + 'static,
     {
+        let thread_env = self.for_thread();
         let thread = std::thread::Builder::new()
             .name(format!("ruaft-daemon-{:?}", daemon))
             .spawn(move || {
+                thread_env.attach();
                 func();
+                ThreadEnv::detach();
             })
             .expect("Creating daemon thread should never fail");
         self.data.lock().daemons.push((daemon, thread));

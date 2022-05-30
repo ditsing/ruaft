@@ -375,15 +375,11 @@ impl<Command: 'static + Send> Raft<Command> {
     pub(crate) fn run_verify_authority_daemon(&self) {
         let me = self.me;
         let keep_running = self.keep_running.clone();
-        let daemon_env = self.daemon_env.clone();
         let this_daemon = self.verify_authority_daemon.clone();
         let rf = self.inner_state.clone();
         let stop_wait_group = self.stop_wait_group.clone();
 
         let verify_authority_daemon = move || {
-            // Note: do not change this to `let _ = ...`.
-            let _guard = daemon_env.for_scope();
-
             log::info!("{:?} verify authority daemon running ...", me);
             while keep_running.load(Ordering::Acquire) {
                 this_daemon.wait_for(Self::BEAT_RECORDING_MAX_PAUSE);

@@ -122,8 +122,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
         let this = self.clone();
 
         let election_daemon = move || {
-            // Note: do not change this to `let _ = ...`.
-            let _guard = this.daemon_env.for_scope();
             log::info!("{:?} election timer daemon running ...", this.me);
 
             let election = this.election.clone();

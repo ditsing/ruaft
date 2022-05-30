@@ -62,9 +62,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
         // Clone everything that the thread needs.
         let this = self.clone();
         let sync_log_entry_daemon = move || {
-            // Note: do not change this to `let _ = ...`.
-            let _guard = this.daemon_env.for_scope();
-
             log::info!("{:?} sync log entries daemon running ...", this.me);
 
             let mut openings = vec![];

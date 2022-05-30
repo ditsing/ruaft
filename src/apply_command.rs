@@ -55,11 +55,8 @@ impl<Command: ReplicableCommand> Raft<Command> {
         let rf = self.inner_state.clone();
         let condvar = self.apply_command_signal.clone();
         let snapshot_daemon = self.snapshot_daemon.clone();
-        let daemon_env = self.daemon_env.clone();
         let stop_wait_group = self.stop_wait_group.clone();
         let apply_command_daemon = move || {
-            // Note: do not change this to `let _ = ...`.
-            let _guard = daemon_env.for_scope();
             log::info!("{:?} apply command daemon running ...", me);
 
             while keep_running.load(Ordering::SeqCst) {

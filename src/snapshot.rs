@@ -142,14 +142,10 @@ impl<C: 'static + Clone + Send + serde::Serialize> Raft<C> {
         let rf = self.inner_state.clone();
         let persister = self.persister.clone();
         let snapshot_daemon = self.snapshot_daemon.clone();
-        let daemon_env = self.daemon_env.clone();
         let stop_wait_group = self.stop_wait_group.clone();
 
         log::info!("{:?} snapshot daemon running ...", me);
         let snapshot_daemon = move || loop {
-            // Note: do not change this to `let _ = ...`.
-            let _guard = daemon_env.for_scope();
-
             parker.park();
             if !keep_running.load(Ordering::SeqCst) {
                 log::info!("{:?} snapshot daemon done.", me);
@@ -159,7 +155,6 @@ impl<C: 'static + Clone + Send + serde::Serialize> Raft<C> {
                 drop(rf);
                 drop(persister);
                 drop(snapshot_daemon);
-                drop(daemon_env);
                 drop(stop_wait_group);
                 break;
             }

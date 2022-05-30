@@ -103,7 +103,7 @@ fn fail_no_agree() -> config::Result<()> {
     let result = cfg.leader_start(leader2, 30);
     assert!(result.is_some(), "leader2 rejected start()");
     let index = result.unwrap().1;
-    assert!(index == 2 || index == 3, "unexpected index {}", index);
+    assert!((2..=4).contains(&index), "unexpected index {}", index);
 
     cfg.one(1000, SERVERS, true)?;
 

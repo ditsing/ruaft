@@ -953,4 +953,42 @@ mod tests {
         );
         assert_ticket_ready!(t4, VerifyAuthorityResult::TimedOut);
     }
+
+    #[test]
+    fn test_edge_case_stale_sentinel() {
+        let daemon = init_daemon();
+        // We were the leader at an earlier term.
+        let stale_commit_index = COMMIT_INDEX;
+        let stale_sentinel_commit_index = COMMIT_INDEX;
+
+        // Then we lost leadership. Someone became the leader and created new
+        // entries. Those entries are committed, but we did not know.
+        // So our commit index is not moved.
+        let _prev_term_log_index = COMMIT_INDEX + 2;
+        // However, the new leader had answer queries at _prev_term_log_index.
+
+        // We created a new sentinel, it is not yet committed.
+        let _sentinel_commit_index = COMMIT_INDEX + 3;
+
+        // New term, we are the leader.
+        daemon.reset_state(NEXT_TERM);
+        let t = daemon.verify_authority_async(NEXT_TERM, COMMIT_INDEX);
+
+        // We received 3 heartbeats.
+        let beat_ticker0 = daemon.beat_tickers[0].clone();
+        let beat_ticker1 = daemon.beat_tickers[1].clone();
+        let beat_ticker2 = daemon.beat_tickers[2].clone();
+        beat_ticker0.tick(beat_ticker0.next_beat());
+        beat_ticker1.tick(beat_ticker1.next_beat());
+        beat_ticker2.tick(beat_ticker2.next_beat());
+
+        // We are now using stale data from the old term.
+        daemon.run_verify_authority_iteration(
+            TERM,
+            stale_commit_index,
+            stale_sentinel_commit_index,
+        );
+        // This is not right.
+        assert_ticket_ready!(t, VerifyAuthorityResult::Success(COMMIT_INDEX));
+    }
 }

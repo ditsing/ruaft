@@ -973,4 +973,44 @@ mod tests {
             VerifyAuthorityResult::Success(sentinel_commit_index)
         );
     }
+
+    #[test]
+    fn test_edge_case_stale_commit_index() {
+        let daemon = init_daemon();
+        // The previous leader created two new entries after COMMIT_INDEX. These
+        // entries are committed, but we did not know. So our commit index is
+        // not moved. However, the new leader had answer queries at
+        // COMMIT_INDEX + 2.
+
+        // We created a new sentinel, it is not yet committed.
+        let sentinel_commit_index = COMMIT_INDEX + 3;
+
+        // New term, we are the leader.
+        daemon.reset_state(TERM, sentinel_commit_index);
+        // Request `t` arrived.
+        let stale_commit_index_for_t = COMMIT_INDEX;
+        // The daemon is triggered.
+        let stale_commit_index_for_daemon = sentinel_commit_index;
+        // Request `_` arrived.
+        let commit_index = sentinel_commit_index + 1;
+        // This is a tricky order-of-order enqueue.
+        let _ = daemon.verify_authority_async(TERM, commit_index);
+        let t = daemon.verify_authority_async(TERM, stale_commit_index_for_t);
+
+        // We received 3 heartbeats.
+        let beat_ticker0 = daemon.beat_tickers[0].clone();
+        let beat_ticker1 = daemon.beat_tickers[1].clone();
+        let beat_ticker2 = daemon.beat_tickers[2].clone();
+        beat_ticker0.tick(beat_ticker0.next_beat());
+        beat_ticker1.tick(beat_ticker1.next_beat());
+        beat_ticker2.tick(beat_ticker2.next_beat());
+
+        // We are now using stale data from the new term.
+        daemon.run_verify_authority_iteration(
+            TERM,
+            stale_commit_index_for_daemon,
+        );
+        // This is not right.
+        assert_ticket_ready!(t, VerifyAuthorityResult::Success(COMMIT_INDEX));
+    }
 }

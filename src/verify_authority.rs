@@ -264,6 +264,11 @@ impl VerifyAuthorityDaemon {
         // the leader might not know the commit index of the previous leader.
         // This holds true even it is guaranteed that all entries committed by
         // the previous leader will be committed by the current leader.
+        //
+        // Similarly, if the sentinel is not committed, the leader cannot know
+        // if all entries of the previous leader will be committed, in case the
+        // leadership is lost before any commits can be made. Thus, the leader
+        // cannot answer any queries before the sentinel is committed.
         if commit_index < self.state.lock().sentinel_commit_index {
             return;
         }
@@ -300,6 +305,7 @@ impl VerifyAuthorityDaemon {
 
             // All requests before `new_start` is now verified.
             let verified = new_start.0 - state.start.0;
+            let sentinel_commit_index = state.sentinel_commit_index;
             for token in state.queue.drain(..verified) {
                 let mut cnt = 0;
                 for (index, beat) in token.beats_moment.iter().enumerate() {
@@ -308,9 +314,21 @@ impl VerifyAuthorityDaemon {
                     }
                 }
                 assert!(cnt + cnt + 1 >= self.beat_tickers.len());
+
+                // Never verify authority before the sentinel commit index. The
+                // previous leader might have exposed data up to the commit
+                // right before the sentinel.
+                let allowed_index =
+                    if sentinel_commit_index > token.commit_index {
+                        // sentinel_commit_index cannot be at 0 after the `if`.
+                        sentinel_commit_index - 1
+                    } else {
+                        token.commit_index
+                    };
+
                 let _ = token
                     .sender
-                    .send(VerifyAuthorityResult::Success(token.commit_index));
+                    .send(VerifyAuthorityResult::Success(allowed_index));
             }
             // Move the queue starting point.
             state.start = new_start;
@@ -981,6 +999,7 @@ mod tests {
         // entries are committed, but we did not know. So our commit index is
         // not moved. However, the new leader had answer queries at
         // COMMIT_INDEX + 2.
+        let prev_term_log_index = COMMIT_INDEX + 2;
 
         // We created a new sentinel, it is not yet committed.
         let sentinel_commit_index = COMMIT_INDEX + 3;
@@ -1010,7 +1029,9 @@ mod tests {
             TERM,
             stale_commit_index_for_daemon,
         );
-        // This is not right.
-        assert_ticket_ready!(t, VerifyAuthorityResult::Success(COMMIT_INDEX));
+        assert_ticket_ready!(
+            t,
+            VerifyAuthorityResult::Success(prev_term_log_index)
+        );
     }
 }

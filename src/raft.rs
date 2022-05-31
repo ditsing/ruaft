@@ -1,5 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 
 use parking_lot::{Condvar, Mutex};
 use serde_derive::{Deserialize, Serialize};
@@ -164,6 +165,9 @@ impl<Command: ReplicableCommand> Raft<Command> {
         Some(IndexTerm::pack(index, term))
     }
 
+    const SHUTDOWN_TIMEOUT: Duration =
+        Duration::from_millis(HEARTBEAT_INTERVAL.as_millis() as u64 * 2);
+
     /// Cleanly shutdown this instance. This function never blocks forever. It
     /// either panics or returns eventually.
     pub fn kill(mut self) {
@@ -186,7 +190,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             .expect(
                 "All references to the thread pool should have been dropped.",
             )
-            .shutdown_timeout(HEARTBEAT_INTERVAL * 2);
+            .shutdown_timeout(Self::SHUTDOWN_TIMEOUT);
         // DaemonEnv must be shutdown after the thread pool, since there might
         // be tasks logging errors in the pool.
         self.daemon_env.shutdown();

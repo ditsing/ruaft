@@ -377,7 +377,6 @@ impl<Command: 'static + Send> Raft<Command> {
         let keep_running = self.keep_running.clone();
         let this_daemon = self.verify_authority_daemon.clone();
         let rf = self.inner_state.clone();
-        let stop_wait_group = self.stop_wait_group.clone();
 
         let verify_authority_daemon = move || {
             log::info!("{:?} verify authority daemon running ...", me);
@@ -394,8 +393,6 @@ impl<Command: 'static + Send> Raft<Command> {
                 );
             }
             log::info!("{:?} verify authority daemon done.", me);
-
-            drop(stop_wait_group);
         };
         self.daemon_env
             .watch_daemon(Daemon::VerifyAuthority, verify_authority_daemon);

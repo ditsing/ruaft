@@ -1,7 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use crossbeam_utils::sync::WaitGroup;
 use parking_lot::{Condvar, Mutex};
 use serde_derive::{Deserialize, Serialize};
 
@@ -44,7 +43,6 @@ pub struct Raft<Command> {
     pub(crate) thread_pool: utils::ThreadPoolHolder,
 
     pub(crate) daemon_env: DaemonEnv,
-    pub(crate) stop_wait_group: WaitGroup,
 }
 
 impl<Command: ReplicableCommand> Raft<Command> {
@@ -119,7 +117,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
             heartbeats_daemon: HeartbeatsDaemon::create(),
             thread_pool: utils::ThreadPoolHolder::new(thread_pool),
             daemon_env,
-            stop_wait_group: WaitGroup::new(),
         };
 
         // Running in a standalone thread.
@@ -183,7 +180,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
         // DaemonEnv. The shutdown sequence is stop_wait_group -> thread_pool
         // -> DaemonEnv. The first and third cannot be combined with the second
         // in the middle.
-        self.stop_wait_group.wait();
+        self.daemon_env.wait_for_daemons();
         self.thread_pool
             .take()
             .expect(

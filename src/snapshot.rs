@@ -142,7 +142,6 @@ impl<C: 'static + Clone + Send + serde::Serialize> Raft<C> {
         let rf = self.inner_state.clone();
         let persister = self.persister.clone();
         let snapshot_daemon = self.snapshot_daemon.clone();
-        let stop_wait_group = self.stop_wait_group.clone();
 
         log::info!("{:?} snapshot daemon running ...", me);
         let snapshot_daemon = move || loop {
@@ -155,7 +154,6 @@ impl<C: 'static + Clone + Send + serde::Serialize> Raft<C> {
                 drop(rf);
                 drop(persister);
                 drop(snapshot_daemon);
-                drop(stop_wait_group);
                 break;
             }
             if persister.state_size() >= max_state_size {

@@ -55,7 +55,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
         let rf = self.inner_state.clone();
         let condvar = self.apply_command_signal.clone();
         let snapshot_daemon = self.snapshot_daemon.clone();
-        let stop_wait_group = self.stop_wait_group.clone();
         let apply_command_daemon = move || {
             log::info!("{:?} apply command daemon running ...", me);
 
@@ -111,8 +110,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
                 }
             }
             log::info!("{:?} apply command daemon done.", me);
-
-            drop(stop_wait_group);
         };
         self.daemon_env
             .watch_daemon(Daemon::ApplyCommand, apply_command_daemon);

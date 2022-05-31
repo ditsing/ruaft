@@ -102,11 +102,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
             }
 
             log::info!("{:?} sync log entries daemon done.", this.me);
-
-            let stop_wait_group = this.stop_wait_group.clone();
-            // Making sure the rest of `this` is dropped before the wait group.
-            drop(this);
-            drop(stop_wait_group);
         };
         self.daemon_env
             .watch_daemon(Daemon::SyncLogEntries, sync_log_entry_daemon);

@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::sync::{Arc, Weak};
 
+use crossbeam_utils::sync::WaitGroup;
 use parking_lot::Mutex;
 
 #[cfg(all(not(test), feature = "integration-test"))]
@@ -33,6 +34,7 @@ macro_rules! check_or_record {
 pub(crate) struct DaemonEnv {
     data: Arc<Mutex<DaemonEnvData>>,
     thread_env: ThreadEnv,
+    stop_wait_group: Option<WaitGroup>,
 }
 
 #[derive(Debug)]
@@ -126,15 +128,28 @@ impl DaemonEnv {
         T: Send + 'static,
     {
         let thread_env = self.for_thread();
+        let stop_wait_group = self
+            .stop_wait_group
+            .clone()
+            .expect("Expecting a valid stop wait group when creating daemons");
         let thread = std::thread::Builder::new()
             .name(format!("ruaft-daemon-{:?}", daemon))
             .spawn(move || {
                 thread_env.attach();
                 func();
                 ThreadEnv::detach();
+                drop(stop_wait_group);
             })
             .expect("Creating daemon thread should never fail");
         self.data.lock().daemons.push((daemon, thread));
+    }
+
+    pub fn wait_for_daemons(&mut self) {
+        if let Some(stop_wait_group) = self.stop_wait_group.take() {
+            stop_wait_group.wait();
+        } else {
+            panic!("Daemons can only be waited once")
+        }
     }
 
     /// Makes sure that all daemons have been shutdown, no more errors can be
@@ -224,7 +239,12 @@ impl DaemonEnv {
             #[cfg(all(not(test), feature = "integration-test"))]
             local_logger: thread_local_logger::get(),
         };
-        Self { data, thread_env }
+
+        Self {
+            data,
+            thread_env,
+            stop_wait_group: Some(WaitGroup::new()),
+        }
     }
 
     /// Creates a [`ThreadEnv`] that could be attached to a thread. Any code
@@ -278,6 +298,7 @@ impl ThreadEnv {
         DaemonEnv {
             data: env.data.upgrade().unwrap(),
             thread_env: env,
+            stop_wait_group: None,
         }
     }
 

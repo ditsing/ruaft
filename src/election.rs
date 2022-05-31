@@ -362,19 +362,22 @@ impl<Command: ReplicableCommand> Raft<Command> {
             for item in rf.current_step.iter_mut() {
                 *item = 0;
             }
+
+            let sentinel_commit_index;
+            if rf.commit_index != rf.log.last_index_term().index {
+                // Create a sentinel commit at the start of the term.
+                sentinel_commit_index = rf.log.add_term_change_entry(term);
+                persister.save_state(rf.persisted_state().into());
+            } else {
+                sentinel_commit_index = rf.commit_index;
+            }
+
             // Reset the verify authority daemon before sending heartbeats to
             // followers. This is critical to the correctness of verifying
             // authority.
             // No verity authority request can go through before the reset is
             // done, since we are holding the raft lock.
-            verify_authority_daemon.reset_state(term);
-
-            if rf.commit_index != rf.log.last_index_term().index {
-                rf.sentinel_commit_index = rf.log.add_term_change_entry(term);
-                persister.save_state(rf.persisted_state().into());
-            } else {
-                rf.sentinel_commit_index = rf.commit_index;
-            }
+            verify_authority_daemon.reset_state(term, sentinel_commit_index);
 
             // Sync all logs now.
             let _ = new_log_entry.send(None);

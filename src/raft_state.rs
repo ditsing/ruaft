@@ -25,9 +25,6 @@ pub(crate) struct RaftState<Command> {
     pub state: State,
 
     pub leader_id: Peer,
-
-    // Index of the first commit of each term as the leader.
-    pub sentinel_commit_index: Index,
 }
 
 impl<Command> RaftState<Command> {
@@ -43,7 +40,6 @@ impl<Command> RaftState<Command> {
             current_step: vec![0; peer_size],
             state: State::Follower,
             leader_id: me,
-            sentinel_commit_index: 0,
         }
     }
 }

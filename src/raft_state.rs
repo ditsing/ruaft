@@ -32,7 +32,7 @@ impl<Command> RaftState<Command> {
         RaftState {
             current_term: Term(0),
             voted_for: None,
-            log: crate::log_array::LogArray::create(),
+            log: LogArray::create(),
             commit_index: 0,
             last_applied: 0,
             next_index: vec![1; peer_size],

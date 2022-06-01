@@ -145,19 +145,19 @@ fn one_partition() -> Result {
     std::thread::spawn(move || {
         logger.attach();
         clerk_minority1.put(KEY, "15");
-        counter1.fetch_or(1, Ordering::SeqCst);
+        counter1.fetch_or(1, Ordering::AcqRel);
     });
     let counter2 = counter.clone();
     let logger = LocalLogger::inherit();
     std::thread::spawn(move || {
         logger.attach();
         clerk_minority2.get(KEY);
-        counter2.fetch_or(2, Ordering::SeqCst);
+        counter2.fetch_or(2, Ordering::AcqRel);
     });
 
     sleep_millis(1000);
 
-    assert_eq!(counter.load(Ordering::SeqCst), 0);
+    assert_eq!(counter.load(Ordering::Acquire), 0);
 
     assert_eq!(clerk_majority.get(KEY), Some("14".to_owned()));
     clerk_majority.put(KEY, "16");
@@ -171,12 +171,12 @@ fn one_partition() -> Result {
     sleep_election_timeouts(1);
     for _ in 0..100 {
         sleep_millis(60);
-        if counter.load(Ordering::SeqCst) == 3 {
+        if counter.load(Ordering::Acquire) == 3 {
             break;
         }
     }
 
-    assert_eq!(counter.load(Ordering::SeqCst), 3);
+    assert_eq!(counter.load(Ordering::Acquire), 3);
     assert_eq!(clerk.get(KEY), Some("15".to_owned()));
 
     Ok(())

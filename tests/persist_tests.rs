@@ -321,7 +321,7 @@ fn internal_churn(unreliable: bool) -> config::Result<()> {
         let handle = std::thread::spawn(move || {
             test_utils::thread_local_logger::set(logger);
             let mut cmds = vec![];
-            while !stop.load(Ordering::SeqCst) {
+            while !stop.load(Ordering::Acquire) {
                 let cmd = thread_rng().gen();
                 let mut index = None;
                 for i in 0..SERVERS {
@@ -390,7 +390,7 @@ fn internal_churn(unreliable: bool) -> config::Result<()> {
         cfg.connect(i);
     }
 
-    stop.store(true, Ordering::SeqCst);
+    stop.store(true, Ordering::Release);
     let mut all_cmds = vec![];
     for handle in handles {
         let mut cmds = handle.join().expect("Client should not fail")?;

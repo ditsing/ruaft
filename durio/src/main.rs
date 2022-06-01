@@ -65,7 +65,7 @@ async fn run_web_server(socket_addr: SocketAddr, kv_server: Arc<KVServer>) {
     let get = warp::get()
         .and(warp::path!("kvstore" / "get" / String))
         .and_then(move |key: String| {
-            let counter = counter.fetch_add(1, Ordering::SeqCst).to_string();
+            let counter = counter.fetch_add(1, Ordering::Relaxed).to_string();
             let get_clerk = get_clerk.clone();
             async move {
                 let value = get_clerk.get(&key).await.unwrap_or_default();

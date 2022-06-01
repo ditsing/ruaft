@@ -270,7 +270,7 @@ impl KVServer {
         &self,
         key: String,
     ) -> Result<Option<String>, KVError> {
-        if !self.keep_running.load(Ordering::SeqCst) {
+        if !self.keep_running.load(Ordering::Acquire) {
             return Err(KVError::NotLeader);
         }
 
@@ -314,7 +314,7 @@ impl KVServer {
         op: KVOp,
         timeout: Duration,
     ) -> Result<CommitResult, CommitError> {
-        if !self.keep_running.load(Ordering::SeqCst) {
+        if !self.keep_running.load(Ordering::Acquire) {
             return Err(CommitError::NotLeader);
         }
         let result_holder = {
@@ -351,8 +351,8 @@ impl KVServer {
         let set = result_holder.term.compare_exchange(
             Self::UNSEEN_TERM,
             Self::ATTEMPTING_TERM,
-            Ordering::SeqCst,
-            Ordering::SeqCst,
+            Ordering::AcqRel,
+            Ordering::Acquire,
         );
         let start = match set {
             // Nobody has attempted start() yet.
@@ -367,8 +367,8 @@ impl KVServer {
                 let set = result_holder.term.compare_exchange(
                     prev_term,
                     Self::ATTEMPTING_TERM,
-                    Ordering::SeqCst,
-                    Ordering::SeqCst,
+                    Ordering::AcqRel,
+                    Ordering::Acquire,
                 );
                 set.is_ok()
             }
@@ -389,8 +389,8 @@ impl KVServer {
             let set = result_holder.term.compare_exchange(
                 Self::ATTEMPTING_TERM,
                 start_term,
-                Ordering::SeqCst,
-                Ordering::SeqCst,
+                Ordering::AcqRel,
+                Ordering::Acquire,
             );
             // Setting term must have been successful, and must return the
             // value previously set by this attempt.
@@ -498,7 +498,7 @@ impl KVServer {
 
     pub fn kill(self: Arc<Self>) {
         // Return error to new queries.
-        self.keep_running.store(false, Ordering::SeqCst);
+        self.keep_running.store(false, Ordering::Release);
         // Cancel all in-flight queries.
         for (_, (_, sender)) in self.state.lock().queries.drain() {
             let _ = sender.send(Err(CommitError::NotLeader));

@@ -83,7 +83,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
                     {
                         // Only schedule a new task if the last task has cleared
                         // the queue of RPC requests.
-                        if openings[i].0.fetch_add(1, Ordering::SeqCst) == 0 {
+                        if openings[i].0.fetch_add(1, Ordering::AcqRel) == 0 {
                             task_number += 1;
                             this.thread_pool.spawn(Self::sync_log_entries(
                                 this.inner_state.clone(),
@@ -159,7 +159,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
         beat_ticker: DaemonBeatTicker,
         task_number: TaskNumber,
     ) {
-        if opening.swap(0, Ordering::SeqCst) == 0 {
+        if opening.swap(0, Ordering::AcqRel) == 0 {
             return;
         }
 

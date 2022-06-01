@@ -58,7 +58,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
         let apply_command_daemon = move || {
             log::info!("{:?} apply command daemon running ...", me);
 
-            while keep_running.load(Ordering::SeqCst) {
+            while keep_running.load(Ordering::Relaxed) {
                 let messages = {
                     let mut rf = rf.lock();
                     if rf.last_applied >= rf.commit_index {

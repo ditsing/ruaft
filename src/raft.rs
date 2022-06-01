@@ -171,7 +171,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
     /// Cleanly shutdown this instance. This function never blocks forever. It
     /// either panics or returns eventually.
     pub fn kill(mut self) {
-        self.keep_running.store(false, Ordering::SeqCst);
+        self.keep_running.store(false, Ordering::Release);
         self.election.stop_election_timer();
         self.new_log_entry.take().map(|n| n.send(None));
         self.apply_command_signal.notify_all();

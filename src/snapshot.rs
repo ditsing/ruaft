@@ -146,7 +146,7 @@ impl<C: 'static + Clone + Send + serde::Serialize> Raft<C> {
         log::info!("{:?} snapshot daemon running ...", me);
         let snapshot_daemon = move || loop {
             parker.park();
-            if !keep_running.load(Ordering::SeqCst) {
+            if !keep_running.load(Ordering::Acquire) {
                 log::info!("{:?} snapshot daemon done.", me);
 
                 // Explicitly drop every thing.
@@ -161,7 +161,7 @@ impl<C: 'static + Clone + Send + serde::Serialize> Raft<C> {
                 let snapshot = {
                     let mut snapshot =
                         snapshot_daemon.current_snapshot.0.lock();
-                    if keep_running.load(Ordering::SeqCst)
+                    if keep_running.load(Ordering::Acquire)
                         && snapshot.last_included_index <= log_start.index
                     {
                         request_snapshot(log_start.index + 1);

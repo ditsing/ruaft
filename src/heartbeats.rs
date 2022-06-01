@@ -87,7 +87,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
                 let keep_running = self.keep_running.clone();
                 self.thread_pool.spawn(async move {
                     let mut interval = tokio::time::interval(interval);
-                    while keep_running.load(Ordering::SeqCst) {
+                    while keep_running.load(Ordering::Relaxed) {
                         let tick = interval.tick();
                         let trigger = trigger.recv();
                         futures_util::pin_mut!(tick, trigger);

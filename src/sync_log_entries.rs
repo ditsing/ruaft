@@ -72,7 +72,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
 
             let mut task_number = 0;
             while let Ok(peer) = rx.recv() {
-                if !this.keep_running.load(Ordering::SeqCst) {
+                if !this.keep_running.load(Ordering::Relaxed) {
                     break;
                 }
                 if !this.inner_state.lock().is_leader() {

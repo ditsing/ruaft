@@ -127,7 +127,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             let election = this.election.clone();
 
             let mut should_run = None;
-            while this.keep_running.load(Ordering::SeqCst) {
+            while this.keep_running.load(Ordering::Relaxed) {
                 let mut cancel_handle =
                     should_run.and_then(|last_timer_count| {
                         this.run_election(last_timer_count)
@@ -158,7 +158,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
                 // check the running signal before sleeping. We are holding the
                 // timer lock, so no one can change it. The kill() method will
                 // not be able to notify this thread before `wait` is called.
-                if !this.keep_running.load(Ordering::SeqCst) {
+                if !this.keep_running.load(Ordering::Relaxed) {
                     break;
                 }
                 should_run = match deadline {

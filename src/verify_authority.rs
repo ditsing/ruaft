@@ -403,7 +403,7 @@ impl<Command: 'static + Send> Raft<Command> {
 
         let verify_authority_daemon = move || {
             log::info!("{:?} verify authority daemon running ...", me);
-            while keep_running.load(Ordering::Acquire) {
+            while keep_running.load(Ordering::Relaxed) {
                 this_daemon.wait_for(Self::BEAT_RECORDING_MAX_PAUSE);
                 let (current_term, commit_index) = {
                     let rf = rf.lock();
@@ -436,7 +436,7 @@ impl<Command: 'static + Send> Raft<Command> {
         &self,
     ) -> Option<impl Future<Output = crate::VerifyAuthorityResult>> {
         // Fail the request if we have been killed.
-        if !self.keep_running.load(Ordering::Acquire) {
+        if !self.keep_running.load(Ordering::Relaxed) {
             return None;
         }
 

@@ -14,7 +14,8 @@ use kvraft::{
 };
 use ruaft::{
     AppendEntriesArgs, AppendEntriesReply, InstallSnapshotArgs,
-    InstallSnapshotReply, Raft, RequestVoteArgs, RequestVoteReply,
+    InstallSnapshotReply, Raft, ReplicableCommand, RequestVoteArgs,
+    RequestVoteReply,
 };
 
 const REQUEST_VOTE_RPC: &str = "Raft.RequestVote";
@@ -51,9 +52,7 @@ impl RpcClient {
 }
 
 #[async_trait]
-impl<Command: 'static + Send + Serialize> ruaft::RemoteRaft<Command>
-    for RpcClient
-{
+impl<Command: ReplicableCommand> ruaft::RemoteRaft<Command> for RpcClient {
     async fn request_vote(
         &self,
         args: RequestVoteArgs,

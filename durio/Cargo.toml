@@ -14,6 +14,7 @@ categories = ["raft"]
 
 [dependencies]
 async-trait = "0.1"
+axum = "0.5.7"
 bytes = "1.1"
 crossbeam-channel = "0.5.4"
 futures-util = "0.3.21"
@@ -29,6 +30,5 @@ tarpc = { version = ">=0.27", features = ["serde-transport", "tcp"] }
 test_utils = { path = "../test_utils", default-features = false }
 tokio = { version = "1.7", features = ["macros", "rt-multi-thread", "time", "parking_lot"] }
 tokio-serde = { version = "0.8", features = ["json"] }
-warp = { version = "0.3", default-features = false, features = []}
 
 [dev-dependencies]

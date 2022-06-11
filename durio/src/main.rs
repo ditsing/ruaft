@@ -3,9 +3,9 @@ use std::net::SocketAddr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 
+use axum::extract::{Json, Path};
 use lazy_static::lazy_static;
 use serde_derive::{Deserialize, Serialize};
-use warp::Filter;
 
 use kvraft::KVServer;
 
@@ -47,24 +47,26 @@ lazy_static! {
 }
 
 async fn run_web_server(socket_addr: SocketAddr, kv_server: Arc<KVServer>) {
-    let is_leader = warp::get()
-        .and(warp::path!("kvstore" / "is_leader"))
-        .and_then(move || {
+    let app = axum::Router::new();
+    let app = app.route(
+        "kvstore/is_leader",
+        axum::routing::get(move || {
             let kv_server = kv_server.clone();
             async move {
                 let ret: Result<String, Infallible> =
                     Ok(format!("{:?}", kv_server.raft().get_state()));
                 ret
             }
-        });
+        }),
+    );
 
     let clerk = Arc::new(create_async_clerk(KV_ADDRS.clone()).await);
     let counter = Arc::new(AtomicUsize::new(0));
 
     let get_clerk = clerk.clone();
-    let get = warp::get()
-        .and(warp::path!("kvstore" / "get" / String))
-        .and_then(move |key: String| {
+    let app = app.route(
+        "kvstore/get/:key",
+        axum::routing::get(move |Path(key): Path<String>| {
             let counter = counter.fetch_add(1, Ordering::Relaxed).to_string();
             let get_clerk = get_clerk.clone();
             async move {
@@ -73,36 +75,39 @@ async fn run_web_server(socket_addr: SocketAddr, kv_server: Arc<KVServer>) {
                     Ok(key + "!" + counter.as_str() + "!" + value.as_str());
                 ret
             }
-        });
+        }),
+    );
 
     let put_clerk = clerk.clone();
-    let put = warp::post()
-        .and(warp::path!("kvstore" / "put"))
-        .and(warp::body::json())
-        .and_then(move |body: PutAppendBody| {
+    let app = app.route(
+        "kvstore/put",
+        axum::routing::post(move |Json(body): Json<PutAppendBody>| {
             let put_clerk = put_clerk.clone();
             async move {
                 put_clerk.put(body.key, body.value).await;
                 let ret: Result<String, Infallible> = Ok("OK".to_string());
                 ret
             }
-        });
+        }),
+    );
 
     let append_clerk = clerk.clone();
-    let append = warp::post()
-        .and(warp::path!("kvstore" / "append"))
-        .and(warp::body::json())
-        .and_then(move |body: PutAppendBody| {
+    let app = app.route(
+        "kvstore/append",
+        axum::routing::post(move |Json(body): Json<PutAppendBody>| {
             let append_clerk = append_clerk.clone();
             async move {
                 append_clerk.append(body.key, body.value).await;
                 let ret: Result<String, Infallible> = Ok("OK".to_string());
                 ret
             }
-        });
+        }),
+    );
 
-    let routes = is_leader.or(get).or(put).or(append);
-    warp::serve(routes).run(socket_addr).await;
+    axum::Server::bind(&socket_addr)
+        .serve(app.into_make_service())
+        .await
+        .expect("Webserver should not fail")
 }
 
 fn main() {

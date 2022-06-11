@@ -157,27 +157,20 @@ pub fn register_server<
     let server_name = name.as_ref();
     let mut server = Server::make_server(server_name);
 
-    let raft_clone = raft.clone();
-    server.register_rpc_handler(
-        REQUEST_VOTE_RPC.to_owned(),
-        make_rpc_handler(move |args| {
-            raft_clone.as_ref().process_request_vote(args)
-        }),
-    )?;
+    server.register_rpc_handler(REQUEST_VOTE_RPC.to_owned(), {
+        let raft = raft.clone();
+        make_rpc_handler(move |args| raft.as_ref().process_request_vote(args))
+    })?;
 
-    let raft_clone = raft.clone();
-    server.register_rpc_handler(
-        APPEND_ENTRIES_RPC.to_owned(),
-        make_rpc_handler(move |args| {
-            raft_clone.as_ref().process_append_entries(args)
-        }),
-    )?;
+    server.register_rpc_handler(APPEND_ENTRIES_RPC.to_owned(), {
+        let raft = raft.clone();
+        make_rpc_handler(move |args| raft.as_ref().process_append_entries(args))
+    })?;
 
-    let raft_clone = raft;
     server.register_rpc_handler(
         INSTALL_SNAPSHOT_RPC.to_owned(),
         make_rpc_handler(move |args| {
-            raft_clone.as_ref().process_install_snapshot(args)
+            raft.as_ref().process_install_snapshot(args)
         }),
     )?;
 
@@ -197,21 +190,19 @@ pub fn register_kv_server<
     let server_name = name.as_ref();
     let mut server = Server::make_server(server_name);
 
-    let kv_clone = kv.clone();
-    server.register_async_rpc_handler(
-        GET.to_owned(),
+    server.register_async_rpc_handler(GET.to_owned(), {
+        let kv = kv.clone();
         make_async_rpc_handler(move |args| async move {
-            kv_clone.as_ref().get(args).await
-        }),
-    )?;
+            kv.as_ref().get(args).await
+        })
+    })?;
 
-    let kv_clone = kv.clone();
-    server.register_async_rpc_handler(
-        PUT_APPEND.to_owned(),
+    server.register_async_rpc_handler(PUT_APPEND.to_owned(), {
+        let kv = kv.clone();
         make_async_rpc_handler(move |args| async move {
-            kv_clone.as_ref().put_append(args).await
-        }),
-    )?;
+            kv.as_ref().put_append(args).await
+        })
+    })?;
 
     server.register_async_rpc_handler(
         COMMIT_SENTINEL.to_owned(),

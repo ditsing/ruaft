@@ -133,11 +133,9 @@ fn main() {
         .build()
         .expect("Creating thread pool should not fail");
 
-    let kv_server = rpc_server_thread_pool.block_on(async {
-        run_kv_instance(KV_ADDRS[me], RAFT_ADDRS.clone(), me)
-            .await
-            .expect("Running kv instance should not fail")
-    });
+    let kv_server = rpc_server_thread_pool
+        .block_on(run_kv_instance(KV_ADDRS[me], RAFT_ADDRS.clone(), me))
+        .expect("Running kv instance should not fail");
 
     // Run web servers in a thread pool. This pool
     // 1. Accepts incoming HTTP connections.

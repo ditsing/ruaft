@@ -192,6 +192,7 @@ pub fn register_kv_server<
 
     server.register_async_rpc_handler(GET.to_owned(), {
         let kv = kv.clone();
+        // Note: make_async_rpc_handler expects a FnOnce.
         make_async_rpc_handler(move |args| async move {
             kv.as_ref().get(args).await
         })

@@ -122,7 +122,6 @@ impl KVServer {
             let _ = tx.send(message);
         };
         let snapshot_holder = Arc::new(SnapshotHolder::default());
-        let snapshot_holder_clone = snapshot_holder.clone();
         let ret = Arc::new(Self {
             me,
             state: Mutex::new(KVServerState::default()),
@@ -132,7 +131,10 @@ impl KVServer {
                 persister,
                 apply_command,
                 max_state_size_bytes,
-                move |index| snapshot_holder_clone.request_snapshot(index),
+                {
+                    let snapshot_holder = snapshot_holder.clone();
+                    move |index| snapshot_holder.request_snapshot(index)
+                },
             ),
             keep_running: AtomicBool::new(true),
             #[cfg(all(not(test), feature = "integration-test"))]

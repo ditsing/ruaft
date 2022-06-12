@@ -310,14 +310,12 @@ impl Config {
         }
         let persister = self.log.lock().saved[index].clone();
 
-        let log_clone = self.log.clone();
+        let log = self.log.clone();
         let raft = Raft::new(
             clients,
             index,
             persister,
-            move |message| {
-                Self::apply_command(log_clone.clone(), index, message)
-            },
+            move |message| Self::apply_command(log.clone(), index, message),
             None,
             NO_SNAPSHOT,
         );

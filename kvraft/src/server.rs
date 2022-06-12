@@ -13,8 +13,8 @@ use ruaft::{
     ApplyCommandMessage, Index, Persister, Raft, RemoteRaft, Term,
     VerifyAuthorityResult,
 };
-use test_utils::log_with;
-use test_utils::thread_local_logger::LocalLogger;
+#[cfg(all(not(test), feature = "integration-test"))]
+use test_utils::{log_with, thread_local_logger::LocalLogger};
 
 use crate::common::{
     ClerkId, CommitSentinelArgs, CommitSentinelReply, GetArgs, GetReply,
@@ -27,6 +27,7 @@ pub struct KVServer {
     state: Mutex<KVServerState>,
     rf: Raft<UniqueKVOp>,
     keep_running: AtomicBool,
+    #[cfg(all(not(test), feature = "integration-test"))]
     logger: LocalLogger,
 }
 
@@ -134,6 +135,7 @@ impl KVServer {
                 move |index| snapshot_holder_clone.request_snapshot(index),
             ),
             keep_running: AtomicBool::new(true),
+            #[cfg(all(not(test), feature = "integration-test"))]
             logger: LocalLogger::inherit(),
         });
         ret.process_command(snapshot_holder, rx);
@@ -230,9 +232,11 @@ impl KVServer {
         command_channel: Receiver<ApplyCommandMessage<UniqueKVOp>>,
     ) {
         let this = Arc::downgrade(self);
+        #[cfg(all(not(test), feature = "integration-test"))]
         let logger = LocalLogger::inherit();
         let me = self.me;
         std::thread::spawn(move || {
+            #[cfg(all(not(test), feature = "integration-test"))]
             logger.attach();
             log::info!("KVServer {} waiting for commands ...", me);
             while let Ok(message) = command_channel.recv() {
@@ -380,7 +384,11 @@ impl KVServer {
                 me: self.me,
                 unique_id,
             };
+            #[cfg(all(not(test), feature = "integration-test"))]
             let start = log_with!(self.logger, self.rf.start(op));
+            #[cfg(not(all(not(test), feature = "integration-test")))]
+            let start = self.rf.start(op);
+
             let start_term = start.map_or(Self::UNSEEN_TERM, |index_term| {
                 let Term(term) = index_term.term;
                 Self::validate_term(term);

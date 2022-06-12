@@ -9,7 +9,7 @@ async-trait = "0.1"
 bincode = "1.3.3"
 bytes = "1.1"
 futures-util = "0.3.21"
-kvraft = { path = "../kvraft" }
+kvraft = { path = "../kvraft", features = ["integration-test"] }
 labrpc = "0.2.2"
 linearizability = { path = "../linearizability" }
 log = "0.4"

@@ -193,13 +193,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
             Ok(SyncLogEntriesResult::Success) => {
                 let mut rf = rf.lock();
 
-                check_or_record!(
-                    match_index < rf.log.end(),
-                    ErrorKind::LeaderLogShrunk(match_index),
-                    "The leader log shrunk",
-                    &rf
-                );
-
                 if !rf.is_leader() {
                     return;
                 }
@@ -207,6 +200,13 @@ impl<Command: ReplicableCommand> Raft<Command> {
                 if rf.current_term != term {
                     return;
                 }
+
+                check_or_record!(
+                    match_index < rf.log.end(),
+                    ErrorKind::LeaderLogShrunk(match_index),
+                    "The leader log shrunk",
+                    &rf
+                );
 
                 rf.next_index[peer_index] = match_index + 1;
                 rf.current_step[peer_index] = 0;

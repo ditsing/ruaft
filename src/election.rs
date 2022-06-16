@@ -6,8 +6,9 @@ use parking_lot::{Condvar, Mutex};
 use rand::{thread_rng, Rng};
 
 use crate::daemon_env::Daemon;
+use crate::sync_log_entries::SyncLogEntriesComms;
 use crate::term_marker::TermMarker;
-use crate::utils::{retry_rpc, SharedSender, RPC_DEADLINE};
+use crate::utils::{retry_rpc, RPC_DEADLINE};
 use crate::verify_authority::VerifyAuthorityDaemon;
 use crate::{
     Peer, Persister, Raft, RaftState, RemoteRaft, ReplicableCommand,
@@ -270,7 +271,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             votes,
             rx,
             self.election.clone(),
-            self.new_log_entry.clone().unwrap(),
+            self.sync_log_entries_comms.clone(),
             self.verify_authority_daemon.clone(),
             self.persister.clone(),
         ));
@@ -306,7 +307,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
         votes: Vec<tokio::task::JoinHandle<Option<bool>>>,
         cancel_token: futures_channel::oneshot::Receiver<()>,
         election: Arc<ElectionState>,
-        new_log_entry: SharedSender<Option<Peer>>,
+        new_log_entry: SyncLogEntriesComms,
         verify_authority_daemon: VerifyAuthorityDaemon,
         persister: Arc<dyn Persister>,
     ) {
@@ -380,7 +381,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             verify_authority_daemon.reset_state(term, sentinel_commit_index);
 
             // Sync all logs now.
-            let _ = new_log_entry.send(None);
+            new_log_entry.update_followers();
         }
     }
 }

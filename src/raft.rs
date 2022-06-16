@@ -11,6 +11,7 @@ use crate::election::ElectionState;
 use crate::heartbeats::{HeartbeatsDaemon, HEARTBEAT_INTERVAL};
 use crate::persister::PersistedRaftState;
 use crate::snapshot::{RequestSnapshotFnMut, SnapshotDaemon};
+use crate::sync_log_entries::SyncLogEntriesComms;
 use crate::verify_authority::VerifyAuthorityDaemon;
 use crate::{
     utils, IndexTerm, Persister, RaftState, RemoteRaft, ReplicableCommand,
@@ -33,7 +34,7 @@ pub struct Raft<Command> {
 
     pub(crate) persister: Arc<dyn Persister>,
 
-    pub(crate) new_log_entry: Option<utils::SharedSender<Option<Peer>>>,
+    pub(crate) sync_log_entries_comms: SyncLogEntriesComms,
     pub(crate) apply_command_signal: Arc<Condvar>,
     pub(crate) keep_running: Arc<AtomicBool>,
     pub(crate) election: Arc<ElectionState>,
@@ -103,13 +104,15 @@ impl<Command: ReplicableCommand> Raft<Command> {
             .into_iter()
             .map(|r| Arc::new(r) as Arc<dyn RemoteRaft<Command>>)
             .collect();
+        let (sync_log_entries_comms, sync_log_entries_daemon) =
+            crate::sync_log_entries::create();
 
         let mut this = Raft {
             inner_state: Arc::new(Mutex::new(state)),
             peers,
             me: Peer(me),
             persister,
-            new_log_entry: None,
+            sync_log_entries_comms,
             apply_command_signal: Arc::new(Condvar::new()),
             keep_running: Arc::new(AtomicBool::new(true)),
             election: Arc::new(election),
@@ -125,7 +128,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
         // Running in a standalone thread.
         this.run_snapshot_daemon(max_state_size_bytes, request_snapshot);
         // Running in a standalone thread.
-        this.run_log_entry_daemon();
+        this.run_log_entry_daemon(sync_log_entries_daemon);
         // Running in a standalone thread.
         this.run_apply_command_daemon(apply_command);
         // One off function that schedules many little tasks, running on the
@@ -159,7 +162,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
         self.persister.save_state(rf.persisted_state().into());
 
         // Several attempts have been made to remove the unwrap below.
-        let _ = self.new_log_entry.as_ref().unwrap().send(None);
+        let _ = self.sync_log_entries_comms.update_followers();
 
         log::info!("{:?} started new entry at {} {:?}", self.me, index, term);
         Some(IndexTerm::pack(index, term))
@@ -173,7 +176,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
     pub fn kill(mut self) {
         self.keep_running.store(false, Ordering::Release);
         self.election.stop_election_timer();
-        self.new_log_entry.take().map(|n| n.send(None));
+        self.sync_log_entries_comms.kill();
         self.apply_command_signal.notify_all();
         self.snapshot_daemon.kill();
         self.verify_authority_daemon.kill();

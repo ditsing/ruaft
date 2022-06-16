@@ -13,6 +13,39 @@ use crate::{
     Raft, RaftState, RemoteRaft, ReplicableCommand, Term,
 };
 
+#[derive(Clone)]
+pub(crate) struct SyncLogEntriesComms {
+    tx: crate::utils::SharedSender<Option<Peer>>,
+}
+
+impl SyncLogEntriesComms {
+    pub fn update_followers(&self) {
+        // Ignore the error. The log syncing thread must have died.
+        let _ = self.tx.send(None);
+    }
+
+    pub fn kill(&self) {
+        self.tx
+            .send(None)
+            .expect("The sync log entries daemon should still be alive");
+    }
+
+    fn rerun(&self, peer_index: usize) {
+        // Ignore the error. The log syncing thread must have died.
+        let _ = self.tx.send(Some(Peer(peer_index)));
+    }
+}
+
+pub(crate) struct SyncLogEntriesDaemon {
+    rx: std::sync::mpsc::Receiver<Option<Peer>>,
+}
+
+pub(crate) fn create() -> (SyncLogEntriesComms, SyncLogEntriesDaemon) {
+    let (tx, rx) = std::sync::mpsc::channel::<Option<Peer>>();
+    let tx = SharedSender::new(tx);
+    (SyncLogEntriesComms { tx }, SyncLogEntriesDaemon { rx })
+}
+
 #[repr(align(64))]
 struct Opening(Arc<AtomicUsize>);
 
@@ -54,11 +87,10 @@ impl<Command: ReplicableCommand> Raft<Command> {
     ///
     /// See comments on [`Raft::sync_log_entries`] to learn about the syncing
     /// and backoff strategy.
-    pub(crate) fn run_log_entry_daemon(&mut self) {
-        let (tx, rx) = std::sync::mpsc::channel::<Option<Peer>>();
-        let tx = SharedSender::new(tx);
-        self.new_log_entry.replace(tx);
-
+    pub(crate) fn run_log_entry_daemon(
+        &self,
+        SyncLogEntriesDaemon { rx }: SyncLogEntriesDaemon,
+    ) {
         // Clone everything that the thread needs.
         let this = self.clone();
         let sync_log_entry_daemon = move || {
@@ -89,7 +121,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
                                 this.inner_state.clone(),
                                 rpc_client.clone(),
                                 i,
-                                this.new_log_entry.clone().unwrap(),
+                                this.sync_log_entries_comms.clone(),
                                 openings[i].0.clone(),
                                 this.apply_command_signal.clone(),
                                 this.term_marker(),
@@ -152,7 +184,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
         rf: Arc<Mutex<RaftState<Command>>>,
         rpc_client: impl RemoteRaft<Command>,
         peer_index: usize,
-        rerun: SharedSender<Option<Peer>>,
+        comms: SyncLogEntriesComms,
         opening: Arc<AtomicUsize>,
         apply_command_signal: Arc<Condvar>,
         term_marker: TermMarker<Command>,
@@ -260,7 +292,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
                 if prev_log_index == match_index {
                     // If we did not make any progress this time, try again.
                     // This can only happen when installing snapshots.
-                    let _ = rerun.send(Some(Peer(peer_index)));
+                    comms.rerun(peer_index);
                 }
             }
             Ok(SyncLogEntriesResult::Archived(committed)) => {
@@ -289,7 +321,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
                 rf.next_index[peer_index] = committed.index + 1;
 
                 // Ignore the error. The log syncing thread must have died.
-                let _ = rerun.send(Some(Peer(peer_index)));
+                comms.rerun(peer_index);
             }
             Ok(SyncLogEntriesResult::Diverged(committed)) => {
                 let mut rf = rf.lock();
@@ -326,7 +358,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
                 }
 
                 // Ignore the error. The log syncing thread must have died.
-                let _ = rerun.send(Some(Peer(peer_index)));
+                comms.rerun(peer_index);
             }
             // Do nothing, not our term anymore.
             Ok(SyncLogEntriesResult::TermElapsed(term)) => {
@@ -335,7 +367,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             Err(_) => {
                 tokio::time::sleep(HEARTBEAT_INTERVAL).await;
                 // Ignore the error. The log syncing thread must have died.
-                let _ = rerun.send(Some(Peer(peer_index)));
+                comms.rerun(peer_index);
             }
         };
     }

@@ -162,7 +162,6 @@ mod tests {
     // feature 'integration-test', which is in conflict with this test. This
     // test intends to verify that durio can be run under normal production
     // setup, i.e. without 'integration-test'.
-    #[ignore]
     #[tokio::test]
     async fn smoke_test() {
         let kv_addrs: Vec<SocketAddr> = vec![

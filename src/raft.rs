@@ -162,7 +162,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
         self.persister.save_state(rf.persisted_state().into());
 
         // Several attempts have been made to remove the unwrap below.
-        let _ = self.sync_log_entries_comms.update_followers();
+        let _ = self.sync_log_entries_comms.update_followers(index);
 
         log::info!("{:?} started new entry at {} {:?}", self.me, index, term);
         Some(IndexTerm::pack(index, term))

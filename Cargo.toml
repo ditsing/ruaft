@@ -33,7 +33,6 @@ default = []
 integration-test = ["test_utils"]
 
 [dev-dependencies]
-kvraft = { path = "kvraft" }
 scopeguard = "1.1.0"
 stdext = "0.3"
 test_configs = { path = "test_configs" }
@@ -46,4 +45,9 @@ members = [
     "linearizability",
     "test_configs",
     "test_utils",
+]
+default-members = [
+    ".",
+    "kvraft",
+    "linearizability",
 ]

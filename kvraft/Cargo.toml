@@ -22,4 +22,5 @@ stdext = "0.3"
 test_configs = { path = "../test_configs" }
 
 [features]
+default = []
 integration-test = ["test_utils"]

@@ -120,20 +120,15 @@ fn main() {
         .unwrap_or_default()
         .parse()
         .expect("An index of the current instance must be passed in");
-    test_utils::init_log(format!("durio-instance-{}", me).as_str())
-        .expect("Initiating log should not fail");
+    env_logger::init();
 
     // Run RPC servers in a thread pool. This pool
     // 1. Accepts incoming RPC connections for KV and Raft servers.
     // 2. Sends out RPCs to other Raft instances.
     // Timers are used by RPC handling code in the KV server.
-    let local_logger = test_utils::thread_local_logger::get();
     let rpc_server_thread_pool = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_name("durio-rpc")
-        .on_thread_start(move || {
-            test_utils::thread_local_logger::set(local_logger.clone())
-        })
         .build()
         .expect("Creating thread pool should not fail");
 
@@ -144,13 +139,9 @@ fn main() {
     // Run web servers in a thread pool. This pool
     // 1. Accepts incoming HTTP connections.
     // 2. Sends out RPCs to KV instances, both local and remote.
-    let local_logger = test_utils::thread_local_logger::get();
     let thread_pool = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .thread_name("durio-web")
-        .on_thread_start(move || {
-            test_utils::thread_local_logger::set(local_logger.clone())
-        })
         .build()
         .expect("Creating thread pool should not fail");
 
@@ -166,6 +157,12 @@ mod tests {
     use super::*;
     use std::time::Duration;
 
+    // This test is ignored by default, because it cannot be run with other
+    // Ruaft tests at the same time. All other ruaft tests are compiled with
+    // feature 'integration-test', which is in conflict with this test. This
+    // test intends to verify that durio can be run under normal production
+    // setup, i.e. without 'integration-test'.
+    #[ignore]
     #[tokio::test]
     async fn smoke_test() {
         let kv_addrs: Vec<SocketAddr> = vec![

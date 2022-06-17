@@ -353,16 +353,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
 
             rf.state = State::Leader;
             rf.leader_id = me;
-            let log_len = rf.log.end();
-            for item in rf.next_index.iter_mut() {
-                *item = log_len;
-            }
-            for item in rf.match_index.iter_mut() {
-                *item = 0;
-            }
-            for item in rf.current_step.iter_mut() {
-                *item = 0;
-            }
+            rf.match_index.fill(0);
 
             let sentinel_commit_index;
             if rf.commit_index != rf.log.last_index_term().index {

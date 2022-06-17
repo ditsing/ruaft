@@ -105,7 +105,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             .map(|r| Arc::new(r) as Arc<dyn RemoteRaft<Command>>)
             .collect();
         let (sync_log_entries_comms, sync_log_entries_daemon) =
-            crate::sync_log_entries::create();
+            crate::sync_log_entries::create(peer_size);
 
         let mut this = Raft {
             inner_state: Arc::new(Mutex::new(state)),

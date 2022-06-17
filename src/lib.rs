@@ -21,6 +21,7 @@ mod heartbeats;
 mod index_term;
 mod log_array;
 mod messages;
+mod peer_progress;
 mod persister;
 mod process_append_entries;
 mod process_install_snapshot;

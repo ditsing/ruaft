@@ -381,7 +381,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             verify_authority_daemon.reset_state(term, sentinel_commit_index);
 
             // Sync all logs now.
-            new_log_entry.update_followers(sentinel_commit_index);
+            new_log_entry.reset_progress(term, sentinel_commit_index);
         }
     }
 }

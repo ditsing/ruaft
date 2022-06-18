@@ -14,7 +14,7 @@ use crate::{
     Peer, Raft, RaftState, RemoteRaft, ReplicableCommand, Term,
 };
 
-#[derive(Clone, Eq, PartialEq)]
+#[derive(Eq, PartialEq)]
 enum Event {
     NewTerm(Term, Index),
     NewLogEntry(Index),

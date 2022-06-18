@@ -14,7 +14,7 @@
 ///
 /// Note that the same reasoning does not apply to the `Receiver`. There are
 /// more levels of mutability in the `Receiver`.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct SharedSender<T>(std::sync::mpsc::Sender<T>);
 
 unsafe impl<T> Sync for SharedSender<T> where T: Sync {}
@@ -46,5 +46,11 @@ impl<T> From<std::sync::mpsc::Sender<T>> for SharedSender<T> {
 impl<T> From<SharedSender<T>> for std::sync::mpsc::Sender<T> {
     fn from(this: SharedSender<T>) -> Self {
         this.0
+    }
+}
+
+impl<T> Clone for SharedSender<T> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
     }
 }

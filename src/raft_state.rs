@@ -18,9 +18,7 @@ pub(crate) struct RaftState<Command> {
     pub commit_index: Index,
     pub last_applied: Index,
 
-    pub next_index: Vec<Index>,
     pub match_index: Vec<Index>,
-    pub current_step: Vec<i64>,
 
     pub state: State,
 
@@ -35,9 +33,7 @@ impl<Command> RaftState<Command> {
             log: LogArray::create(),
             commit_index: 0,
             last_applied: 0,
-            next_index: vec![1; peer_size],
             match_index: vec![0; peer_size],
-            current_step: vec![0; peer_size],
             state: State::Follower,
             leader_id: me,
         }

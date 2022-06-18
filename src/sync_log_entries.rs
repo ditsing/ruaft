@@ -1,4 +1,4 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 use parking_lot::{Condvar, Mutex};
@@ -77,9 +77,6 @@ pub(crate) fn create(
     )
 }
 
-#[repr(align(64))]
-struct Opening(Arc<AtomicUsize>);
-
 enum SyncLogEntriesOperation<Command> {
     AppendEntries(AppendEntriesArgs<Command>),
     InstallSnapshot(InstallSnapshotArgs),
@@ -127,12 +124,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
         let sync_log_entry_daemon = move || {
             log::info!("{:?} sync log entries daemon running ...", this.me);
 
-            let mut openings = vec![];
-            openings.resize_with(this.peers.len(), || {
-                Opening(Arc::new(AtomicUsize::new(0)))
-            });
-            let openings = openings; // Not mutable beyond this point.
-
             let mut task_number = 0;
             while let Ok(event) = rx.recv() {
                 if !this.keep_running.load(Ordering::Relaxed) {
@@ -143,19 +134,19 @@ impl<Command: ReplicableCommand> Raft<Command> {
                 }
                 for (i, rpc_client) in this.peers.iter().enumerate() {
                     if i != this.me.0 && event.should_schedule(Peer(i)) {
+                        let progress = &peer_progress[i];
                         if let Event::NewTerm(_term, index) = event {
-                            peer_progress[i].reset_progress(index);
+                            progress.reset_progress(index);
                         }
                         // Only schedule a new task if the last task has cleared
                         // the queue of RPC requests.
-                        if openings[i].0.fetch_add(1, Ordering::AcqRel) == 0 {
+                        if progress.should_schedule() {
                             task_number += 1;
                             this.thread_pool.spawn(Self::sync_log_entries(
                                 this.inner_state.clone(),
                                 rpc_client.clone(),
                                 this.sync_log_entries_comms.clone(),
-                                peer_progress[i].clone(),
-                                openings[i].0.clone(),
+                                progress.clone(),
                                 this.apply_command_signal.clone(),
                                 this.term_marker(),
                                 this.beat_ticker(i),
@@ -218,13 +209,12 @@ impl<Command: ReplicableCommand> Raft<Command> {
         rpc_client: impl RemoteRaft<Command>,
         comms: SyncLogEntriesComms,
         progress: PeerProgress,
-        opening: Arc<AtomicUsize>,
         apply_command_signal: Arc<Condvar>,
         term_marker: TermMarker<Command>,
         beat_ticker: DaemonBeatTicker,
         task_number: TaskNumber,
     ) {
-        if opening.swap(0, Ordering::AcqRel) == 0 {
+        if !progress.take_task() {
             return;
         }
 

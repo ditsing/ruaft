@@ -15,9 +15,14 @@ use crate::{
     RequestVoteArgs, State, Term,
 };
 
+struct VersionedDeadline {
+    version: usize,
+    deadline: Option<Instant>,
+}
+
 pub(crate) struct ElectionState {
     // Timer will be removed upon shutdown or elected.
-    timer: Mutex<(usize, Option<Instant>)>,
+    timer: Mutex<VersionedDeadline>,
     // Wake up the timer thread when the timer is reset or cancelled.
     signal: Condvar,
 }
@@ -27,25 +32,28 @@ const ELECTION_TIMEOUT_VAR_MILLIS: u64 = 200;
 impl ElectionState {
     pub(crate) fn create() -> Self {
         Self {
-            timer: Mutex::new((0, None)),
+            timer: Mutex::new(VersionedDeadline {
+                version: 0,
+                deadline: None,
+            }),
             signal: Condvar::new(),
         }
     }
 
     pub(crate) fn reset_election_timer(&self) {
         let mut guard = self.timer.lock();
-        guard.0 += 1;
-        guard.1.replace(Self::election_timeout());
+        guard.version += 1;
+        guard.deadline.replace(Self::election_timeout());
         self.signal.notify_one();
     }
 
     fn try_reset_election_timer(&self, timer_count: usize) -> bool {
         let mut guard = self.timer.lock();
-        if guard.0 != timer_count {
+        if guard.version != timer_count {
             return false;
         }
-        guard.0 += 1;
-        guard.1.replace(Self::election_timeout());
+        guard.version += 1;
+        guard.deadline.replace(Self::election_timeout());
         self.signal.notify_one();
         true
     }
@@ -60,8 +68,8 @@ impl ElectionState {
 
     pub(crate) fn stop_election_timer(&self) {
         let mut guard = self.timer.lock();
-        guard.0 += 1;
-        guard.1.take();
+        guard.version += 1;
+        guard.deadline.take();
         self.signal.notify_one();
     }
 }
@@ -135,7 +143,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
                     });
 
                 let mut guard = election.timer.lock();
-                let (timer_count, deadline) = *guard;
+                let (timer_count, deadline) = (guard.version, guard.deadline);
                 // If the timer is reset
                 // 0. Zero times. We know should_run is None. If should_run has
                 // a value, the election would have been started and the timer
@@ -169,7 +177,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
                         let fired = ret.timed_out() && Instant::now() > timeout;
                         // If the timer has been updated, do not schedule,
                         // break so that we could cancel.
-                        if timer_count != guard.0 {
+                        if timer_count != guard.version {
                             // Timer has been updated, cancel current
                             // election, and block on timeout again.
                             break None;
@@ -179,9 +187,9 @@ impl<Command: ReplicableCommand> Raft<Command> {
                             // If the next election is cancelled before we
                             // are back on wait, timer_count will be set to
                             // a different value.
-                            guard.0 += 1;
-                            guard.1.take();
-                            break Some(guard.0);
+                            guard.version += 1;
+                            guard.deadline.take();
+                            break Some(guard.version);
                         }
                     },
                     None => {

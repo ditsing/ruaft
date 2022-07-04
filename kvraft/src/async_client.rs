@@ -261,7 +261,7 @@ mod tests {
             let mut hasher = DefaultHasher::new();
             hasher.write(key.as_bytes());
             let hash_code = hasher.finish();
-            return (hash_code % (self.peer_size as u64)) as usize == self.id;
+            (hash_code % (self.peer_size as u64)) as usize == self.id
         }
     }
 

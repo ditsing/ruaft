@@ -21,6 +21,12 @@ impl Persister {
     }
 }
 
+impl Default for Persister {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ruaft::Persister for Persister {
     fn read_state(&self) -> bytes::Bytes {
         self.state.lock().bytes.clone()

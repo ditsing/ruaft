@@ -7,14 +7,13 @@ use ruaft::utils::integration_test::{
 use test_configs::interceptor::{make_config, RaftRpcEvent};
 use test_utils::init_test_log;
 
-#[test]
-fn smoke_test() {
+#[tokio::test(flavor = "multi_thread")]
+async fn smoke_test() {
     init_test_log!();
     let server_count = 3;
     let config = make_config(server_count, None);
     let config = Arc::new(config);
-    let thread_pool = tokio::runtime::Runtime::new().unwrap();
-    let put = thread_pool.spawn(
+    let put = tokio::spawn(
         config.spawn_put("commit".to_string(), "consistency".to_string()),
     );
 
@@ -32,10 +31,10 @@ fn smoke_test() {
         handle.unblock();
     }
     assert!(responded, "At least one peer must have responded OK");
-    let result = thread_pool.block_on(put).unwrap();
+    let result = put.await.unwrap();
     assert!(result.is_ok());
 
-    let get = thread_pool.spawn(config.spawn_get("commit".to_string()));
+    let get = tokio::spawn(config.spawn_get("commit".to_string()));
     let start = Instant::now();
     while let Ok((_event, handle)) = config
         .event_queue
@@ -51,18 +50,17 @@ fn smoke_test() {
         handle.unblock();
     }
     assert!(get.is_finished());
-    let value = thread_pool.block_on(get).unwrap().unwrap();
+    let value = get.await.unwrap().unwrap();
     assert_eq!("consistency", value);
 }
 
-#[test]
-fn delayed_commit_consistency_test() {
+#[tokio::test(flavor = "multi_thread")]
+async fn delayed_commit_consistency_test() {
     init_test_log!();
     let server_count = 3;
     let config = Arc::new(make_config(server_count, None));
-    let thread_pool = tokio::runtime::Runtime::new().unwrap();
 
-    let first_write = thread_pool.spawn(
+    let first_write = tokio::spawn(
         config.spawn_put("consistency".to_string(), "failed".to_string()),
     );
     let mut write_handle = None;
@@ -105,7 +103,7 @@ fn delayed_commit_consistency_test() {
     assert_ne!(new_leader, leader, "A new leader must have been elected");
     assert_eq!(1, config.kv_servers[leader].raft().get_state().0 .0);
 
-    let second_write = thread_pool.spawn(config.spawn_put_to_kv(
+    let second_write = tokio::spawn(config.spawn_put_to_kv(
         new_leader,
         "consistency".to_string(),
         "guaranteed".to_string(),
@@ -122,19 +120,19 @@ fn delayed_commit_consistency_test() {
     }
     assert_eq!(1, config.kv_servers[leader].raft().get_state().0 .0);
     assert!(second_write.is_finished());
-    thread_pool.block_on(second_write).unwrap().unwrap();
+    second_write.await.unwrap().unwrap();
 
-    let read = thread_pool
-        .spawn(config.spawn_get_from_kv(leader, "consistency".to_string()));
+    let read = tokio::spawn(
+        config.spawn_get_from_kv(leader, "consistency".to_string()),
+    );
     // Spare kv server some time to handle the request.
     std::thread::sleep(Duration::from_millis(100));
 
     // Unblocks the write response.
     write_handle.unblock();
+    first_write.await.unwrap().unwrap();
 
-    thread_pool.block_on(first_write).unwrap().unwrap();
-
-    if let Ok(result) = thread_pool.block_on(read).unwrap() {
+    if let Ok(result) = read.await.unwrap() {
         // This is so wrong. The second write was successful.
         assert_eq!(result, "failed");
     } else {

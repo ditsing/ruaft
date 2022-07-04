@@ -45,6 +45,7 @@ impl SyncLogEntriesComms {
     }
 
     pub fn reset_progress(&self, term: Term, index: Index) {
+        let index = std::cmp::max(index, 1);
         let _ = self.tx.send(Event::NewTerm(term, index));
     }
 

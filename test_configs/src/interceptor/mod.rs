@@ -193,8 +193,12 @@ impl Config {
         None
     }
 
-    pub async fn put(&self, key: String, value: String) -> Result<(), ()> {
-        let kv_server = self.find_leader().unwrap();
+    pub async fn put_to_kv(
+        &self,
+        kv_server: &KVServer,
+        key: String,
+        value: String,
+    ) -> Result<(), ()> {
         let result = kv_server
             .put_append(PutAppendArgs {
                 key,
@@ -210,6 +214,24 @@ impl Config {
         result.result.map_err(|_| ())
     }
 
+    pub async fn put(&self, key: String, value: String) -> Result<(), ()> {
+        let kv_server = self.find_leader().unwrap();
+        self.put_to_kv(kv_server, key, value).await
+    }
+
+    pub fn spawn_put_to_kv(
+        self: &Arc<Self>,
+        index: usize,
+        key: String,
+        value: String,
+    ) -> impl Future<Output = Result<(), ()>> {
+        let this = self.clone();
+        async move {
+            this.put_to_kv(this.kv_servers[index].as_ref(), key, value)
+                .await
+        }
+    }
+
     pub fn spawn_put(
         self: &Arc<Self>,
         key: String,
@@ -219,10 +241,27 @@ impl Config {
         async move { this.put(key, value).await }
     }
 
-    pub async fn get(&self, key: String) -> Result<String, ()> {
-        let kv_server = self.find_leader().unwrap();
+    pub async fn get_from_kv(
+        &self,
+        kv_server: &KVServer,
+        key: String,
+    ) -> Result<String, ()> {
         let result = kv_server.get(GetArgs { key }).await;
         result.result.map(|v| v.unwrap_or_default()).map_err(|_| ())
+    }
+
+    pub fn spawn_get_from_kv(
+        self: &Arc<Self>,
+        index: usize,
+        key: String,
+    ) -> impl Future<Output = Result<String, ()>> {
+        let this = self.clone();
+        async move { this.get_from_kv(this.kv_servers[index].as_ref(), key).await }
+    }
+
+    pub async fn get(&self, key: String) -> Result<String, ()> {
+        let kv_server = self.find_leader().unwrap();
+        self.get_from_kv(kv_server, key).await
     }
 
     pub fn spawn_get(

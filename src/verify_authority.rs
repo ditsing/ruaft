@@ -411,6 +411,8 @@ impl<Command: 'static + Send> Raft<Command> {
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::needless_borrow)]
+
     use super::*;
 
     const PEER_SIZE: usize = 5;

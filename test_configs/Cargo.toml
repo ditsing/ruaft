@@ -8,11 +8,14 @@ anyhow = "1.0"
 async-trait = "0.1"
 bincode = "1.3.3"
 bytes = "1.1"
+crossbeam-channel = "0.5.5"
+futures-channel = "0.3.21"
 futures-util = "0.3.21"
 kvraft = { path = "../kvraft", features = ["integration-test"] }
 labrpc = "0.2.2"
 linearizability = { path = "../linearizability" }
 log = "0.4"
+once_cell = "1.12.0"
 parking_lot = "0.12"
 rand = "0.8"
 ruaft = { path = "..", features = ["integration-test"] }

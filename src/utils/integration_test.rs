@@ -1,7 +1,7 @@
 #![cfg(feature = "integration-test")]
 
 use crate::{
-    AppendEntriesArgs, AppendEntriesReply, Peer, RequestVoteArgs,
+    AppendEntriesArgs, AppendEntriesReply, IndexTerm, Peer, RequestVoteArgs,
     RequestVoteReply, Term,
 };
 
@@ -38,6 +38,12 @@ pub fn make_append_entries_args<Command>(
 
 pub fn unpack_request_vote_reply(reply: RequestVoteReply) -> (Term, bool) {
     (reply.term, reply.vote_granted)
+}
+
+pub fn unpack_append_entries_args<T>(
+    request: AppendEntriesArgs<T>,
+) -> Option<IndexTerm> {
+    request.entries.last().map(|e| e.into())
 }
 
 pub fn unpack_append_entries_reply(reply: AppendEntriesReply) -> (Term, bool) {

@@ -2,7 +2,7 @@ pub use async_client::{AsyncClerk, AsyncClient};
 pub use client::Clerk;
 pub use common::{
     CommitSentinelArgs, CommitSentinelReply, GetArgs, GetReply, PutAppendArgs,
-    PutAppendReply,
+    PutAppendEnum, PutAppendReply, UniqueId,
 };
 pub use remote_kvraft::RemoteKvraft;
 pub use server::KVServer;

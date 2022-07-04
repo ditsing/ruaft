@@ -132,10 +132,5 @@ async fn delayed_commit_consistency_test() {
     write_handle.unblock();
     first_write.await.unwrap().unwrap();
 
-    if let Ok(result) = read.await.unwrap() {
-        // This is so wrong. The second write was successful.
-        assert_eq!(result, "failed");
-    } else {
-        panic!("The read request should not timeout");
-    }
+    assert!(read.await.unwrap().is_err());
 }

@@ -14,7 +14,7 @@ use crate::{IndexTerm, Peer, RaftState, State, Term};
 macro_rules! check_or_record {
     ($condition:expr, $error_kind:expr, $message:expr, $rf:expr) => {
         if !$condition {
-            crate::daemon_env::ThreadEnv::upgrade().record_error(
+            $crate::daemon_env::ThreadEnv::upgrade().record_error(
                 $error_kind,
                 $message,
                 $rf,

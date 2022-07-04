@@ -1,3 +1,4 @@
+pub mod interceptor;
 pub mod kvraft;
 mod persister;
 pub mod raft;

@@ -3,7 +3,8 @@ use std::sync::Arc;
 
 use parking_lot::{Condvar, Mutex};
 
-use crate::daemon_env::{Daemon, ErrorKind};
+use crate::daemon_env::ErrorKind;
+use crate::daemon_watch::Daemon;
 use crate::heartbeats::HEARTBEAT_INTERVAL;
 use crate::peer_progress::PeerProgress;
 use crate::term_marker::TermMarker;
@@ -160,8 +161,8 @@ impl<Command: ReplicableCommand> Raft<Command> {
 
             log::info!("{:?} sync log entries daemon done.", this.me);
         };
-        self.daemon_env
-            .watch_daemon(Daemon::SyncLogEntries, sync_log_entry_daemon);
+        self.daemon_watch
+            .create_daemon(Daemon::SyncLogEntries, sync_log_entry_daemon);
     }
 
     /// Syncs log entries to a peer once, requests a new sync if that fails.

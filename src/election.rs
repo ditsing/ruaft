@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use parking_lot::{Condvar, Mutex};
 use rand::{thread_rng, Rng};
 
-use crate::daemon_env::Daemon;
+use crate::daemon_watch::Daemon;
 use crate::sync_log_entries::SyncLogEntriesComms;
 use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, RPC_DEADLINE};
@@ -214,8 +214,8 @@ impl<Command: ReplicableCommand> Raft<Command> {
 
             log::info!("{:?} election timer daemon done.", this.me);
         };
-        self.daemon_env
-            .watch_daemon(Daemon::ElectionTimer, election_daemon);
+        self.daemon_watch
+            .create_daemon(Daemon::ElectionTimer, election_daemon);
     }
 
     fn run_election(

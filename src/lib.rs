@@ -16,6 +16,7 @@ pub(crate) use crate::raft_state::State;
 mod apply_command;
 mod beat_ticker;
 mod daemon_env;
+mod daemon_watch;
 mod election;
 mod heartbeats;
 mod index_term;

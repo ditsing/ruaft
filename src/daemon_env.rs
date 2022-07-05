@@ -1,12 +1,12 @@
 use std::cell::RefCell;
 use std::sync::{Arc, Weak};
 
-use crossbeam_utils::sync::WaitGroup;
 use parking_lot::Mutex;
 
 #[cfg(all(not(test), feature = "integration-test"))]
 use test_utils::thread_local_logger::{self, LocalLogger};
 
+use crate::daemon_watch::Daemon;
 use crate::{IndexTerm, Peer, RaftState, State, Term};
 
 /// A convenient macro to record errors.
@@ -29,27 +29,17 @@ macro_rules! check_or_record {
 /// Each daemon thread should hold a copy of this struct, either directly or
 /// through a copy of [`crate::Raft`]. It can be used for logging unexpected
 /// errors to a central location, which cause a failure at shutdown. It also
-/// checks daemon thread panics and collect information if they do.
+/// collects daemon thread panics, which are supplied by [`crate::DaemonWatch`].
 #[derive(Clone, Debug)]
 pub(crate) struct DaemonEnv {
     data: Arc<Mutex<DaemonEnvData>>,
     thread_env: ThreadEnv,
-    stop_wait_group: Option<WaitGroup>,
-}
-
-#[derive(Debug)]
-pub(crate) enum Daemon {
-    Snapshot,
-    ElectionTimer,
-    SyncLogEntries,
-    ApplyCommand,
-    VerifyAuthority,
 }
 
 #[derive(Debug, Default)]
 struct DaemonEnvData {
     errors: Vec<Error>,
-    daemons: Vec<(Daemon, std::thread::JoinHandle<()>)>,
+    panics: Vec<String>,
 }
 
 #[allow(dead_code)]
@@ -119,37 +109,11 @@ impl DaemonEnv {
         })
     }
 
-    /// Register a daemon thread to make sure it is correctly shutdown when the
-    /// Raft instance is killed.
-    pub fn watch_daemon<F, T>(&self, daemon: Daemon, func: F)
-    where
-        F: FnOnce() -> T,
-        F: Send + 'static,
-        T: Send + 'static,
-    {
-        let thread_env = self.for_thread();
-        let stop_wait_group = self
-            .stop_wait_group
-            .clone()
-            .expect("Expecting a valid stop wait group when creating daemons");
-        let thread = std::thread::Builder::new()
-            .name(format!("ruaft-daemon-{:?}", daemon))
-            .spawn(move || {
-                thread_env.attach();
-                func();
-                ThreadEnv::detach();
-                drop(stop_wait_group);
-            })
-            .expect("Creating daemon thread should never fail");
-        self.data.lock().daemons.push((daemon, thread));
-    }
-
-    pub fn wait_for_daemons(&mut self) {
-        if let Some(stop_wait_group) = self.stop_wait_group.take() {
-            stop_wait_group.wait();
-        } else {
-            panic!("Daemons can only be waited once")
-        }
+    pub fn record_panic(&self, daemon: Daemon, err: &str) {
+        self.data
+            .lock()
+            .panics
+            .push(format!("\nDaemon {:?} panicked: {}", daemon, err));
     }
 
     /// Makes sure that all daemons have been shutdown, no more errors can be
@@ -160,19 +124,7 @@ impl DaemonEnv {
                 panic!("No one should be holding daemon env at shutdown.")
             })
             .into_inner();
-        let daemon_panics: Vec<String> = data
-            .daemons
-            .into_iter()
-            .filter_map(|(daemon, join_handle)| {
-                let err = join_handle.join().err()?;
-                let err_str = err.downcast_ref::<&str>().map(|s| s.to_owned());
-                let err_string =
-                    err.downcast_ref::<String>().map(|s| s.as_str());
-                let err =
-                    err_str.or(err_string).unwrap_or("unknown panic error");
-                Some(format!("\nDaemon {:?} panicked: {}", daemon, err))
-            })
-            .collect();
+        let daemon_panics: Vec<String> = data.panics;
         let recorded_errors: Vec<String> = data
             .errors
             .iter()
@@ -240,11 +192,7 @@ impl DaemonEnv {
             local_logger: thread_local_logger::get(),
         };
 
-        Self {
-            data,
-            thread_env,
-            stop_wait_group: Some(WaitGroup::new()),
-        }
+        Self { data, thread_env }
     }
 
     /// Creates a [`ThreadEnv`] that could be attached to a thread. Any code
@@ -298,7 +246,6 @@ impl ThreadEnv {
         DaemonEnv {
             data: env.data.upgrade().unwrap(),
             thread_env: env,
-            stop_wait_group: None,
         }
     }
 
@@ -387,14 +334,13 @@ mod tests {
     }
 
     #[test]
-    fn test_watch_daemon_shutdown() {
+    fn test_record_panic() {
         let daemon_env = DaemonEnv::create();
-        daemon_env.watch_daemon(Daemon::ApplyCommand, || {
-            panic!("message with type &str");
-        });
-        daemon_env.watch_daemon(Daemon::Snapshot, || {
-            panic!("message with type {:?}", "debug string");
-        });
+        daemon_env.record_panic(Daemon::ApplyCommand, "message with type &str");
+        daemon_env.record_panic(
+            Daemon::Snapshot,
+            format!("message with type {:?}", "debug string").as_str(),
+        );
 
         let result = std::thread::spawn(move || {
             daemon_env.shutdown();

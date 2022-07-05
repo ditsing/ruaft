@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use parking_lot::{Condvar, Mutex};
 
 use crate::beat_ticker::{Beat, SharedBeatTicker};
-use crate::daemon_env::Daemon;
+use crate::daemon_watch::Daemon;
 use crate::heartbeats::HEARTBEAT_INTERVAL;
 use crate::{Index, Raft, Term};
 
@@ -351,8 +351,8 @@ impl<Command: 'static + Send> Raft<Command> {
             }
             log::info!("{:?} verify authority daemon done.", me);
         };
-        self.daemon_env
-            .watch_daemon(Daemon::VerifyAuthority, verify_authority_daemon);
+        self.daemon_watch
+            .create_daemon(Daemon::VerifyAuthority, verify_authority_daemon);
     }
 
     /// Create a verify authority request. Returns None if we are not the

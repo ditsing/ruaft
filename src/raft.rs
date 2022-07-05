@@ -7,6 +7,7 @@ use serde_derive::{Deserialize, Serialize};
 
 use crate::apply_command::ApplyCommandFnMut;
 use crate::daemon_env::{DaemonEnv, ThreadEnv};
+use crate::daemon_watch::DaemonWatch;
 use crate::election::ElectionState;
 use crate::heartbeats::{HeartbeatsDaemon, HEARTBEAT_INTERVAL};
 use crate::persister::PersistedRaftState;
@@ -43,6 +44,7 @@ pub struct Raft<Command> {
     pub(crate) heartbeats_daemon: HeartbeatsDaemon,
 
     pub(crate) thread_pool: utils::ThreadPoolHolder,
+    pub(crate) daemon_watch: DaemonWatch,
 
     pub(crate) daemon_env: DaemonEnv,
 }
@@ -100,6 +102,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             .on_thread_stop(ThreadEnv::detach)
             .build()
             .expect("Creating thread pool should not fail");
+        let daemon_watch = DaemonWatch::create(daemon_env.for_thread());
         let peers = peers
             .into_iter()
             .map(|r| Arc::new(r) as Arc<dyn RemoteRaft<Command>>)
@@ -120,6 +123,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             verify_authority_daemon: VerifyAuthorityDaemon::create(peer_size),
             heartbeats_daemon: HeartbeatsDaemon::create(),
             thread_pool: utils::ThreadPoolHolder::new(thread_pool),
+            daemon_watch,
             daemon_env,
         };
 
@@ -172,21 +176,15 @@ impl<Command: ReplicableCommand> Raft<Command> {
 
     /// Cleanly shutdown this instance. This function never blocks forever. It
     /// either panics or returns eventually.
-    pub fn kill(mut self) {
+    pub fn kill(self) {
         self.keep_running.store(false, Ordering::Release);
         self.election.stop_election_timer();
         self.sync_log_entries_comms.kill();
         self.apply_command_signal.notify_all();
         self.snapshot_daemon.kill();
         self.verify_authority_daemon.kill();
-        // We cannot easily combine stop_wait_group into DaemonEnv because of
-        // shutdown dependencies. The thread pool is not managed by DaemonEnv,
-        // but it cannot be shutdown until all daemons are. On the other hand
-        // the thread pool uses DaemonEnv, thus must be shutdown before
-        // DaemonEnv. The shutdown sequence is stop_wait_group -> thread_pool
-        // -> DaemonEnv. The first and third cannot be combined with the second
-        // in the middle.
-        self.daemon_env.wait_for_daemons();
+
+        self.daemon_watch.wait_for_daemons();
         self.thread_pool
             .take()
             .expect(

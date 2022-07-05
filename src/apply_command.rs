@@ -1,6 +1,6 @@
 use std::sync::atomic::Ordering;
 
-use crate::daemon_env::Daemon;
+use crate::daemon_watch::Daemon;
 use crate::heartbeats::HEARTBEAT_INTERVAL;
 use crate::{Index, Raft, ReplicableCommand, Snapshot};
 
@@ -111,7 +111,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             }
             log::info!("{:?} apply command daemon done.", me);
         };
-        self.daemon_env
-            .watch_daemon(Daemon::ApplyCommand, apply_command_daemon);
+        self.daemon_watch
+            .create_daemon(Daemon::ApplyCommand, apply_command_daemon);
     }
 }

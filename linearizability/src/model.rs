@@ -14,7 +14,7 @@ pub trait Model:
     ) -> Vec<Vec<&Operation<Self::Input, Self::Output>>> {
         let history: Vec<&Operation<Self::Input, Self::Output>> =
             history.iter().collect();
-        return vec![history];
+        vec![history]
     }
     fn step(&mut self, input: &Self::Input, output: &Self::Output) -> bool;
 }

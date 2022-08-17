@@ -45,11 +45,9 @@ impl<T: Serialize> SnapshotHolder<T> {
 
 impl<T: DeserializeOwned> SnapshotHolder<T> {
     pub fn load_snapshot(&self, snapshot: Snapshot) -> T {
-        let state = bincode::deserialize(&snapshot.data).expect(&*format!(
+        bincode::deserialize(&snapshot.data).expect(&*format!(
             "Deserialization should never fail, {:?}",
             &snapshot.data
-        ));
-
-        state
+        ))
     }
 }

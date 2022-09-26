@@ -286,7 +286,7 @@ impl Config {
         // might directly or indirectly block on the log lock, e.g. through
         // the apply command function.
         if let Some(raft) = raft {
-            raft.kill();
+            raft.kill().join();
         }
         let mut log = self.log.lock();
         log.saved[index] = Arc::new(crate::Persister::new());
@@ -371,7 +371,7 @@ impl Config {
         drop(network);
         for raft in &mut self.state.lock().rafts {
             if let Some(raft) = raft.take() {
-                raft.kill();
+                raft.kill().join();
             }
         }
         log::trace!("Cleaning up test raft.config done.");

@@ -4,7 +4,6 @@ use std::sync::Arc;
 use parking_lot::{Condvar, Mutex};
 
 use crate::daemon_env::ErrorKind;
-use crate::daemon_watch::Daemon;
 use crate::heartbeats::HEARTBEAT_INTERVAL;
 use crate::peer_progress::PeerProgress;
 use crate::term_marker::TermMarker;
@@ -120,10 +119,10 @@ impl<Command: ReplicableCommand> Raft<Command> {
     pub(crate) fn run_log_entry_daemon(
         &self,
         SyncLogEntriesDaemon { rx, peer_progress }: SyncLogEntriesDaemon,
-    ) {
+    ) -> impl FnOnce() {
         // Clone everything that the thread needs.
         let this = self.clone();
-        let sync_log_entry_daemon = move || {
+        move || {
             log::info!("{:?} sync log entries daemon running ...", this.me);
 
             let mut task_number = 0;
@@ -160,9 +159,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             }
 
             log::info!("{:?} sync log entries daemon done.", this.me);
-        };
-        self.daemon_watch
-            .create_daemon(Daemon::SyncLogEntries, sync_log_entry_daemon);
+        }
     }
 
     /// Syncs log entries to a peer once, requests a new sync if that fails.

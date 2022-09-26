@@ -132,7 +132,10 @@ impl<Command: ReplicableCommand> Raft<Command> {
         // Running in a standalone thread.
         this.run_snapshot_daemon(max_state_size_bytes, request_snapshot);
         // Running in a standalone thread.
-        this.run_log_entry_daemon(sync_log_entries_daemon);
+        daemon_watch.create_daemon(
+            Daemon::SyncLogEntries,
+            this.run_log_entry_daemon(sync_log_entries_daemon),
+        );
         // Running in a standalone thread.
         daemon_watch.create_daemon(
             Daemon::ApplyCommand,

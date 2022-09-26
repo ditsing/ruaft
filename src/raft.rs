@@ -7,7 +7,7 @@ use serde_derive::{Deserialize, Serialize};
 
 use crate::apply_command::ApplyCommandFnMut;
 use crate::daemon_env::{DaemonEnv, ThreadEnv};
-use crate::daemon_watch::DaemonWatch;
+use crate::daemon_watch::{Daemon, DaemonWatch};
 use crate::election::ElectionState;
 use crate::heartbeats::{HeartbeatsDaemon, HEARTBEAT_INTERVAL};
 use crate::persister::PersistedRaftState;
@@ -123,7 +123,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             heartbeats_daemon: HeartbeatsDaemon::create(),
             thread_pool: thread_pool.handle().clone(),
             runtime: Arc::new(Mutex::new(Some(thread_pool))),
-            daemon_watch,
+            daemon_watch: daemon_watch.clone(),
             daemon_env,
         };
 
@@ -134,7 +134,10 @@ impl<Command: ReplicableCommand> Raft<Command> {
         // Running in a standalone thread.
         this.run_log_entry_daemon(sync_log_entries_daemon);
         // Running in a standalone thread.
-        this.run_apply_command_daemon(apply_command);
+        daemon_watch.create_daemon(
+            Daemon::ApplyCommand,
+            this.run_apply_command_daemon(apply_command),
+        );
         // One off function that schedules many little tasks, running on the
         // internal thread pool.
         this.schedule_heartbeats(HEARTBEAT_INTERVAL);

@@ -7,7 +7,6 @@ use std::time::{Duration, Instant};
 use parking_lot::{Condvar, Mutex};
 
 use crate::beat_ticker::{Beat, SharedBeatTicker};
-use crate::daemon_watch::Daemon;
 use crate::heartbeats::HEARTBEAT_INTERVAL;
 use crate::{Index, Raft, Term};
 
@@ -332,13 +331,13 @@ impl<Command: 'static + Send> Raft<Command> {
     const BEAT_RECORDING_MAX_PAUSE: Duration = Duration::from_millis(20);
 
     /// Create a thread and runs the verify authority daemon.
-    pub(crate) fn run_verify_authority_daemon(&self) {
+    pub(crate) fn run_verify_authority_daemon(&self) -> impl FnOnce() {
         let me = self.me;
         let keep_running = self.keep_running.clone();
         let this_daemon = self.verify_authority_daemon.clone();
         let rf = self.inner_state.clone();
 
-        let verify_authority_daemon = move || {
+        move || {
             log::info!("{:?} verify authority daemon running ...", me);
             while keep_running.load(Ordering::Relaxed) {
                 this_daemon.wait_for(Self::BEAT_RECORDING_MAX_PAUSE);
@@ -350,9 +349,7 @@ impl<Command: 'static + Send> Raft<Command> {
                     .run_verify_authority_iteration(current_term, commit_index);
             }
             log::info!("{:?} verify authority daemon done.", me);
-        };
-        self.daemon_watch
-            .create_daemon(Daemon::VerifyAuthority, verify_authority_daemon);
+        }
     }
 
     /// Create a verify authority request. Returns None if we are not the

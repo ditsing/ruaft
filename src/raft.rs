@@ -128,7 +128,10 @@ impl<Command: ReplicableCommand> Raft<Command> {
         };
 
         // Running in a standalone thread.
-        this.run_verify_authority_daemon();
+        daemon_watch.create_daemon(
+            Daemon::VerifyAuthority,
+            this.run_verify_authority_daemon(),
+        );
         // Running in a standalone thread.
         daemon_watch.create_daemon(
             Daemon::Snapshot,

@@ -102,7 +102,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
             .on_thread_stop(ThreadEnv::detach)
             .build()
             .expect("Creating thread pool should not fail");
-        let daemon_watch = DaemonWatch::create(daemon_env.for_thread());
         let peers = peers
             .into_iter()
             .map(|r| Arc::new(r) as Arc<dyn RemoteRaft<Command>>)
@@ -129,6 +128,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             join_handle: Arc::new(Mutex::new(None)),
         };
 
+        let mut daemon_watch = DaemonWatch::create(daemon_env.for_thread());
         // Running in a standalone thread.
         daemon_watch.create_daemon(
             Daemon::VerifyAuthority,

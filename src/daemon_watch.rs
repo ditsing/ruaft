@@ -1,7 +1,5 @@
 use crate::daemon_env::ThreadEnv;
 use crossbeam_utils::sync::WaitGroup;
-use parking_lot::Mutex;
-use std::sync::Arc;
 
 #[derive(Debug)]
 pub(crate) enum Daemon {
@@ -17,10 +15,8 @@ pub(crate) enum Daemon {
 /// [`DaemonWatch`] manages daemon threads and makes sure that panics are
 /// recorded during shutdown. It collects daemon panics and send them to
 /// [`crate::DaemonEnv`].
-#[derive(Clone)]
 pub(crate) struct DaemonWatch {
-    #[allow(clippy::type_complexity)]
-    daemons: Arc<Mutex<Vec<(Daemon, std::thread::JoinHandle<()>)>>>,
+    daemons: Vec<(Daemon, std::thread::JoinHandle<()>)>,
     thread_env: ThreadEnv,
     stop_wait_group: WaitGroup,
 }
@@ -28,7 +24,7 @@ pub(crate) struct DaemonWatch {
 impl DaemonWatch {
     pub fn create(thread_env: ThreadEnv) -> Self {
         Self {
-            daemons: Arc::new(Mutex::new(vec![])),
+            daemons: vec![],
             thread_env,
             stop_wait_group: WaitGroup::new(),
         }
@@ -36,7 +32,7 @@ impl DaemonWatch {
 
     /// Register a daemon thread to make sure it is correctly shutdown when the
     /// Raft instance is killed.
-    pub fn create_daemon<F, T>(&self, daemon: Daemon, func: F)
+    pub fn create_daemon<F, T>(&mut self, daemon: Daemon, func: F)
     where
         F: FnOnce() -> T,
         F: Send + 'static,
@@ -53,13 +49,13 @@ impl DaemonWatch {
                 drop(stop_wait_group);
             })
             .expect("Creating daemon thread should never fail");
-        self.daemons.lock().push((daemon, thread));
+        self.daemons.push((daemon, thread));
     }
 
     pub fn wait_for_daemons(self) {
         self.stop_wait_group.wait();
         self.thread_env.attach();
-        for (daemon, join_handle) in self.daemons.lock().drain(..) {
+        for (daemon, join_handle) in self.daemons.into_iter() {
             if let Some(err) = join_handle.join().err() {
                 let err_str = err.downcast_ref::<&str>().map(|s| s.to_owned());
                 let err_string =
@@ -81,7 +77,7 @@ mod tests {
     #[test]
     fn test_watch_daemon_shutdown() {
         let daemon_env = DaemonEnv::create();
-        let daemon_watch = DaemonWatch::create(daemon_env.for_thread());
+        let mut daemon_watch = DaemonWatch::create(daemon_env.for_thread());
         daemon_watch.create_daemon(Daemon::ApplyCommand, || {
             panic!("message with type &str");
         });

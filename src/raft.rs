@@ -151,7 +151,8 @@ impl<Command: ReplicableCommand> Raft<Command> {
         // internal thread pool.
         this.schedule_heartbeats(HEARTBEAT_INTERVAL);
         // The last step is to start running election timer.
-        this.run_election_timer();
+        daemon_watch
+            .create_daemon(Daemon::ElectionTimer, this.run_election_timer());
         this
     }
 }

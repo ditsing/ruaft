@@ -5,7 +5,6 @@ use std::time::{Duration, Instant};
 use parking_lot::{Condvar, Mutex};
 use rand::{thread_rng, Rng};
 
-use crate::daemon_watch::Daemon;
 use crate::sync_log_entries::SyncLogEntriesComms;
 use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, RPC_DEADLINE};
@@ -127,10 +126,10 @@ impl<Command: ReplicableCommand> Raft<Command> {
     /// election timer. There could be more than one vote-counting tasks running
     /// at the same time, but all earlier tasks except the newest one will
     /// eventually realize the term they were competing for has passed and quit.
-    pub(crate) fn run_election_timer(&self) {
+    pub(crate) fn run_election_timer(&self) -> impl FnOnce() {
         let this = self.clone();
 
-        let election_daemon = move || {
+        move || {
             log::info!("{:?} election timer daemon running ...", this.me);
 
             let election = this.election.clone();
@@ -213,9 +212,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             }
 
             log::info!("{:?} election timer daemon done.", this.me);
-        };
-        self.daemon_watch
-            .create_daemon(Daemon::ElectionTimer, election_daemon);
+        }
     }
 
     fn run_election(

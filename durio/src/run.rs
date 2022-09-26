@@ -22,7 +22,7 @@ pub(crate) async fn run_kv_instance(
     let persister = Arc::new(DoNothingPersister::default());
 
     let kv_server = KVServer::new(remote_rafts, me, persister, None);
-    let raft = Arc::new(kv_server.raft().clone());
+    let raft = kv_server.raft().clone();
 
     start_raft_service_server(local_raft_peer, raft).await?;
     start_kv_service_server(addr, kv_server.clone()).await?;

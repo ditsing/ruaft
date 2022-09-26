@@ -58,7 +58,7 @@ impl Config {
             KVServer::new(clients, index, persister, Some(self.maxraftstate));
         self.state.lock().kv_servers[index].replace(kv.clone());
 
-        let raft = Arc::new(kv.raft().clone());
+        let raft = kv.raft().clone();
 
         register_server(raft, Self::server_name(index), self.network.as_ref())?;
 

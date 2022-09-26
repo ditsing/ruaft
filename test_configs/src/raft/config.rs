@@ -321,7 +321,6 @@ impl Config {
         );
         self.state.lock().rafts[index].replace(raft.clone());
 
-        let raft = Arc::new(raft);
         register_server(raft, Self::server_name(index), self.network.as_ref())?;
         Ok(())
     }

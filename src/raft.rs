@@ -180,6 +180,8 @@ impl<Command: ReplicableCommand> Raft<Command> {
     /// committed to the log when this method returns. When and if it is
     /// committed, the `apply_command` callback will be called.
     pub fn start(&self, command: Command) -> Option<IndexTerm> {
+        let _guard = self.daemon_env.for_scope();
+
         let mut rf = self.inner_state.lock();
         let term = rf.current_term;
         if !rf.is_leader() {

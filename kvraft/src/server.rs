@@ -14,7 +14,7 @@ use ruaft::{
     VerifyAuthorityResult,
 };
 #[cfg(all(not(test), feature = "integration-test"))]
-use test_utils::{log_with, thread_local_logger::LocalLogger};
+use test_utils::thread_local_logger::LocalLogger;
 
 use crate::common::{
     ClerkId, CommitSentinelArgs, CommitSentinelReply, GetArgs, GetReply,
@@ -27,8 +27,6 @@ pub struct KVServer {
     state: Mutex<KVServerState>,
     rf: Raft<UniqueKVOp>,
     keep_running: AtomicBool,
-    #[cfg(all(not(test), feature = "integration-test"))]
-    logger: LocalLogger,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -137,8 +135,6 @@ impl KVServer {
                 },
             ),
             keep_running: AtomicBool::new(true),
-            #[cfg(all(not(test), feature = "integration-test"))]
-            logger: LocalLogger::inherit(),
         });
         ret.process_command(snapshot_holder, rx);
         ret
@@ -386,9 +382,6 @@ impl KVServer {
                 me: self.me,
                 unique_id,
             };
-            #[cfg(all(not(test), feature = "integration-test"))]
-            let start = log_with!(self.logger, self.rf.start(op));
-            #[cfg(not(all(not(test), feature = "integration-test")))]
             let start = self.rf.start(op);
 
             let start_term = start.map_or(Self::UNSEEN_TERM, |index_term| {

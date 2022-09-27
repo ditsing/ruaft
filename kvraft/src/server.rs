@@ -516,11 +516,11 @@ impl KVServer {
         // Drop all read requests.
         self.state.lock().index_subscribers.drain();
 
-        let rf = self.raft().clone();
+        let raft_join_handle = self.raft().clone().kill();
         // We must drop self to remove the only clone of raft, so that
         // `rf.kill()` does not block.
         drop(self);
-        rf.kill().join();
+        raft_join_handle.join();
         // The process_command thread will exit, after Raft drops the reference
         // to the sender.
     }

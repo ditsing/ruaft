@@ -239,6 +239,9 @@ impl RaftJoinHandle {
     const SHUTDOWN_TIMEOUT: Duration =
         Duration::from_millis(HEARTBEAT_INTERVAL.as_millis() as u64 * 2);
 
+    /// Waits for the Raft instance to shutdown.
+    ///
+    /// See the struct documentation for more details.
     pub fn join(self) {
         // Wait for all Raft instances to be dropped.
         self.stop_wait_group.wait();

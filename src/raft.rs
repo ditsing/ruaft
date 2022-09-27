@@ -1,3 +1,4 @@
+use crossbeam_utils::sync::WaitGroup;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -7,16 +8,14 @@ use serde_derive::{Deserialize, Serialize};
 
 use crate::apply_command::ApplyCommandFnMut;
 use crate::daemon_env::{DaemonEnv, ThreadEnv};
-use crate::daemon_watch::DaemonWatch;
+use crate::daemon_watch::{Daemon, DaemonWatch};
 use crate::election::ElectionState;
 use crate::heartbeats::{HeartbeatsDaemon, HEARTBEAT_INTERVAL};
 use crate::persister::PersistedRaftState;
 use crate::snapshot::{RequestSnapshotFnMut, SnapshotDaemon};
 use crate::sync_log_entries::SyncLogEntriesComms;
 use crate::verify_authority::VerifyAuthorityDaemon;
-use crate::{
-    utils, IndexTerm, Persister, RaftState, RemoteRaft, ReplicableCommand,
-};
+use crate::{IndexTerm, Persister, RaftState, RemoteRaft, ReplicableCommand};
 
 #[derive(
     Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize,
@@ -43,10 +42,11 @@ pub struct Raft<Command> {
     pub(crate) verify_authority_daemon: VerifyAuthorityDaemon,
     pub(crate) heartbeats_daemon: HeartbeatsDaemon,
 
-    pub(crate) thread_pool: utils::ThreadPoolHolder,
-    pub(crate) daemon_watch: DaemonWatch,
-
+    pub(crate) thread_pool: tokio::runtime::Handle,
     pub(crate) daemon_env: DaemonEnv,
+
+    stop_wait_group: WaitGroup,
+    join_handle: Arc<Mutex<Option<RaftJoinHandle>>>,
 }
 
 impl<Command: ReplicableCommand> Raft<Command> {
@@ -102,7 +102,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
             .on_thread_stop(ThreadEnv::detach)
             .build()
             .expect("Creating thread pool should not fail");
-        let daemon_watch = DaemonWatch::create(daemon_env.for_thread());
         let peers = peers
             .into_iter()
             .map(|r| Arc::new(r) as Arc<dyn RemoteRaft<Command>>)
@@ -122,24 +121,49 @@ impl<Command: ReplicableCommand> Raft<Command> {
             snapshot_daemon: SnapshotDaemon::create(),
             verify_authority_daemon: VerifyAuthorityDaemon::create(peer_size),
             heartbeats_daemon: HeartbeatsDaemon::create(),
-            thread_pool: utils::ThreadPoolHolder::new(thread_pool),
-            daemon_watch,
-            daemon_env,
+            thread_pool: thread_pool.handle().clone(),
+            stop_wait_group: WaitGroup::new(),
+            daemon_env: daemon_env.clone(),
+            // The join handle will be created later.
+            join_handle: Arc::new(Mutex::new(None)),
         };
 
+        let mut daemon_watch = DaemonWatch::create(daemon_env.for_thread());
         // Running in a standalone thread.
-        this.run_verify_authority_daemon();
+        daemon_watch.create_daemon(
+            Daemon::VerifyAuthority,
+            this.run_verify_authority_daemon(),
+        );
         // Running in a standalone thread.
-        this.run_snapshot_daemon(max_state_size_bytes, request_snapshot);
+        daemon_watch.create_daemon(
+            Daemon::Snapshot,
+            this.run_snapshot_daemon(max_state_size_bytes, request_snapshot),
+        );
         // Running in a standalone thread.
-        this.run_log_entry_daemon(sync_log_entries_daemon);
+        daemon_watch.create_daemon(
+            Daemon::SyncLogEntries,
+            this.run_log_entry_daemon(sync_log_entries_daemon),
+        );
         // Running in a standalone thread.
-        this.run_apply_command_daemon(apply_command);
+        daemon_watch.create_daemon(
+            Daemon::ApplyCommand,
+            this.run_apply_command_daemon(apply_command),
+        );
         // One off function that schedules many little tasks, running on the
         // internal thread pool.
         this.schedule_heartbeats(HEARTBEAT_INTERVAL);
         // The last step is to start running election timer.
-        this.run_election_timer();
+        daemon_watch
+            .create_daemon(Daemon::ElectionTimer, this.run_election_timer());
+
+        // Create the join handle
+        this.join_handle.lock().replace(RaftJoinHandle {
+            stop_wait_group: this.stop_wait_group.clone(),
+            thread_pool,
+            daemon_watch,
+            daemon_env,
+        });
+
         this
     }
 }
@@ -171,12 +195,9 @@ impl<Command: ReplicableCommand> Raft<Command> {
         Some(IndexTerm::pack(index, term))
     }
 
-    const SHUTDOWN_TIMEOUT: Duration =
-        Duration::from_millis(HEARTBEAT_INTERVAL.as_millis() as u64 * 2);
-
     /// Cleanly shutdown this instance. This function never blocks forever. It
     /// either panics or returns eventually.
-    pub fn kill(self) {
+    pub fn kill(self) -> RaftJoinHandle {
         self.keep_running.store(false, Ordering::Release);
         self.election.stop_election_timer();
         self.sync_log_entries_comms.kill();
@@ -184,16 +205,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
         self.snapshot_daemon.kill();
         self.verify_authority_daemon.kill();
 
-        self.daemon_watch.wait_for_daemons();
-        self.thread_pool
-            .take()
-            .expect(
-                "All references to the thread pool should have been dropped.",
-            )
-            .shutdown_timeout(Self::SHUTDOWN_TIMEOUT);
-        // DaemonEnv must be shutdown after the thread pool, since there might
-        // be tasks logging errors in the pool.
-        self.daemon_env.shutdown();
+        self.join_handle.lock().take().unwrap()
     }
 
     /// Returns the current term and whether we are the leader.
@@ -203,6 +215,41 @@ impl<Command: ReplicableCommand> Raft<Command> {
     pub fn get_state(&self) -> (Term, bool) {
         let state = self.inner_state.lock();
         (state.current_term, state.is_leader())
+    }
+}
+
+/// A join handle returned by `Raft::kill()`. Join this handle to cleanly
+/// shutdown a Raft instance.
+///
+/// All clones of the same Raft instance created by `Raft::clone()` must be
+/// dropped before `RaftJoinHandle::join()` can return.
+///
+/// After `RaftJoinHandle::join()` returns, all threads and thread pools created
+/// by this Raft instance will have stopped. No callbacks will be called. No new
+/// commits will be created by this Raft instance.
+#[must_use]
+pub struct RaftJoinHandle {
+    stop_wait_group: WaitGroup,
+    thread_pool: tokio::runtime::Runtime,
+    daemon_watch: DaemonWatch,
+    daemon_env: DaemonEnv,
+}
+
+impl RaftJoinHandle {
+    const SHUTDOWN_TIMEOUT: Duration =
+        Duration::from_millis(HEARTBEAT_INTERVAL.as_millis() as u64 * 2);
+
+    /// Waits for the Raft instance to shutdown.
+    ///
+    /// See the struct documentation for more details.
+    pub fn join(self) {
+        // Wait for all Raft instances to be dropped.
+        self.stop_wait_group.wait();
+        self.daemon_watch.wait_for_daemons();
+        self.thread_pool.shutdown_timeout(Self::SHUTDOWN_TIMEOUT);
+        // DaemonEnv must be shutdown after the thread pool, since there might
+        // be tasks logging errors in the pool.
+        self.daemon_env.shutdown();
     }
 }
 

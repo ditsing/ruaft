@@ -145,11 +145,10 @@ where
 }
 
 pub fn register_server<
-    Command: 'static + Clone + Serialize + DeserializeOwned,
-    R: 'static + AsRef<Raft<Command>> + Send + Sync + Clone,
+    Command: 'static + Clone + Send + Serialize + DeserializeOwned,
     S: AsRef<str>,
 >(
-    raft: R,
+    raft: Raft<Command>,
     name: S,
     network: &Mutex<Network>,
 ) -> std::io::Result<()> {
@@ -159,19 +158,17 @@ pub fn register_server<
 
     server.register_rpc_handler(REQUEST_VOTE_RPC.to_owned(), {
         let raft = raft.clone();
-        make_rpc_handler(move |args| raft.as_ref().process_request_vote(args))
+        make_rpc_handler(move |args| raft.process_request_vote(args))
     })?;
 
     server.register_rpc_handler(APPEND_ENTRIES_RPC.to_owned(), {
         let raft = raft.clone();
-        make_rpc_handler(move |args| raft.as_ref().process_append_entries(args))
+        make_rpc_handler(move |args| raft.process_append_entries(args))
     })?;
 
     server.register_rpc_handler(
         INSTALL_SNAPSHOT_RPC.to_owned(),
-        make_rpc_handler(move |args| {
-            raft.as_ref().process_install_snapshot(args)
-        }),
+        make_rpc_handler(move |args| raft.process_install_snapshot(args)),
     )?;
 
     network.add_server(server_name, server);
@@ -258,14 +255,14 @@ mod tests {
                 .lock()
                 .make_client("test-basic-message", name.to_owned());
 
-            let raft = Arc::new(Raft::new(
+            let raft = Raft::new(
                 vec![RpcClient(client)],
                 0,
                 Arc::new(DoNothingPersister),
                 |_: ApplyCommandMessage<i32>| {},
                 None,
                 crate::utils::NO_SNAPSHOT,
-            ));
+            );
             register_server(raft, name, network.as_ref())?;
 
             let client = network

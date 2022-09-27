@@ -6,7 +6,6 @@ use parking_lot::{Condvar, Mutex};
 
 use crate::check_or_record;
 use crate::daemon_env::ErrorKind;
-use crate::daemon_watch::Daemon;
 use crate::{Index, Raft};
 
 #[derive(Clone, Debug, Default)]
@@ -128,10 +127,10 @@ impl<C: 'static + Clone + Send + serde::Serialize> Raft<C> {
         &mut self,
         max_state_size: Option<usize>,
         mut request_snapshot: impl RequestSnapshotFnMut,
-    ) {
+    ) -> impl FnOnce() {
         let max_state_size = match max_state_size {
             Some(max_state_size) => max_state_size,
-            None => return,
+            None => usize::MAX,
         };
 
         let parker = Parker::new();
@@ -218,7 +217,10 @@ impl<C: 'static + Clone + Send + serde::Serialize> Raft<C> {
                 );
             }
         };
-        self.daemon_watch
-            .create_daemon(Daemon::Snapshot, snapshot_daemon);
+        move || {
+            if max_state_size != usize::MAX {
+                snapshot_daemon()
+            }
+        }
     }
 }

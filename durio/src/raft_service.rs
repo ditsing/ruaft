@@ -1,6 +1,5 @@
 use std::future::Future;
 use std::net::SocketAddr;
-use std::sync::Arc;
 
 use async_trait::async_trait;
 use tarpc::context::Context;
@@ -23,7 +22,7 @@ pub(crate) trait RaftService {
 }
 
 #[derive(Clone)]
-struct RaftRpcServer(Arc<Raft<UniqueKVOp>>);
+struct RaftRpcServer(Raft<UniqueKVOp>);
 
 #[tarpc::server]
 impl RaftService for RaftRpcServer {
@@ -125,7 +124,7 @@ pub(crate) async fn connect_to_raft_service(
 
 pub(crate) fn start_raft_service_server(
     addr: SocketAddr,
-    raft: Arc<Raft<UniqueKVOp>>,
+    raft: Raft<UniqueKVOp>,
 ) -> impl Future<Output = std::io::Result<()>> {
     let server = RaftRpcServer(raft);
     crate::utils::start_tarpc_server(addr, server.serve())

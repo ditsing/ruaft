@@ -520,7 +520,7 @@ impl KVServer {
         // We must drop self to remove the only clone of raft, so that
         // `rf.kill()` does not block.
         drop(self);
-        rf.kill();
+        rf.kill().join();
         // The process_command thread will exit, after Raft drops the reference
         // to the sender.
     }

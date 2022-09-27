@@ -1,6 +1,5 @@
 use std::sync::atomic::Ordering;
 
-use crate::daemon_watch::Daemon;
 use crate::heartbeats::HEARTBEAT_INTERVAL;
 use crate::{Index, Raft, ReplicableCommand, Snapshot};
 
@@ -49,13 +48,13 @@ impl<Command: ReplicableCommand> Raft<Command> {
     pub(crate) fn run_apply_command_daemon(
         &self,
         mut apply_command: impl ApplyCommandFnMut<Command>,
-    ) {
+    ) -> impl FnOnce() {
         let keep_running = self.keep_running.clone();
         let me = self.me;
         let rf = self.inner_state.clone();
         let condvar = self.apply_command_signal.clone();
         let snapshot_daemon = self.snapshot_daemon.clone();
-        let apply_command_daemon = move || {
+        move || {
             log::info!("{:?} apply command daemon running ...", me);
 
             while keep_running.load(Ordering::Relaxed) {
@@ -110,8 +109,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
                 }
             }
             log::info!("{:?} apply command daemon done.", me);
-        };
-        self.daemon_watch
-            .create_daemon(Daemon::ApplyCommand, apply_command_daemon);
+        }
     }
 }

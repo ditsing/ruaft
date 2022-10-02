@@ -92,12 +92,8 @@ impl<T: ReplicableCommand> RemoteRaft<T> for &InterceptingRpcClient<T> {
         &self,
         args: RequestVoteArgs,
     ) -> std::io::Result<RequestVoteReply> {
-        let event_result = self
-            .intercept(RaftRpcEvent::RequestVoteRequest(args.clone()))
-            .await;
-        if let Err(e) = event_result {
-            return Err(e);
-        };
+        self.intercept(RaftRpcEvent::RequestVoteRequest(args.clone()))
+            .await?;
 
         let reply = self.target.wait().process_request_vote(args.clone());
 
@@ -111,12 +107,8 @@ impl<T: ReplicableCommand> RemoteRaft<T> for &InterceptingRpcClient<T> {
         args: AppendEntriesArgs<T>,
     ) -> std::io::Result<AppendEntriesReply> {
         let args_clone = args.clone();
-        let event_result = self
-            .intercept(RaftRpcEvent::AppendEntriesRequest(args_clone))
-            .await;
-        if let Err(e) = event_result {
-            return Err(e);
-        };
+        self.intercept(RaftRpcEvent::AppendEntriesRequest(args_clone))
+            .await?;
 
         let reply = self.target.wait().process_append_entries(args.clone());
 
@@ -129,12 +121,8 @@ impl<T: ReplicableCommand> RemoteRaft<T> for &InterceptingRpcClient<T> {
         &self,
         args: InstallSnapshotArgs,
     ) -> std::io::Result<InstallSnapshotReply> {
-        let event_result = self
-            .intercept(RaftRpcEvent::InstallSnapshotRequest(args.clone()))
-            .await;
-        if let Err(e) = event_result {
-            return Err(e);
-        };
+        self.intercept(RaftRpcEvent::InstallSnapshotRequest(args.clone()))
+            .await?;
 
         let reply = self.target.wait().process_install_snapshot(args.clone());
 

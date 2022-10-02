@@ -130,31 +130,27 @@ impl<Command: ReplicableCommand> Raft<Command> {
 
         let mut daemon_watch = DaemonWatch::create(daemon_env.for_thread());
         // Running in a standalone thread.
-        daemon_watch.create_daemon(
-            Daemon::VerifyAuthority,
-            this.run_verify_authority_daemon(),
-        );
+        let verify_authority_daemon = this.run_verify_authority_daemon();
+        daemon_watch
+            .create_daemon(Daemon::VerifyAuthority, verify_authority_daemon);
         // Running in a standalone thread.
-        daemon_watch.create_daemon(
-            Daemon::Snapshot,
-            this.run_snapshot_daemon(max_state_size_bytes, request_snapshot),
-        );
+        let snapshot_daemon =
+            this.run_snapshot_daemon(max_state_size_bytes, request_snapshot);
+        daemon_watch.create_daemon(Daemon::Snapshot, snapshot_daemon);
         // Running in a standalone thread.
-        daemon_watch.create_daemon(
-            Daemon::SyncLogEntries,
-            this.run_log_entry_daemon(sync_log_entries_daemon),
-        );
+        let sync_log_entry_daemon =
+            this.run_log_entry_daemon(sync_log_entries_daemon);
+        daemon_watch
+            .create_daemon(Daemon::SyncLogEntries, sync_log_entry_daemon);
         // Running in a standalone thread.
-        daemon_watch.create_daemon(
-            Daemon::ApplyCommand,
-            this.run_apply_command_daemon(apply_command),
-        );
+        let apply_command_daemon = this.run_apply_command_daemon(apply_command);
+        daemon_watch.create_daemon(Daemon::ApplyCommand, apply_command_daemon);
         // One off function that schedules many little tasks, running on the
         // internal thread pool.
         this.schedule_heartbeats(HEARTBEAT_INTERVAL);
         // The last step is to start running election timer.
-        daemon_watch
-            .create_daemon(Daemon::ElectionTimer, this.run_election_timer());
+        let election_timer = this.run_election_timer();
+        daemon_watch.create_daemon(Daemon::ElectionTimer, election_timer);
 
         // Create the join handle
         this.join_handle.lock().replace(RaftJoinHandle {

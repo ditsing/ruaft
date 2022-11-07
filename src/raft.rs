@@ -12,8 +12,10 @@ use crate::daemon_watch::{Daemon, DaemonWatch};
 use crate::election::ElectionState;
 use crate::heartbeats::{HeartbeatsDaemon, HEARTBEAT_INTERVAL};
 use crate::persister::PersistedRaftState;
+use crate::remote_context::RemoteContext;
 use crate::snapshot::{RequestSnapshotFnMut, SnapshotDaemon};
 use crate::sync_log_entries::SyncLogEntriesComms;
+use crate::term_marker::TermMarker;
 use crate::verify_authority::VerifyAuthorityDaemon;
 use crate::{IndexTerm, Persister, RaftState, RemoteRaft, ReplicableCommand};
 
@@ -88,8 +90,16 @@ impl<Command: ReplicableCommand> Raft<Command> {
                 .expect("Persisted log should not contain error");
         }
 
-        let election = ElectionState::create();
+        let inner_state = Arc::new(Mutex::new(state));
+        let election = Arc::new(ElectionState::create());
         election.reset_election_timer();
+
+        let term_marker = TermMarker::create(
+            inner_state.clone(),
+            election.clone(),
+            persister.clone(),
+        );
+        let context = RemoteContext::create(term_marker);
 
         let daemon_env = DaemonEnv::create();
         let thread_env = daemon_env.for_thread();
@@ -98,8 +108,14 @@ impl<Command: ReplicableCommand> Raft<Command> {
             .enable_io()
             .thread_name(format!("raft-instance-{}", me))
             .worker_threads(peer_size)
-            .on_thread_start(move || thread_env.clone().attach())
-            .on_thread_stop(ThreadEnv::detach)
+            .on_thread_start(move || {
+                context.clone().attach();
+                thread_env.clone().attach();
+            })
+            .on_thread_stop(move || {
+                RemoteContext::<Command>::detach();
+                ThreadEnv::detach();
+            })
             .build()
             .expect("Creating thread pool should not fail");
         let peers = peers
@@ -110,14 +126,14 @@ impl<Command: ReplicableCommand> Raft<Command> {
             crate::sync_log_entries::create(peer_size);
 
         let mut this = Raft {
-            inner_state: Arc::new(Mutex::new(state)),
+            inner_state,
             peers,
             me: Peer(me),
             persister,
             sync_log_entries_comms,
             apply_command_signal: Arc::new(Condvar::new()),
             keep_running: Arc::new(AtomicBool::new(true)),
-            election: Arc::new(election),
+            election,
             snapshot_daemon: SnapshotDaemon::create(),
             verify_authority_daemon: VerifyAuthorityDaemon::create(peer_size),
             heartbeats_daemon: HeartbeatsDaemon::create(),

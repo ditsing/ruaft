@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 
-use crate::term_marker::TermMarker;
+use crate::remote_context::RemoteContext;
 use crate::utils::{retry_rpc, RPC_DEADLINE};
 use crate::verify_authority::DaemonBeatTicker;
 use crate::{
@@ -74,8 +74,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
             if peer_index != self.me.0 {
                 // rf is now owned by the outer async function.
                 let rf = self.inner_state.clone();
-                // A function that updates term with responses to heartbeats.
-                let term_marker = self.term_marker();
                 // A function that casts an "authoritative" vote with Ok()
                 // responses to heartbeats.
                 let beat_ticker = self.beat_ticker(peer_index);
@@ -97,7 +95,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
                             tokio::spawn(Self::send_heartbeat(
                                 rpc_client.clone(),
                                 args,
-                                term_marker.clone(),
                                 beat_ticker.clone(),
                             ));
                         }
@@ -138,7 +135,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
         // the RPC client.
         rpc_client: impl RemoteRaft<Command>,
         args: AppendEntriesArgs<Command>,
-        term_watermark: TermMarker<Command>,
         beat_ticker: DaemonBeatTicker,
     ) -> std::io::Result<()> {
         let term = args.term;
@@ -166,7 +162,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
         if term == response.term {
             beat_ticker.tick(beat);
         } else {
-            term_watermark.mark(response.term);
+            RemoteContext::<Command>::term_marker().mark(response.term);
         }
         Ok(())
     }

@@ -29,6 +29,7 @@ mod process_install_snapshot;
 mod process_request_vote;
 mod raft;
 mod raft_state;
+mod remote_context;
 mod remote_raft;
 mod replicable_command;
 mod snapshot;

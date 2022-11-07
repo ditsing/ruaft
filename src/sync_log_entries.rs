@@ -6,7 +6,7 @@ use parking_lot::{Condvar, Mutex};
 use crate::daemon_env::ErrorKind;
 use crate::heartbeats::HEARTBEAT_INTERVAL;
 use crate::peer_progress::PeerProgress;
-use crate::term_marker::TermMarker;
+use crate::remote_context::RemoteContext;
 use crate::utils::{retry_rpc, SharedSender, RPC_DEADLINE};
 use crate::verify_authority::DaemonBeatTicker;
 use crate::{
@@ -148,7 +148,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
                                 this.sync_log_entries_comms.clone(),
                                 progress.clone(),
                                 this.apply_command_signal.clone(),
-                                this.term_marker(),
                                 this.beat_ticker(i),
                                 TaskNumber(task_number),
                             ));
@@ -208,7 +207,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
         comms: SyncLogEntriesComms,
         progress: PeerProgress,
         apply_command_signal: Arc<Condvar>,
-        term_marker: TermMarker<Command>,
         beat_ticker: DaemonBeatTicker,
         task_number: TaskNumber,
     ) {
@@ -367,7 +365,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             }
             // Do nothing, not our term anymore.
             Ok(SyncLogEntriesResult::TermElapsed(term)) => {
-                term_marker.mark(term);
+                RemoteContext::<Command>::term_marker().mark(term);
             }
             Err(_) => {
                 tokio::time::sleep(HEARTBEAT_INTERVAL).await;

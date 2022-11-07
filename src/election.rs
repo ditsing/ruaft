@@ -5,8 +5,8 @@ use std::time::{Duration, Instant};
 use parking_lot::{Condvar, Mutex};
 use rand::{thread_rng, Rng};
 
+use crate::remote_context::RemoteContext;
 use crate::sync_log_entries::SyncLogEntriesComms;
-use crate::term_marker::TermMarker;
 use crate::utils::{retry_rpc, RPC_DEADLINE};
 use crate::verify_authority::VerifyAuthorityDaemon;
 use crate::{
@@ -253,7 +253,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
         };
 
         let mut votes = vec![];
-        let term_marker = self.term_marker();
         for (index, rpc_client) in self.peers.iter().enumerate() {
             if index != self.me.0 {
                 // RpcClient must be cloned so that it lives long enough for
@@ -262,7 +261,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
                 let one_vote = self.thread_pool.spawn(Self::request_vote(
                     rpc_client.clone(),
                     args.clone(),
-                    term_marker.clone(),
                 ));
                 votes.push(one_vote);
             }
@@ -287,7 +285,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
     async fn request_vote(
         rpc_client: impl RemoteRaft<Command>,
         args: RequestVoteArgs,
-        term_marker: TermMarker<Command>,
     ) -> Option<bool> {
         let term = args.term;
         // See the comment in send_heartbeat() for this override.
@@ -298,7 +295,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             })
             .await;
         if let Ok(reply) = reply {
-            term_marker.mark(reply.term);
+            RemoteContext::<Command>::term_marker().mark(reply.term);
             return Some(reply.vote_granted && reply.term == term);
         }
         None

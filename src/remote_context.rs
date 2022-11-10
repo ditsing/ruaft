@@ -18,10 +18,8 @@ impl<Command: 'static> RemoteContext<Command> {
     }
 
     thread_local! {
-        // Using a pointer to expose a static reference.
         // Using Any to mask the fact that we are storing a generic struct.
-        static REMOTE_CONTEXT: RefCell<*mut dyn Any> = RefCell::new(
-            std::ptr::null_mut::<()>() as *mut dyn Any);
+        static REMOTE_CONTEXT: RefCell<Option<&'static dyn Any>> = RefCell::new(None);
     }
 
     pub fn attach(self) {
@@ -30,24 +28,24 @@ impl<Command: 'static> RemoteContext<Command> {
 
     pub fn detach() -> Box<Self> {
         let static_context = Self::fetch_context();
-        unsafe { Box::from_raw(static_context) }
+        unsafe { Box::from_raw((static_context as *const Self) as *mut Self) }
     }
 
     fn set_context(context: Box<Self>) {
-        let context_ptr = Box::into_raw(context);
-        let any_ptr: *mut dyn Any = context_ptr;
-        Self::REMOTE_CONTEXT.with(|context| *context.borrow_mut() = any_ptr);
+        let context_ref = Box::leak(context);
+        let any_ref: &'static mut dyn Any = context_ref;
+        Self::REMOTE_CONTEXT
+            .with(|context| *context.borrow_mut() = Some(any_ref));
     }
 
-    fn fetch_context() -> &'static mut Self {
-        let any_ptr = Self::REMOTE_CONTEXT.with(|context| *context.borrow());
-        if any_ptr.is_null() {
-            panic!("Context is not set");
-        }
-        unsafe {
-            (*any_ptr)
-                .downcast_mut::<Self>()
+    fn fetch_context() -> &'static Self {
+        let any_ref = Self::REMOTE_CONTEXT.with(|context| *context.borrow());
+        if let Some(any_ref) = any_ref {
+            any_ref
+                .downcast_ref::<Self>()
                 .expect("Context is set to the wrong type.")
+        } else {
+            panic!("Context is not set");
         }
     }
 }

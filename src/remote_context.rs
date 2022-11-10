@@ -49,3 +49,53 @@ impl<Command: 'static> RemoteContext<Command> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use bytes::Bytes;
+    use parking_lot::Mutex;
+    use std::sync::Arc;
+
+    use crate::election::ElectionState;
+    use crate::term_marker::TermMarker;
+    use crate::{Peer, Persister, RaftState};
+
+    use super::RemoteContext;
+
+    struct DoNothingPersister;
+    impl Persister for DoNothingPersister {
+        fn read_state(&self) -> Bytes {
+            Bytes::new()
+        }
+
+        fn save_state(&self, _bytes: Bytes) {}
+
+        fn state_size(&self) -> usize {
+            0
+        }
+
+        fn save_snapshot_and_state(&self, _: Bytes, _: &[u8]) {}
+    }
+
+    #[test]
+    fn test_context_api() {
+        let rf = Arc::new(Mutex::new(RaftState::<i32>::create(1, Peer(0))));
+        let election = Arc::new(ElectionState::create());
+        let term_marker =
+            TermMarker::create(rf, election, Arc::new(DoNothingPersister));
+
+        let context = Box::new(RemoteContext::create(term_marker));
+        let context_ptr: *const RemoteContext<i32> = &*context;
+
+        RemoteContext::set_context(context);
+
+        let fetched_context = RemoteContext::fetch_context();
+        let fetched_context_ptr: *const RemoteContext<i32> = fetched_context;
+        assert_eq!(context_ptr, fetched_context_ptr);
+
+        let detached_context = RemoteContext::detach();
+        let detached_context_ptr: *const RemoteContext<i32> =
+            &*detached_context;
+        assert_eq!(context_ptr, detached_context_ptr);
+    }
+}

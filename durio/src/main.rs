@@ -183,11 +183,10 @@ mod tests {
 
         // KV servers must be created before the web frontend can be run.
         let mut kv_servers = vec![];
-        for me in 0..3 {
-            let kv_server =
-                run_kv_instance(kv_addrs[me], raft_addrs.clone(), me)
-                    .await
-                    .expect("Running kv instance should not fail");
+        for (me, kv_addr) in kv_addrs.iter().enumerate() {
+            let kv_server = run_kv_instance(*kv_addr, raft_addrs.clone(), me)
+                .await
+                .expect("Running kv instance should not fail");
             kv_servers.push(kv_server);
         }
 
@@ -202,10 +201,10 @@ mod tests {
         tokio::time::sleep(Duration::from_millis(500)).await;
 
         let mut leader_count = 0;
-        for i in 0..3 {
+        for web_addr in web_addrs.iter() {
             let url = format!(
                 "http://localhost:{}/kvstore/is_leader",
-                web_addrs[i].port()
+                web_addr.port()
             );
             let is_leader = reqwest::get(url)
                 .await
@@ -225,12 +224,12 @@ mod tests {
             value: "world".to_owned(),
         };
 
-        for i in 0..3 {
+        for web_addr in web_addrs.iter() {
             let client = reqwest::Client::new();
             client
                 .post(format!(
                     "http://localhost:{}/kvstore/put",
-                    web_addrs[i].port()
+                    web_addr.port()
                 ))
                 .json(&body)
                 .send()
@@ -238,10 +237,10 @@ mod tests {
                 .expect("HTTP request should not fail");
         }
 
-        for i in 0..3 {
+        for web_addr in web_addrs.iter() {
             let url = format!(
                 "http://localhost:{}/kvstore/get/{}",
-                web_addrs[i].port(),
+                web_addr.port(),
                 "hello"
             );
             let result = reqwest::get(url)

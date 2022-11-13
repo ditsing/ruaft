@@ -12,8 +12,11 @@ use crate::daemon_watch::{Daemon, DaemonWatch};
 use crate::election::ElectionState;
 use crate::heartbeats::{HeartbeatsDaemon, HEARTBEAT_INTERVAL};
 use crate::persister::PersistedRaftState;
+use crate::remote_context::RemoteContext;
+use crate::remote_peer::RemotePeer;
 use crate::snapshot::{RequestSnapshotFnMut, SnapshotDaemon};
 use crate::sync_log_entries::SyncLogEntriesComms;
+use crate::term_marker::TermMarker;
 use crate::verify_authority::VerifyAuthorityDaemon;
 use crate::{IndexTerm, Persister, RaftState, RemoteRaft, ReplicableCommand};
 
@@ -28,7 +31,7 @@ pub struct Peer(pub usize);
 #[derive(Clone)]
 pub struct Raft<Command> {
     pub(crate) inner_state: Arc<Mutex<RaftState<Command>>>,
-    pub(crate) peers: Vec<Arc<dyn RemoteRaft<Command>>>,
+    pub(crate) peers: Vec<Peer>,
 
     pub(crate) me: Peer,
 
@@ -88,8 +91,30 @@ impl<Command: ReplicableCommand> Raft<Command> {
                 .expect("Persisted log should not contain error");
         }
 
-        let election = ElectionState::create();
+        let inner_state = Arc::new(Mutex::new(state));
+        let election = Arc::new(ElectionState::create());
         election.reset_election_timer();
+
+        let term_marker = TermMarker::create(
+            inner_state.clone(),
+            election.clone(),
+            persister.clone(),
+        );
+
+        let verify_authority_daemon = VerifyAuthorityDaemon::create(peer_size);
+        let remote_peers = peers
+            .into_iter()
+            .enumerate()
+            .map(|(index, remote_raft)| {
+                RemotePeer::create(
+                    Peer(index),
+                    remote_raft,
+                    verify_authority_daemon.beat_ticker(index),
+                )
+            })
+            .collect();
+
+        let context = RemoteContext::create(term_marker, remote_peers);
 
         let daemon_env = DaemonEnv::create();
         let thread_env = daemon_env.for_thread();
@@ -98,28 +123,31 @@ impl<Command: ReplicableCommand> Raft<Command> {
             .enable_io()
             .thread_name(format!("raft-instance-{}", me))
             .worker_threads(peer_size)
-            .on_thread_start(move || thread_env.clone().attach())
-            .on_thread_stop(ThreadEnv::detach)
+            .on_thread_start(move || {
+                context.clone().attach();
+                thread_env.clone().attach();
+            })
+            .on_thread_stop(move || {
+                RemoteContext::<Command>::detach();
+                ThreadEnv::detach();
+            })
             .build()
             .expect("Creating thread pool should not fail");
-        let peers = peers
-            .into_iter()
-            .map(|r| Arc::new(r) as Arc<dyn RemoteRaft<Command>>)
-            .collect();
+        let peers = (0..peer_size).map(Peer).collect();
         let (sync_log_entries_comms, sync_log_entries_daemon) =
             crate::sync_log_entries::create(peer_size);
 
         let mut this = Raft {
-            inner_state: Arc::new(Mutex::new(state)),
+            inner_state,
             peers,
             me: Peer(me),
             persister,
             sync_log_entries_comms,
             apply_command_signal: Arc::new(Condvar::new()),
             keep_running: Arc::new(AtomicBool::new(true)),
-            election: Arc::new(election),
+            election,
             snapshot_daemon: SnapshotDaemon::create(),
-            verify_authority_daemon: VerifyAuthorityDaemon::create(peer_size),
+            verify_authority_daemon,
             heartbeats_daemon: HeartbeatsDaemon::create(),
             thread_pool: thread_pool.handle().clone(),
             stop_wait_group: WaitGroup::new(),

@@ -4,7 +4,7 @@ use parking_lot::Mutex;
 use serde::Serialize;
 
 use crate::election::ElectionState;
-use crate::{Persister, Raft, RaftState, State, Term};
+use crate::{Persister, RaftState, State, Term};
 
 /// A closure that updates the `Term` of the `RaftState`.
 #[derive(Clone)]
@@ -15,20 +15,22 @@ pub(crate) struct TermMarker<Command> {
 }
 
 impl<Command: Clone + Serialize> TermMarker<Command> {
+    /// Create a `TermMarker` that can be passed to async tasks.
+    pub fn create(
+        rf: Arc<Mutex<RaftState<Command>>>,
+        election: Arc<ElectionState>,
+        persister: Arc<dyn Persister>,
+    ) -> Self {
+        Self {
+            rf,
+            election,
+            persister,
+        }
+    }
+
     pub fn mark(&self, term: Term) {
         let mut rf = self.rf.lock();
         mark_term(&mut rf, &self.election, self.persister.as_ref(), term)
-    }
-}
-
-impl<Command: Clone + Serialize> Raft<Command> {
-    /// Create a `TermMarker` that can be passed to tasks.
-    pub(crate) fn term_marker(&self) -> TermMarker<Command> {
-        TermMarker {
-            rf: self.inner_state.clone(),
-            election: self.election.clone(),
-            persister: self.persister.clone(),
-        }
     }
 }
 

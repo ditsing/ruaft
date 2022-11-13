@@ -50,9 +50,8 @@ impl SyncLogEntriesComms {
     }
 
     pub fn kill(&self) {
-        self.tx
-            .send(Event::Shutdown)
-            .expect("The sync log entries daemon should still be alive");
+        // The sync log entry daemon might have exited.
+        let _ = self.tx.send(Event::Shutdown);
     }
 
     fn rerun(&self, peer: Peer) {

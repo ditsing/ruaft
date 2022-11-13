@@ -400,10 +400,6 @@ impl<Command: 'static + Send> Raft<Command> {
                 .expect("Verify authority daemon never drops senders")
         })
     }
-
-    pub(crate) fn beat_ticker(&self, peer_index: usize) -> DaemonBeatTicker {
-        self.verify_authority_daemon.beat_ticker(peer_index)
-    }
 }
 
 #[cfg(test)]

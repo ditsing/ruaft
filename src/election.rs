@@ -10,8 +10,8 @@ use crate::sync_log_entries::SyncLogEntriesComms;
 use crate::utils::{retry_rpc, RPC_DEADLINE};
 use crate::verify_authority::VerifyAuthorityDaemon;
 use crate::{
-    Peer, Persister, Raft, RaftState, RemoteRaft, ReplicableCommand,
-    RequestVoteArgs, State, Term,
+    Peer, Persister, Raft, RaftState, ReplicableCommand, RequestVoteArgs,
+    State, Term,
 };
 
 struct VersionedDeadline {
@@ -253,15 +253,11 @@ impl<Command: ReplicableCommand> Raft<Command> {
         };
 
         let mut votes = vec![];
-        for (index, rpc_client) in self.peers.iter().enumerate() {
-            if index != self.me.0 {
-                // RpcClient must be cloned so that it lives long enough for
-                // spawn(), which requires static life time.
-                // RPCs are started right away.
-                let one_vote = self.thread_pool.spawn(Self::request_vote(
-                    rpc_client.clone(),
-                    args.clone(),
-                ));
+        for peer in self.peers.clone().into_iter() {
+            if peer != self.me {
+                let one_vote = self
+                    .thread_pool
+                    .spawn(Self::request_vote(peer, args.clone()));
                 votes.push(one_vote);
             }
         }
@@ -282,13 +278,10 @@ impl<Command: ReplicableCommand> Raft<Command> {
     }
 
     const REQUEST_VOTE_RETRY: usize = 1;
-    async fn request_vote(
-        rpc_client: impl RemoteRaft<Command>,
-        args: RequestVoteArgs,
-    ) -> Option<bool> {
+    async fn request_vote(peer: Peer, args: RequestVoteArgs) -> Option<bool> {
         let term = args.term;
         // See the comment in send_heartbeat() for this override.
-        let rpc_client = &rpc_client;
+        let rpc_client = RemoteContext::<Command>::rpc_client(peer);
         let reply =
             retry_rpc(Self::REQUEST_VOTE_RETRY, RPC_DEADLINE, move |_round| {
                 rpc_client.request_vote(args.clone())

@@ -13,6 +13,7 @@ use crate::election::ElectionState;
 use crate::heartbeats::{HeartbeatsDaemon, HEARTBEAT_INTERVAL};
 use crate::persister::PersistedRaftState;
 use crate::remote_context::RemoteContext;
+use crate::remote_peer::RemotePeer;
 use crate::snapshot::{RequestSnapshotFnMut, SnapshotDaemon};
 use crate::sync_log_entries::SyncLogEntriesComms;
 use crate::term_marker::TermMarker;
@@ -30,7 +31,7 @@ pub struct Peer(pub usize);
 #[derive(Clone)]
 pub struct Raft<Command> {
     pub(crate) inner_state: Arc<Mutex<RaftState<Command>>>,
-    pub(crate) peers: Vec<Arc<dyn RemoteRaft<Command>>>,
+    pub(crate) peers: Vec<Peer>,
 
     pub(crate) me: Peer,
 
@@ -99,7 +100,21 @@ impl<Command: ReplicableCommand> Raft<Command> {
             election.clone(),
             persister.clone(),
         );
-        let context = RemoteContext::create(term_marker);
+
+        let verify_authority_daemon = VerifyAuthorityDaemon::create(peer_size);
+        let remote_peers = peers
+            .into_iter()
+            .enumerate()
+            .map(|(index, remote_raft)| {
+                RemotePeer::create(
+                    Peer(index),
+                    remote_raft,
+                    verify_authority_daemon.beat_ticker(index),
+                )
+            })
+            .collect();
+
+        let context = RemoteContext::create(term_marker, remote_peers);
 
         let daemon_env = DaemonEnv::create();
         let thread_env = daemon_env.for_thread();
@@ -118,10 +133,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             })
             .build()
             .expect("Creating thread pool should not fail");
-        let peers = peers
-            .into_iter()
-            .map(|r| Arc::new(r) as Arc<dyn RemoteRaft<Command>>)
-            .collect();
+        let peers = (0..peer_size).map(Peer).collect();
         let (sync_log_entries_comms, sync_log_entries_daemon) =
             crate::sync_log_entries::create(peer_size);
 
@@ -135,7 +147,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             keep_running: Arc::new(AtomicBool::new(true)),
             election,
             snapshot_daemon: SnapshotDaemon::create(),
-            verify_authority_daemon: VerifyAuthorityDaemon::create(peer_size),
+            verify_authority_daemon,
             heartbeats_daemon: HeartbeatsDaemon::create(),
             thread_pool: thread_pool.handle().clone(),
             stop_wait_group: WaitGroup::new(),

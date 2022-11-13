@@ -6,10 +6,7 @@ use parking_lot::Mutex;
 
 use crate::remote_context::RemoteContext;
 use crate::utils::{retry_rpc, RPC_DEADLINE};
-use crate::verify_authority::DaemonBeatTicker;
-use crate::{
-    AppendEntriesArgs, Raft, RaftState, RemoteRaft, ReplicableCommand,
-};
+use crate::{AppendEntriesArgs, Peer, Raft, RaftState, ReplicableCommand};
 
 pub(crate) const HEARTBEAT_INTERVAL: Duration = Duration::from_millis(150);
 
@@ -70,17 +67,12 @@ impl<Command: ReplicableCommand> Raft<Command> {
     /// The request message is a stripped down version of `AppendEntries`. The
     /// response from the peer is ignored.
     pub(crate) fn schedule_heartbeats(&self, interval: Duration) {
-        for (peer_index, rpc_client) in self.peers.iter().enumerate() {
-            if peer_index != self.me.0 {
+        for peer in self.peers.clone().into_iter() {
+            if peer != self.me {
                 // rf is now owned by the outer async function.
                 let rf = self.inner_state.clone();
-                // A function that casts an "authoritative" vote with Ok()
-                // responses to heartbeats.
-                let beat_ticker = self.beat_ticker(peer_index);
                 // A on-demand trigger to sending a heartbeat.
                 let mut trigger = self.heartbeats_daemon.sender.subscribe();
-                // RPC client must be cloned into the outer async function.
-                let rpc_client = rpc_client.clone();
                 // Shutdown signal.
                 let keep_running = self.keep_running.clone();
                 self.thread_pool.spawn(async move {
@@ -92,11 +84,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
                         let _ =
                             futures_util::future::select(tick, trigger).await;
                         if let Some(args) = Self::build_heartbeat(&rf) {
-                            tokio::spawn(Self::send_heartbeat(
-                                rpc_client.clone(),
-                                args,
-                                beat_ticker.clone(),
-                            ));
+                            tokio::spawn(Self::send_heartbeat(peer, args));
                         }
                     }
                 });
@@ -127,17 +115,12 @@ impl<Command: ReplicableCommand> Raft<Command> {
 
     const HEARTBEAT_RETRY: usize = 1;
     async fn send_heartbeat(
-        // Here rpc_client must be owned by the returned future. The returned
-        // future is scheduled to run on a thread pool. We do not control when
-        // the future will be run, or when it will be done with the RPC client.
-        // If a reference is passed in, the reference essentially has to be a
-        // static one, i.e. lives forever. Thus we chose to let the future own
-        // the RPC client.
-        rpc_client: impl RemoteRaft<Command>,
+        peer: Peer,
         args: AppendEntriesArgs<Command>,
-        beat_ticker: DaemonBeatTicker,
     ) -> std::io::Result<()> {
         let term = args.term;
+        let beat_ticker = RemoteContext::<Command>::beat_ticker(peer);
+
         let beat = beat_ticker.next_beat();
         // Passing a reference that is moved to the following closure.
         //
@@ -153,7 +136,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
         // Another option is to use non-move closures, in which case rpc_client
         // of type Arc can be passed-in directly. However that requires args to
         // be sync because they can be shared by more than one futures.
-        let rpc_client = &rpc_client;
+        let rpc_client = RemoteContext::<Command>::rpc_client(peer);
         let response =
             retry_rpc(Self::HEARTBEAT_RETRY, RPC_DEADLINE, move |_round| {
                 rpc_client.append_entries(args.clone())

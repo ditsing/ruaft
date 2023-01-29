@@ -50,6 +50,7 @@ impl<Command: 'static> RemoteContext<Command> {
 
     pub fn detach() -> Box<Self> {
         let static_context = Self::fetch_context();
+        Self::REMOTE_CONTEXT.with(|context| context.borrow_mut().take());
         unsafe { Box::from_raw((static_context as *const Self) as *mut Self) }
     }
 
@@ -74,6 +75,7 @@ impl<Command: 'static> RemoteContext<Command> {
 
 #[cfg(test)]
 mod tests {
+    use std::panic::catch_unwind;
     use std::sync::Arc;
 
     use async_trait::async_trait;
@@ -159,5 +161,10 @@ mod tests {
         let detached_context_ptr: *const RemoteContext<i32> =
             &*detached_context;
         assert_eq!(context_ptr, detached_context_ptr);
+
+        catch_unwind(|| {
+            RemoteContext::<i32>::fetch_context();
+        })
+        .expect_err("Expecting error 'Context is not set'");
     }
 }

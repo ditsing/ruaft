@@ -294,18 +294,10 @@ impl<Command: ReplicableCommand> Raft<Command> {
         None
     }
 
-    #[allow(clippy::too_many_arguments)]
-    async fn count_vote_util_cancelled(
-        me: Peer,
-        term: Term,
-        rf: Arc<Mutex<RaftState<Command>>>,
+    async fn quorum_before_cancelled(
         votes: Vec<tokio::task::JoinHandle<Option<bool>>>,
         cancel_token: futures_channel::oneshot::Receiver<()>,
-        election: Arc<ElectionState>,
-        new_log_entry: SyncLogEntriesComms,
-        verify_authority_daemon: VerifyAuthorityDaemon,
-        persister: Arc<dyn Persister>,
-    ) {
+    ) -> bool {
         let quorum = votes.len() >> 1;
         let mut vote_count = 0;
         let mut against_count = 0;
@@ -338,9 +330,25 @@ impl<Command: ReplicableCommand> Raft<Command> {
             }
         }
 
-        if vote_count < quorum {
+        return vote_count >= quorum;
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn count_vote_util_cancelled(
+        me: Peer,
+        term: Term,
+        rf: Arc<Mutex<RaftState<Command>>>,
+        votes: Vec<tokio::task::JoinHandle<Option<bool>>>,
+        cancel_token: futures_channel::oneshot::Receiver<()>,
+        election: Arc<ElectionState>,
+        new_log_entry: SyncLogEntriesComms,
+        verify_authority_daemon: VerifyAuthorityDaemon,
+        persister: Arc<dyn Persister>,
+    ) {
+        if !Self::quorum_before_cancelled(votes, cancel_token).await {
             return;
         }
+
         let mut rf = rf.lock();
         if rf.current_term == term && rf.state == State::Candidate {
             // We are the leader now. The election timer can be stopped.

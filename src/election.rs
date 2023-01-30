@@ -159,7 +159,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
                     cancel_handle.take().map(|c| c.send(()));
                 }
             }
-            // check the running signal before sleeping. We are holding the
+            // Check the running signal before sleeping. We are holding the
             // timer lock, so no one can change it. The kill() method will
             // not be able to notify this thread before `wait` is called.
             if !self.keep_running.load(Ordering::Relaxed) {
@@ -188,6 +188,10 @@ impl<Command: ReplicableCommand> Raft<Command> {
                     // Alarm has not fired yet. Continue to wait.
                 },
                 None => {
+                    // Nothing to do. Block here until the timer is reset.
+                    // We will not block here indefinitely at shutdown, since
+                    // we checked that keep_running is still true while holding
+                    // the election lock.
                     election.signal.wait(&mut guard);
                     // The timeout has changed, check again.
                     None

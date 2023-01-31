@@ -252,16 +252,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             )
         };
 
-        let mut votes = vec![];
-        for peer in self.peers.clone().into_iter() {
-            if peer != self.me {
-                let one_vote = self
-                    .thread_pool
-                    .spawn(Self::request_vote(peer, args.clone()));
-                votes.push(one_vote);
-            }
-        }
-
+        let votes = self.spawn_request_votes(args);
         let (tx, rx) = futures_channel::oneshot::channel();
         self.thread_pool.spawn(Self::count_vote_util_cancelled(
             me,
@@ -292,6 +283,22 @@ impl<Command: ReplicableCommand> Raft<Command> {
             return Some(reply.vote_granted && reply.term == term);
         }
         None
+    }
+
+    fn spawn_request_votes(
+        &self,
+        args: RequestVoteArgs,
+    ) -> Vec<tokio::task::JoinHandle<Option<bool>>> {
+        let mut votes = vec![];
+        for peer in self.peers.clone().into_iter() {
+            if peer != self.me {
+                let one_vote = self
+                    .thread_pool
+                    .spawn(Self::request_vote(peer, args.clone()));
+                votes.push(one_vote);
+            }
+        }
+        return votes;
     }
 
     async fn quorum_before_cancelled(

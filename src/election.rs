@@ -163,6 +163,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             // timer lock, so no one can change it. The kill() method will
             // not be able to notify this thread before `wait` is called.
             if !self.keep_running.load(Ordering::Relaxed) {
+                cancel_handle.take().map(|c| c.send(()));
                 break;
             }
             should_run = match deadline {

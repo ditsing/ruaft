@@ -246,7 +246,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
         timer_count: usize,
     ) -> Option<futures_channel::oneshot::Sender<()>> {
         let (term, last_log_index) = {
-            let rf = self.inner_state.lock();
+            let mut rf = self.inner_state.lock();
 
             // The previous election is faster and reached the critical section
             // before us. We should stop and not run this election.
@@ -254,6 +254,8 @@ impl<Command: ReplicableCommand> Raft<Command> {
             if !self.election.try_reset_election_timer(timer_count) {
                 return None;
             }
+
+            rf.state = State::Prevote;
 
             (rf.current_term, rf.log.last_index_term())
         };
@@ -307,7 +309,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
         let (next_term, (last_log_index, last_log_term)) = {
             let mut rf = candidate.rf.lock();
 
-            if term != rf.current_term {
+            if term != rf.current_term || rf.state != State::Prevote {
                 return;
             }
 

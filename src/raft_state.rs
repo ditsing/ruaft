@@ -5,8 +5,8 @@ use crate::{
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum State {
     Follower,
+    Prevote,
     Candidate,
-    // TODO: add PreVote
     Leader,
 }
 

@@ -342,7 +342,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
     const REQUEST_VOTE_RETRY: usize = 1;
     async fn request_vote(peer: Peer, args: RequestVoteArgs) -> Option<bool> {
         let term = args.term;
-        // See the comment in send_heartbeat() for this override.
+        // See the comment in send_heartbeat() on why a reference is used.
         let rpc_client = RemoteContext::<Command>::rpc_client(peer);
         let reply =
             retry_rpc(Self::REQUEST_VOTE_RETRY, RPC_DEADLINE, move |_round| {

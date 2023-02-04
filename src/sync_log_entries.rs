@@ -329,7 +329,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
                 // start and end, guaranteed by check_committed() above.
                 progress.record_success(committed.index + 1);
 
-                // Ignore the error. The log syncing thread must have died.
                 comms.rerun(peer);
             }
             Ok(SyncLogEntriesResult::Diverged(committed)) => {
@@ -351,7 +350,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
 
                 progress.record_failure(committed.index);
 
-                // Ignore the error. The log syncing thread must have died.
                 comms.rerun(peer);
             }
             // Do nothing, not our term anymore.
@@ -360,7 +358,6 @@ impl<Command: ReplicableCommand> Raft<Command> {
             }
             Err(_) => {
                 tokio::time::sleep(HEARTBEAT_INTERVAL).await;
-                // Ignore the error. The log syncing thread must have died.
                 comms.rerun(peer);
             }
         };

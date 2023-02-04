@@ -63,13 +63,13 @@ impl<Command: 'static> RemoteContext<Command> {
 
     fn fetch_context() -> &'static Self {
         let any_ref = Self::REMOTE_CONTEXT.with(|context| *context.borrow());
-        if let Some(any_ref) = any_ref {
-            any_ref
-                .downcast_ref::<Self>()
-                .expect("Context is set to the wrong type.")
-        } else {
+        let Some(any_ref) = any_ref else {
             panic!("Context is not set");
-        }
+        };
+
+        any_ref
+            .downcast_ref::<Self>()
+            .expect("Context is set to the wrong type.")
     }
 }
 

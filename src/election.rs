@@ -299,10 +299,9 @@ impl<Command: ReplicableCommand> Raft<Command> {
         let prevotes = Self::spawn_request_votes(&candidate, prevote_args);
         let prevote_results =
             Self::quorum_before_cancelled(prevotes, cancel_token).await;
-        let cancel_token = match prevote_results {
-            QuorumOrCancelled::Accepted(cancel_token) => cancel_token,
+        let QuorumOrCancelled::Accepted(cancel_token) = prevote_results else {
             // Did not get quorum on a prevote. Skip the rest.
-            _ => return,
+            return;
         };
 
         // Advance to the next term.
@@ -349,11 +348,12 @@ impl<Command: ReplicableCommand> Raft<Command> {
                 rpc_client.request_vote(args.clone())
             })
             .await;
-        if let Ok(reply) = reply {
-            RemoteContext::<Command>::term_marker().mark(reply.term);
-            return Some(reply.vote_granted && reply.term == term);
-        }
-        None
+        let Ok(reply) = reply else {
+            return None;
+        };
+
+        RemoteContext::<Command>::term_marker().mark(reply.term);
+        return Some(reply.vote_granted && reply.term == term);
     }
 
     fn spawn_request_votes(

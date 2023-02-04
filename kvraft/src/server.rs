@@ -276,9 +276,8 @@ impl KVServer {
             return Err(KVError::NotLeader);
         }
 
-        let result_fut = match self.rf.verify_authority_async() {
-            Some(result_fut) => result_fut,
-            None => return Err(KVError::NotLeader),
+        let Some(result_fut) = self.rf.verify_authority_async() else {
+            return Err(KVError::NotLeader);
         };
         let index =
             match tokio::time::timeout(Self::DEFAULT_TIMEOUT, result_fut).await
@@ -406,9 +405,12 @@ impl KVServer {
 
         let result = result_holder.result.clone();
         // Wait for the op to be committed.
-        let result = tokio::time::timeout(timeout, result).await;
+        let Ok(result) = tokio::time::timeout(timeout, result).await else {
+            return Err(CommitError::TimedOut);
+        };
+
         match result {
-            Ok(Ok(Ok(result))) => {
+            Ok(Ok(result)) => {
                 // If the result is OK, all other requests should see "Duplicate".
                 if result_holder.peeks.fetch_add(1, Ordering::Relaxed) == 0 {
                     Ok(result)
@@ -416,9 +418,8 @@ impl KVServer {
                     Err(CommitError::Duplicate(result))
                 }
             }
-            Ok(Ok(Err(e))) => Err(e),
-            Ok(Err(_)) => Err(CommitError::NotLeader),
-            Err(_) => Err(CommitError::TimedOut),
+            Ok(Err(e)) => Err(e),
+            Err(_) => Err(CommitError::NotLeader),
         }
     }
 

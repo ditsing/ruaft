@@ -258,9 +258,8 @@ fn count() -> config::Result<()> {
         let start_total = cfg.total_rpcs();
 
         const ITERS: usize = 10;
-        let (term, start_index) = match cfg.leader_start(leader, 1) {
-            Some(pair) => pair,
-            None => continue,
+        let Some((term, start_index)) = cfg.leader_start(leader, 1) else {
+            continue
         };
 
         let mut cmds = vec![];

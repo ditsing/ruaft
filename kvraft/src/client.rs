@@ -97,26 +97,22 @@ impl ClerkInner {
                 args,
                 None,
             );
-            if let Some(reply) = reply {
-                match reply.result {
-                    Ok(_) => {
-                        // Discard the used unique_id.
-                        self.unique_id.inc();
-                        break;
-                    }
-                    Err(KVError::Expired) | Err(KVError::Conflict) => {
-                        // The client ID happens to be re-used. The request does
-                        // not fail as "Duplicate", because another client has
-                        // committed more than just the sentinel.
-                        self.unique_id = UniqueIdSequence::new();
-                    }
-                    Err(e) => {
-                        panic!(
-                            "Unexpected error with indefinite retry: {:?}",
-                            e
-                        );
-                    }
-                };
+            let Some(reply) = reply else { continue };
+            match reply.result {
+                Ok(_) => {
+                    // Discard the used unique_id.
+                    self.unique_id.inc();
+                    break;
+                }
+                Err(KVError::Expired) | Err(KVError::Conflict) => {
+                    // The client ID happens to be re-used. The request does
+                    // not fail as "Duplicate", because another client has
+                    // committed more than just the sentinel.
+                    self.unique_id = UniqueIdSequence::new();
+                }
+                Err(e) => {
+                    panic!("Unexpected error with indefinite retry: {:?}", e);
+                }
             };
         }
     }

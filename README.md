@@ -121,7 +121,7 @@ assuming there is no thread starvation.
 - [x] Allow storing arbitrary information
 - [x] Add more logging
 - [ ] Benchmarks
-- [ ] Support the `Prevote` state
+- [x] Support the `Prevote` state
 - [x] Run Ruaft on a Raspberry Pi cluster
 
 [durio]: https://github.com/ditsing/ruaft/tree/master/durio

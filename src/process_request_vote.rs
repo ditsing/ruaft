@@ -14,6 +14,18 @@ impl<Command: Clone + serde::Serialize> Raft<Command> {
         let mut rf = self.inner_state.lock();
 
         let term = rf.current_term;
+
+        if args.prevote {
+            let last_log = rf.log.last_index_term();
+            let longer_log = args.last_log_term > last_log.term
+                || (args.last_log_term == last_log.term
+                    && args.last_log_index >= last_log.index);
+            return RequestVoteReply {
+                term: args.term,
+                vote_granted: args.term >= term && longer_log,
+            };
+        }
+
         #[allow(clippy::comparison_chain)]
         if args.term < term {
             return RequestVoteReply {

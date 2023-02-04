@@ -10,6 +10,7 @@ pub struct RequestVoteArgs {
     pub(crate) candidate_id: Peer,
     pub(crate) last_log_index: Index,
     pub(crate) last_log_term: Term,
+    pub(crate) prevote: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

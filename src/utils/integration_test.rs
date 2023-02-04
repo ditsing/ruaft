@@ -16,6 +16,7 @@ pub fn make_request_vote_args(
         candidate_id: Peer(peer_id),
         last_log_index,
         last_log_term,
+        prevote: false,
     }
 }
 

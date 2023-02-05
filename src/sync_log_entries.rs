@@ -131,7 +131,8 @@ impl<Command: ReplicableCommand> Raft<Command> {
                 if !this.inner_state.lock().is_leader() {
                     continue;
                 }
-                for peer in this.peers.clone().into_iter() {
+                for peer in this.peers.iter() {
+                    let peer = peer.clone();
                     if peer != this.me && event.should_schedule(peer) {
                         let progress = &peer_progress[peer.0];
                         if let Event::NewTerm(_term, index) = event {
@@ -322,7 +323,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
                     &rf
                 );
 
-                Self::check_committed(&rf, peer, committed.clone());
+                Self::check_committed(&rf, peer, &committed);
 
                 // Next index moves towards the log end. This is the only place
                 // where that happens. committed.index should be between log
@@ -346,7 +347,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
                     ),
                     &rf
                 );
-                Self::check_committed(&rf, peer, committed.clone());
+                Self::check_committed(&rf, peer, &committed);
 
                 progress.record_failure(committed.index);
 
@@ -366,7 +367,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
     fn check_committed(
         rf: &RaftState<Command>,
         peer: Peer,
-        committed: IndexTerm,
+        committed: &IndexTerm,
     ) {
         if committed.index < rf.log.start() {
             return;

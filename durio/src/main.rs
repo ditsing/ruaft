@@ -157,11 +157,6 @@ mod tests {
     use super::*;
     use std::time::Duration;
 
-    // This test is ignored by default, because it cannot be run with other
-    // Ruaft tests at the same time. All other ruaft tests are compiled with
-    // feature 'integration-test', which is in conflict with this test. This
-    // test intends to verify that durio can be run under normal production
-    // setup, i.e. without 'integration-test'.
     #[tokio::test]
     async fn smoke_test() {
         let kv_addrs: Vec<SocketAddr> = vec![

@@ -6,6 +6,29 @@ use crate::term_marker::TermMarker;
 use crate::verify_authority::DaemonBeatTicker;
 use crate::{Peer, RemoteRaft};
 
+/// A struct that contains useful utilities when contacting peers.
+///
+/// The motivation of RemoteContext is to avoid cloning the `Arc<>` to utilities
+/// multiple times for each request. Instead, we embed shared utilities in the
+/// thread local space of each thread in a thread pool. Those references will be
+/// released when the thread pool is destroyed.
+///
+/// This class provides a static reference to those utilities, which also helps
+/// simplifying lifetimes in futures.
+///
+/// A big hack in this class is that we need to store generic structs in a
+/// thread local environment. This is because that the RPC interface is generic
+/// over the data to store in Raft. Thus `RemoteContext` must be generic, too.
+///
+/// Generic thread local variables is not supported in Rust, due to the fact
+/// that one could potentially store multiple instances of the same class with
+/// different generic parameters. The instances must be somehow identified by
+/// their concrete types, which greatly increases implementation complexity.
+///
+/// Luckily in our case, the "multiple instance" issue does not apply. A thread
+/// pool belongs to a known Raft instance, which has one set of known generic
+/// parameters. We would only ever need to store one instance of RemoteContext
+/// in one thread. Thus the ambiguity is casted away in `fetch_context()`.
 #[derive(Clone)]
 pub(crate) struct RemoteContext<Command> {
     term_marker: TermMarker<Command>,

@@ -267,6 +267,16 @@ impl Config {
         }
     }
 
+    pub fn connect_pair(&self, one: usize, two: usize) {
+        let mut state = self.state.lock();
+        state.connected[one] = true;
+        state.connected[two] = true;
+
+        let mut network = self.network.lock();
+        network.set_enable_client(Self::client_name(one, two), true);
+        network.set_enable_client(Self::client_name(two, one), true);
+    }
+
     pub fn crash1(&self, index: usize) {
         self.disconnect(index);
 

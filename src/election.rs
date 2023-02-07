@@ -353,7 +353,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
         };
 
         RemoteContext::<Command>::term_marker().mark(reply.term);
-        return Some(reply.vote_granted && reply.term == term);
+        Some(reply.vote_granted && reply.term == term)
     }
 
     fn spawn_request_votes(
@@ -369,7 +369,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
                 votes.push(one_vote);
             }
         }
-        return votes;
+        votes
     }
 
     async fn quorum_before_cancelled(
@@ -410,11 +410,11 @@ impl<Command: ReplicableCommand> Raft<Command> {
             }
         }
 
-        return if vote_count < quorum {
+        if vote_count < quorum {
             QuorumOrCancelled::Rejected
         } else {
             QuorumOrCancelled::Accepted(cancel_token)
-        };
+        }
     }
 
     fn become_leader(term: Term, this: ElectionCandidate<Command>) {

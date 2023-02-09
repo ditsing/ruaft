@@ -1,13 +1,20 @@
+use std::time::Instant;
+
 use crate::{
     log_array::LogArray, persister::PersistedRaftState, Index, Peer, Term,
 };
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum State {
-    Follower,
+    Follower(FollowerData),
     Prevote,
     Candidate,
     Leader,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) struct FollowerData {
+    last_heartbeat: Option<Instant>,
 }
 
 #[repr(align(64))]
@@ -33,19 +40,28 @@ impl<Command> RaftState<Command> {
             log: LogArray::create(),
             commit_index: 0,
             match_index: vec![0; peer_size],
-            state: State::Follower,
+            state: State::Follower(FollowerData::default()),
             leader_id: me,
         }
     }
 
     pub fn step_down(&mut self) {
         self.voted_for = None;
-        self.state = State::Follower;
+        self.state = State::Follower(FollowerData::default());
     }
 
     pub fn meet_leader(&mut self, leader_id: Peer) {
         self.leader_id = leader_id;
-        self.state = State::Follower;
+        self.state = State::Follower(FollowerData {
+            last_heartbeat: Some(Instant::now()),
+        })
+    }
+
+    pub fn last_heartbeat(&self) -> Option<Instant> {
+        let State::Follower(follower_data) = &self.state else {
+            return None;
+        };
+        return follower_data.last_heartbeat;
     }
 }
 

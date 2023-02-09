@@ -1,4 +1,9 @@
-use crate::{Raft, RequestVoteArgs, RequestVoteReply};
+use std::time::{Duration, Instant};
+
+use crate::{
+    election::ELECTION_TIMEOUT_BASE_MILLIS, Raft, RequestVoteArgs,
+    RequestVoteReply,
+};
 
 // Command must be
 // 1. clone: they are copied to the persister.
@@ -17,12 +22,13 @@ impl<Command: Clone + serde::Serialize> Raft<Command> {
 
         if args.prevote {
             let last_log = rf.log.last_index_term();
+            let timed_out = Self::heartbeat_timed_out(rf.last_heartbeat());
             let longer_log = args.last_log_term > last_log.term
                 || (args.last_log_term == last_log.term
                     && args.last_log_index >= last_log.index);
             return RequestVoteReply {
                 term: args.term,
-                vote_granted: args.term >= term && longer_log,
+                vote_granted: args.term >= term && longer_log && timed_out,
             };
         }
 
@@ -65,5 +71,16 @@ impl<Command: Clone + serde::Serialize> Raft<Command> {
                 vote_granted: false,
             }
         }
+    }
+
+    fn heartbeat_timed_out(last_heartbeat: Option<Instant>) -> bool {
+        let Some(last_heartbeat) = last_heartbeat else {
+            return true;
+        };
+
+        return last_heartbeat
+            .checked_add(Duration::from_millis(ELECTION_TIMEOUT_BASE_MILLIS))
+            .unwrap()
+            .le(&Instant::now());
     }
 }

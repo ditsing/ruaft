@@ -37,6 +37,16 @@ impl<Command> RaftState<Command> {
             leader_id: me,
         }
     }
+
+    pub fn step_down(&mut self) {
+        self.voted_for = None;
+        self.state = State::Follower;
+    }
+
+    pub fn meet_leader(&mut self, leader_id: Peer) {
+        self.leader_id = leader_id;
+        self.state = State::Follower;
+    }
 }
 
 impl<Command: Clone> RaftState<Command> {

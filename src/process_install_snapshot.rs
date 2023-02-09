@@ -1,6 +1,6 @@
 use crate::check_or_record;
 use crate::daemon_env::ErrorKind;
-use crate::{InstallSnapshotArgs, InstallSnapshotReply, Raft, State};
+use crate::{InstallSnapshotArgs, InstallSnapshotReply, Raft};
 
 impl<C: Clone + serde::Serialize> Raft<C> {
     pub fn process_install_snapshot(
@@ -28,9 +28,7 @@ impl<C: Clone + serde::Serialize> Raft<C> {
             self.persister.save_state(rf.persisted_state().into());
         }
 
-        rf.state = State::Follower;
-        rf.leader_id = args.leader_id;
-
+        rf.meet_leader(args.leader_id);
         self.election.reset_election_timer();
 
         // The above code is exactly the same as AppendEntries.

@@ -4,7 +4,7 @@ use parking_lot::Mutex;
 use serde::Serialize;
 
 use crate::election::ElectionState;
-use crate::{Persister, RaftState, State, Term};
+use crate::{Persister, RaftState, Term};
 
 /// A closure that updates the `Term` of the `RaftState`.
 #[derive(Clone)]
@@ -32,8 +32,7 @@ impl<Command: Clone + Serialize> TermMarker<Command> {
         let mut rf = self.rf.lock();
         if term > rf.current_term {
             rf.current_term = term;
-            rf.voted_for = None;
-            rf.state = State::Follower;
+            rf.step_down();
 
             self.election.reset_election_timer();
             self.persister.save_state(rf.persisted_state().into());

@@ -1,7 +1,6 @@
 use crate::daemon_env::ErrorKind;
 use crate::{
     check_or_record, AppendEntriesArgs, AppendEntriesReply, IndexTerm, Raft,
-    State,
 };
 
 // Command must be
@@ -30,9 +29,7 @@ impl<Command: Clone + serde::Serialize> Raft<Command> {
             self.persister.save_state(rf.persisted_state().into());
         }
 
-        rf.state = State::Follower;
-        rf.leader_id = args.leader_id;
-
+        rf.meet_leader(args.leader_id);
         self.election.reset_election_timer();
 
         if rf.log.start() > args.prev_log_index

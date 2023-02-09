@@ -1,4 +1,4 @@
-use crate::{Raft, RequestVoteArgs, RequestVoteReply, State};
+use crate::{Raft, RequestVoteArgs, RequestVoteReply};
 
 // Command must be
 // 1. clone: they are copied to the persister.
@@ -34,8 +34,7 @@ impl<Command: Clone + serde::Serialize> Raft<Command> {
             };
         } else if args.term > term {
             rf.current_term = args.term;
-            rf.voted_for = None;
-            rf.state = State::Follower;
+            rf.step_down();
 
             self.election.reset_election_timer();
             self.persister.save_state(rf.persisted_state().into());

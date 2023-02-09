@@ -277,6 +277,12 @@ impl Config {
         network.set_enable_client(Self::client_name(two, one), true);
     }
 
+    pub fn disconnect_pair(&self, one: usize, two: usize) {
+        let mut network = self.network.lock();
+        network.set_enable_client(Self::client_name(one, two), false);
+        network.set_enable_client(Self::client_name(two, one), false);
+    }
+
     pub fn crash1(&self, index: usize) {
         self.disconnect(index);
 

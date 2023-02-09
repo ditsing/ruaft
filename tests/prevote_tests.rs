@@ -9,6 +9,7 @@ fn no_disruptive_rejoin() -> config::Result<()> {
     const SERVERS: usize = 5;
     let cfg = make_config!(SERVERS, false);
     defer!(cfg.cleanup());
+    let initial_leader = cfg.check_one_leader()?;
     cfg.one(100, SERVERS, false)?;
     let initial_term =
         cfg.check_terms()?.expect("Servers should agree on term");
@@ -19,19 +20,23 @@ fn no_disruptive_rejoin() -> config::Result<()> {
     //  |      v
     //  -----> 2 <--> 4
 
-    cfg.disconnect(4);
-    cfg.disconnect(3);
+    let disruptor_1: usize = (initial_leader + 3) % SERVERS;
+    let disruptor_2: usize = (initial_leader + 4) % SERVERS;
+    cfg.disconnect(disruptor_1);
+    cfg.disconnect(disruptor_2);
 
     // The disconnected servers (3 & 4) should not disrupt the exist leader.
-    cfg.connect_pair(2, 4);
-    cfg.connect_pair(1, 3);
+    let disrupted_1: usize = (initial_leader + 1) % SERVERS;
+    let disrupted_2: usize = (initial_leader + 2) % SERVERS;
+    cfg.connect_pair(disrupted_1, disruptor_1);
+    cfg.connect_pair(disrupted_2, disrupted_2);
 
     let leader = cfg.check_one_leader()?;
     cfg.one(200, 3, false)?;
 
     let (first_term, _) = cfg.leader_start(leader, 300).unwrap();
-    assert!(first_term >= initial_term);
-    assert!(first_term <= initial_term + 1);
+    assert_eq!(initial_leader, leader);
+    assert_eq!(first_term, initial_term);
 
     sleep_election_timeouts(2);
 

@@ -30,23 +30,13 @@ impl<Command: Clone + Serialize> TermMarker<Command> {
 
     pub fn mark(&self, term: Term) {
         let mut rf = self.rf.lock();
-        mark_term(&mut rf, &self.election, self.persister.as_ref(), term)
-    }
-}
+        if term > rf.current_term {
+            rf.current_term = term;
+            rf.voted_for = None;
+            rf.state = State::Follower;
 
-/// Update the term of the `RaftState`.
-pub(crate) fn mark_term<Command: Clone + Serialize>(
-    rf: &mut RaftState<Command>,
-    election: &ElectionState,
-    persister: &dyn Persister,
-    term: Term,
-) {
-    if term > rf.current_term {
-        rf.current_term = term;
-        rf.voted_for = None;
-        rf.state = State::Follower;
-
-        election.reset_election_timer();
-        persister.save_state(rf.persisted_state().into());
+            self.election.reset_election_timer();
+            self.persister.save_state(rf.persisted_state().into());
+        }
     }
 }

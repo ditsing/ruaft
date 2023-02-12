@@ -123,6 +123,7 @@ assuming there is no thread starvation.
 - [ ] Benchmarks
 - [x] Support the `Prevote` state
 - [x] Run Ruaft on a Raspberry Pi cluster
+- [ ] Make prevote, active check quorum and election timeout configurable.
 
 [durio]: https://github.com/ditsing/ruaft/tree/master/durio
 [kvraft]: https://github.com/ditsing/ruaft/tree/master/kvraft

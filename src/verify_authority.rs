@@ -133,6 +133,14 @@ impl VerifyAuthorityDaemon {
         }
     }
 
+    /// Returns a snapshot of current beats as a token to verify authority.
+    pub fn beats_moment(&self) -> Vec<Beat> {
+        self.beat_tickers
+            .iter()
+            .map(|beat_ticker| beat_ticker.current_beat())
+            .collect()
+    }
+
     /// Enqueues a verify authority request. Returns a receiver of the
     /// verification result. Returns None if the term has passed.
     pub fn verify_authority_async(
@@ -146,11 +154,7 @@ impl VerifyAuthorityDaemon {
         // peers after being elected, before releasing the "elected" message to
         // the rest of the Raft system. The newest beats we get here are at
         // least as new as the phantom beats created by `Self::reset_state()`.
-        let beats_moment = self
-            .beat_tickers
-            .iter()
-            .map(|beat_ticker| beat_ticker.current_beat())
-            .collect();
+        let beats_moment = self.beats_moment();
 
         // The inflight beats could also be for any term after `current_term`.
         // We must check if the term stored in the daemon is the same as
@@ -189,6 +193,18 @@ impl VerifyAuthorityDaemon {
 
         self.clear_ticked_requests(commit_index);
         self.remove_expired_requests(current_term);
+    }
+
+    /// Verifies that at `beats_moment` we had authority.
+    pub fn verify_beats_moment(&self, beats_moment: Vec<Beat>) -> bool {
+        let mut cnt = 0;
+        for (index, beat) in beats_moment.iter().enumerate() {
+            if self.beat_tickers[index].ticked() >= *beat {
+                cnt += 1;
+            }
+        }
+
+        cnt + cnt + 1 >= self.beat_tickers.len()
     }
 
     /// Fetches the newest successful RPC response from peers, and mark verify
@@ -243,13 +259,8 @@ impl VerifyAuthorityDaemon {
             let verified = new_start.0 - state.start.0;
             let sentinel_commit_index = state.sentinel_commit_index;
             for token in state.queue.drain(..verified) {
-                let mut cnt = 0;
-                for (index, beat) in token.beats_moment.iter().enumerate() {
-                    if self.beat_tickers[index].ticked() >= *beat {
-                        cnt += 1;
-                    }
-                }
-                assert!(cnt + cnt + 1 >= self.beat_tickers.len());
+                // Double check that we indeed had authority at that moment.
+                assert!(self.verify_beats_moment(token.beats_moment));
 
                 // Never verify authority before the sentinel commit index. The
                 // previous leader might have exposed data up to the commit

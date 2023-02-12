@@ -174,9 +174,11 @@ impl<Command: ReplicableCommand> Raft<Command> {
         // Running in a standalone thread.
         let apply_command_daemon = this.run_apply_command_daemon(apply_command);
         daemon_watch.create_daemon(Daemon::ApplyCommand, apply_command_daemon);
-        // One off function that schedules many little tasks, running on the
+        // One off functions that schedule many little tasks, running on the
         // internal thread pool.
         this.schedule_heartbeats(HEARTBEAT_INTERVAL);
+        this.schedule_check_quorum(HEARTBEAT_INTERVAL * 2);
+
         // The last step is to start running election timer.
         daemon_watch.create_daemon(Daemon::ElectionTimer, {
             let raft = this.clone();

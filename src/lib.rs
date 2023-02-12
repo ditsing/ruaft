@@ -18,6 +18,7 @@ pub(crate) use crate::raft_state::State;
 
 mod apply_command;
 mod beat_ticker;
+mod check_quorum;
 mod daemon_env;
 mod daemon_watch;
 mod election;

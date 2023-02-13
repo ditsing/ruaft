@@ -133,7 +133,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
                 }
                 for peer in this.peers.iter() {
                     let peer = *peer;
-                    if peer != this.me && event.should_schedule(peer) {
+                    if event.should_schedule(peer) {
                         let progress = &peer_progress[peer.0];
                         if let Event::NewTerm(_term, index) = event {
                             progress.reset_progress(index);

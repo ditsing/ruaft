@@ -362,12 +362,10 @@ impl<Command: ReplicableCommand> Raft<Command> {
     ) -> Vec<tokio::task::JoinHandle<Option<bool>>> {
         let mut votes = vec![];
         for peer in candidate.peers.clone().into_iter() {
-            if peer != candidate.me {
-                let one_vote = candidate
-                    .thread_pool
-                    .spawn(Self::request_vote(peer, args.clone()));
-                votes.push(one_vote);
-            }
+            let one_vote = candidate
+                .thread_pool
+                .spawn(Self::request_vote(peer, args.clone()));
+            votes.push(one_vote);
         }
         votes
     }

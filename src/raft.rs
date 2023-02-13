@@ -1,8 +1,8 @@
-use crossbeam_utils::sync::WaitGroup;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
+use crossbeam_utils::sync::WaitGroup;
 use parking_lot::{Condvar, Mutex};
 use serde_derive::{Deserialize, Serialize};
 
@@ -133,7 +133,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             })
             .build()
             .expect("Creating thread pool should not fail");
-        let peers = (0..peer_size).map(Peer).collect();
+        let peers = (0..peer_size).filter(|p| *p != me).map(Peer).collect();
         let (sync_log_entries_comms, sync_log_entries_daemon) =
             crate::sync_log_entries::create(peer_size);
 
@@ -283,6 +283,11 @@ impl RaftJoinHandle {
 
 #[cfg(test)]
 mod tests {
+    use crate::utils::do_nothing::{DoNothingPersister, DoNothingRemoteRaft};
+    use crate::ApplyCommandMessage;
+
+    use super::*;
+
     #[test]
     fn test_raft_must_sync() {
         let optional_raft: Option<super::Raft<i32>> = None;
@@ -293,5 +298,25 @@ mod tests {
         must_sync(optional_raft)
         // The following raft is not Sync.
         // let optional_raft: Option<super::Raft<std::rc::Rc<i32>>> = None;
+    }
+
+    #[test]
+    fn test_no_me_in_peers() {
+        let peer_size = 5;
+        let me = 2;
+
+        let raft = Raft::new(
+            vec![DoNothingRemoteRaft {}; peer_size],
+            me,
+            Arc::new(DoNothingPersister {}),
+            |_: ApplyCommandMessage<i32>| {},
+            None,
+            |_| {},
+        );
+
+        assert_eq!(4, raft.peers.len());
+        for peer in &raft.peers {
+            assert_ne!(peer.0, me);
+        }
     }
 }

@@ -158,7 +158,6 @@ impl DaemonEnv {
             voted_for: raft.voted_for,
             log: raft.log.all_index_term(),
             commit_index: raft.commit_index,
-            last_applied: raft.last_applied,
             state: raft.state,
             leader_id: raft.leader_id,
         }
@@ -172,7 +171,6 @@ struct StrippedRaftState {
     voted_for: Option<Peer>,
     log: Vec<IndexTerm>,
     commit_index: usize,
-    last_applied: usize,
     state: State,
     leader_id: Peer,
 }

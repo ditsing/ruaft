@@ -16,7 +16,6 @@ pub(crate) struct RaftState<Command> {
     pub log: LogArray<Command>,
 
     pub commit_index: Index,
-    pub last_applied: Index,
 
     pub match_index: Vec<Index>,
 
@@ -32,7 +31,6 @@ impl<Command> RaftState<Command> {
             voted_for: None,
             log: LogArray::create(),
             commit_index: 0,
-            last_applied: 0,
             match_index: vec![0; peer_size],
             state: State::Follower,
             leader_id: me,

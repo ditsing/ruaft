@@ -10,6 +10,7 @@ pub(crate) enum State {
     Leader,
 }
 
+#[repr(align(64))]
 pub(crate) struct RaftState<Command> {
     pub current_term: Term,
     pub voted_for: Option<Peer>,

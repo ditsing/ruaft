@@ -301,9 +301,12 @@ fn figure8_unreliable() -> config::Result<()> {
     Ok(())
 }
 
-fn internal_churn(unreliable: bool) -> config::Result<()> {
+fn internal_churn(
+    unreliable: bool,
+    test_name: &'static str,
+) -> config::Result<()> {
     const SERVERS: usize = 5;
-    let cfg = Arc::new(make_config!(SERVERS, false));
+    let cfg = Arc::new(config::make_config(SERVERS, false, test_name));
     defer!(cfg.cleanup());
 
     if unreliable {
@@ -422,10 +425,10 @@ fn internal_churn(unreliable: bool) -> config::Result<()> {
 
 #[test]
 fn reliable_churn() -> config::Result<()> {
-    internal_churn(false)
+    internal_churn(false, stdext::function_name!())
 }
 
 #[test]
 fn unreliable_churn() -> config::Result<()> {
-    internal_churn(true)
+    internal_churn(true, stdext::function_name!())
 }

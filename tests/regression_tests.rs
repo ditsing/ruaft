@@ -5,11 +5,11 @@ use ruaft::utils::integration_test::{
     unpack_append_entries_args, unpack_append_entries_reply,
 };
 use test_configs::interceptor::{make_config, RaftRpcEvent};
-use test_utils::init_test_log;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn smoke_test() {
-    init_test_log!();
+    test_utils::init_log("regression_tests-smoke_test")
+        .expect("Initializing test log should never fail");
     let server_count = 3;
     let config = make_config(server_count, None);
     let config = Arc::new(config);
@@ -56,7 +56,8 @@ async fn smoke_test() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn delayed_commit_consistency_test() {
-    init_test_log!();
+    test_utils::init_log("regression_tests-delayed_commit_consistency_test")
+        .expect("Initializing test log should never fail");
     let server_count = 3;
     let config = Arc::new(make_config(server_count, None));
 

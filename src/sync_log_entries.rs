@@ -34,7 +34,7 @@ impl Event {
 
 #[derive(Clone)]
 pub(crate) struct SyncLogEntriesComms {
-    tx: crate::utils::SharedSender<Event>,
+    tx: SharedSender<Event>,
 }
 
 impl SyncLogEntriesComms {

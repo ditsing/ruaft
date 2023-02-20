@@ -1,3 +1,5 @@
+#![allow(clippy::uninlined_format_args)]
+
 pub mod interceptor;
 pub mod kvraft;
 mod persister;

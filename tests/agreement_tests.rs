@@ -1,4 +1,5 @@
 #![allow(clippy::identity_op)]
+#![allow(clippy::uninlined_format_args)]
 
 use rand::{thread_rng, Rng};
 use scopeguard::defer;

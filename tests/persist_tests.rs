@@ -1,4 +1,5 @@
 #![allow(clippy::identity_op)]
+#![allow(clippy::uninlined_format_args)]
 
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;

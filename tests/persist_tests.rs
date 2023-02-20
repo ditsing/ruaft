@@ -1,5 +1,4 @@
 #![allow(clippy::identity_op)]
-#![allow(clippy::uninlined_format_args)]
 
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
@@ -414,9 +413,7 @@ fn internal_churn(
     for cmd in all_cmds {
         assert!(
             consented.contains(&cmd),
-            "Cmd {} not found in {:?}",
-            cmd,
-            consented
+            "Cmd {cmd} not found in {consented:?}"
         );
     }
 

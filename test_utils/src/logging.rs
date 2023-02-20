@@ -36,8 +36,7 @@ pub fn init_log(module: &str) -> std::io::Result<PathBuf> {
         .take(10)
         .map(char::from)
         .collect();
-    let log_file_name =
-        format!("{}-{:010}-{}.log", module_file, timestamp, suffix);
+    let log_file_name = format!("{module_file}-{timestamp:010}-{suffix}.log");
 
     let log_dir = option_env!("LOG_DIR").unwrap_or(LOG_DIR);
     let mut path = PathBuf::from(log_dir);
@@ -49,7 +48,7 @@ pub fn init_log(module: &str) -> std::io::Result<PathBuf> {
     {
         let mut latest_path = path.clone();
         latest_path.pop();
-        latest_path.push(format!("{}-latest", module_file));
+        latest_path.push(format!("{module_file}-latest"));
         let _ = std::fs::remove_file(latest_path.as_path());
         #[cfg(unix)]
         let _ = std::os::unix::fs::symlink(path.as_path(), latest_path);

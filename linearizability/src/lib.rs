@@ -195,6 +195,7 @@ mod tests {
     }
     #[test]
     fn no_accept() {
+        #[allow(clippy::box_default)]
         let ops = Box::leak(Box::new(vec![]));
         let start = Instant::now();
         for i in 0..4 {
@@ -210,6 +211,7 @@ mod tests {
 
     #[test]
     fn accept() {
+        #[allow(clippy::box_default)]
         let ops = Box::leak(Box::new(vec![]));
         let start = Instant::now();
         for i in 0..4 {

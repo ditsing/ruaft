@@ -107,10 +107,7 @@ impl AsyncClient {
                         // Do nothing.
                     }
                     Err(e) => {
-                        panic!(
-                            "Unexpected error with indefinite retry: {:?}",
-                            e
-                        );
+                        panic!("Unexpected error with indefinite retry: {e:?}");
                     }
                 };
             };

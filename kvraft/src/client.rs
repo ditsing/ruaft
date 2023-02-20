@@ -111,7 +111,7 @@ impl ClerkInner {
                     self.unique_id = UniqueIdSequence::new();
                 }
                 Err(e) => {
-                    panic!("Unexpected error with indefinite retry: {:?}", e);
+                    panic!("Unexpected error with indefinite retry: {e:?}")
                 }
             };
         }

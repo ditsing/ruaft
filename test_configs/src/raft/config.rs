@@ -22,7 +22,7 @@ struct LogState {
     committed_logs: Vec<Vec<i32>>,
     results: Vec<Result<()>>,
     max_index: usize,
-    saved: Vec<Arc<crate::Persister>>,
+    saved: Vec<Option<crate::Persister>>,
 }
 
 pub struct Config {
@@ -297,16 +297,19 @@ impl Config {
         // 4. Follower appended entries, replied to the leader. Note although
         // the follower is removed from the network, it can still send replies.
         // 5. The leader believes the entries are appended, but they are not.
-        let data = self.log.lock().saved[index].read_state();
+
         // Make sure to give up the log lock before calling external code, which
         // might directly or indirectly block on the log lock, e.g. through
         // the apply command function.
-        if let Some(raft) = raft {
-            raft.kill().join();
-        }
+        let Some(raft) = raft else { return };
+
+        let data = raft.persister().read_state();
+        raft.kill().join();
+
         let mut log = self.log.lock();
-        log.saved[index] = Arc::new(crate::Persister::new());
-        log.saved[index].save_state(data);
+        let persister = crate::Persister::new();
+        persister.save_state(data);
+        log.saved[index] = Some(persister);
     }
 
     pub fn start1(&self, index: usize) -> Result<()> {
@@ -324,7 +327,9 @@ impl Config {
                 )))
             }
         }
-        let persister = self.log.lock().saved[index].clone();
+        let persister = self.log.lock().saved[index]
+            .take()
+            .expect("A persister must be present to create a raft server");
 
         let log = self.log.clone();
         let raft = Raft::new(
@@ -488,7 +493,7 @@ pub fn make_config(
     });
 
     let mut saved = vec![];
-    saved.resize_with(server_count, || Arc::new(crate::Persister::new()));
+    saved.resize_with(server_count, || Some(crate::Persister::new()));
     let log = Arc::new(Mutex::new(LogState {
         committed_logs: vec![vec![]; server_count],
         results: vec![],

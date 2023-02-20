@@ -59,4 +59,8 @@ impl Persister {
     pub fn snapshot_size(&self) -> usize {
         self.state.lock().snapshot.len()
     }
+
+    pub fn downcast_unsafe(trait_obj: &dyn ruaft::Persister) -> &Self {
+        unsafe { &*(trait_obj as *const dyn ruaft::Persister as *const Self) }
+    }
 }

@@ -19,7 +19,7 @@ pub(crate) async fn run_kv_instance(
         remote_rafts.push(LazyRaftServiceClient::new(raft_peer));
     }
 
-    let persister = Arc::new(DoNothingPersister::default());
+    let persister = DoNothingPersister::default();
 
     let kv_server = KVServer::new(remote_rafts, me, persister, None);
     let raft = kv_server.raft().clone();

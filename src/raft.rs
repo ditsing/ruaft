@@ -60,7 +60,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
     pub fn new(
         peers: Vec<impl RemoteRaft<Command> + 'static>,
         me: usize,
-        persister: Arc<dyn Persister>,
+        persister: impl Persister + 'static,
         apply_command: impl ApplyCommandFnMut<Command>,
         max_state_size_bytes: Option<usize>,
         request_snapshot: impl RequestSnapshotFnMut,
@@ -95,6 +95,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
         let election = Arc::new(ElectionState::create());
         election.reset_election_timer();
 
+        let persister = Arc::new(persister);
         let term_marker = TermMarker::create(
             inner_state.clone(),
             election.clone(),
@@ -308,7 +309,7 @@ mod tests {
         let raft = Raft::new(
             vec![DoNothingRemoteRaft {}; peer_size],
             me,
-            Arc::new(DoNothingPersister {}),
+            DoNothingPersister {},
             |_: ApplyCommandMessage<i32>| {},
             None,
             |_| {},

@@ -216,8 +216,6 @@ pub fn register_kv_server<
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use bytes::Bytes;
 
     use ruaft::utils::integration_test::{
@@ -258,7 +256,7 @@ mod tests {
             let raft = Raft::new(
                 vec![RpcClient(client)],
                 0,
-                Arc::new(DoNothingPersister),
+                DoNothingPersister,
                 |_: ApplyCommandMessage<i32>| {},
                 None,
                 crate::utils::NO_SNAPSHOT,

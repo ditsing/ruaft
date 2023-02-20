@@ -19,7 +19,7 @@ pub struct Config {
     network: Arc<Mutex<labrpc::Network>>,
     server_count: usize,
     state: Mutex<ConfigState>,
-    storage: Mutex<Vec<Arc<Persister>>>,
+    storage: Mutex<Vec<Option<Persister>>>,
     maxraftstate: usize,
 }
 
@@ -52,7 +52,9 @@ impl Config {
             }
         }
 
-        let persister = self.storage.lock()[index].clone();
+        let persister = self.storage.lock()[index]
+            .take()
+            .expect("A persister must be present to create a raft server");
 
         let kv =
             KVServer::new(clients, index, persister, Some(self.maxraftstate));
@@ -150,14 +152,14 @@ impl Config {
             network.remove_server(Self::kv_server_name(index));
         }
 
-        let data = self.storage.lock()[index].read();
-
-        let persister = Arc::new(Persister::new());
-        self.storage.lock()[index] = persister.clone();
-        persister.restore(data);
-
         if let Some(kv_server) = self.state.lock().kv_servers[index].take() {
+            let persister = kv_server.raft().persister();
+            let data = Persister::downcast_unsafe(persister.as_ref()).read();
             kv_server.kill();
+
+            let persister = Persister::new();
+            persister.restore(data);
+            self.storage.lock()[index] = Some(persister);
         }
     }
 
@@ -254,8 +256,13 @@ impl Config {
         size_fn: impl Fn(&Persister) -> usize,
     ) -> Result<(), String> {
         let mut over_limits = String::new();
-        for (index, p) in self.storage.lock().iter().enumerate() {
-            let size = size_fn(p);
+        for (index, p) in self.state.lock().kv_servers.iter().enumerate() {
+            let p = p
+                .as_ref()
+                .expect("KV server must be running to check size")
+                .raft()
+                .persister();
+            let size = size_fn(Persister::downcast_unsafe(p.as_ref()));
             if size > upper {
                 let str = format!(" (index {}, size {})", index, size);
                 over_limits.push_str(&str);
@@ -299,7 +306,7 @@ pub fn make_config(
     let storage = Mutex::new(vec![]);
     storage
         .lock()
-        .resize_with(server_count, || Arc::new(Persister::new()));
+        .resize_with(server_count, || Some(Persister::new()));
 
     let cfg = Config {
         network,

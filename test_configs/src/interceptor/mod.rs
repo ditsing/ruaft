@@ -263,7 +263,6 @@ impl Config {
 
 pub fn make_config(server_count: usize, max_state: Option<usize>) -> Config {
     let (event_queue, clients) = make_grid_clients(server_count);
-    let persister = Arc::new(Persister::new());
     let mut kv_servers = vec![];
     let clients: Vec<Vec<&'static InterceptingRpcClient<UniqueKVOp>>> = clients
         .into_iter()
@@ -277,12 +276,9 @@ pub fn make_config(server_count: usize, max_state: Option<usize>) -> Config {
         })
         .collect();
     for (index, client_vec) in clients.iter().enumerate() {
-        let kv_server = KVServer::new(
-            client_vec.to_vec(),
-            index,
-            persister.clone(),
-            max_state,
-        );
+        let persister = Persister::new();
+        let kv_server =
+            KVServer::new(client_vec.to_vec(), index, persister, max_state);
         kv_servers.push(kv_server);
     }
 

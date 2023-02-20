@@ -42,7 +42,7 @@ pub struct InstallSnapshotArgs {
     pub(crate) leader_id: Peer,
     pub(crate) last_included_index: Index,
     pub(crate) last_included_term: Term,
-    // TODO(ditsing): Serde cannot handle Vec<u8> as efficient as expected.
+    #[serde(with = "serde_bytes")]
     pub(crate) data: Vec<u8>,
     pub(crate) offset: usize,
     pub(crate) done: bool,

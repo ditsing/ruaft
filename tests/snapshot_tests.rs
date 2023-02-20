@@ -167,3 +167,16 @@ fn linearizability() {
         test_linearizability: true,
     });
 }
+
+#[ignore = "Large test with too many threads"]
+#[test]
+fn snapshot_throughput() {
+    init_test_log!();
+    generic_test(GenericTestParams {
+        // To boost client count to 48 we need more network threads in labrpc.
+        clients: 32,
+        crash: true,
+        maxraftstate: Some(10000),
+        ..Default::default()
+    })
+}

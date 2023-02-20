@@ -46,6 +46,7 @@ pub struct LogEntry<Command> {
 #[derive(Clone, Serialize, Deserialize)]
 pub(crate) struct LogArray<C> {
     inner: Vec<LogEntry<C>>,
+    #[serde(with = "serde_bytes")]
     snapshot: Vec<u8>,
 }
 

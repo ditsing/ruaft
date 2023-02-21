@@ -216,8 +216,7 @@ pub fn register_kv_server<
 
 #[cfg(test)]
 mod tests {
-    use bytes::Bytes;
-
+    use ruaft::utils::do_nothing::DoNothingPersister;
     use ruaft::utils::integration_test::{
         make_append_entries_args, make_request_vote_args,
         unpack_append_entries_reply, unpack_request_vote_reply,
@@ -225,21 +224,6 @@ mod tests {
     use ruaft::{ApplyCommandMessage, RemoteRaft, Term};
 
     use super::*;
-
-    struct DoNothingPersister;
-    impl ruaft::Persister for DoNothingPersister {
-        fn read_state(&self) -> Bytes {
-            Bytes::new()
-        }
-
-        fn save_state(&self, _bytes: Bytes) {}
-
-        fn state_size(&self) -> usize {
-            0
-        }
-
-        fn save_snapshot_and_state(&self, _: Bytes, _: &[u8]) {}
-    }
 
     #[test]
     fn test_basic_message() -> std::io::Result<()> {

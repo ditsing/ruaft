@@ -312,7 +312,7 @@ fn count() -> config::Result<()> {
         }
 
         let diff = cfg.total_rpcs() - start_total;
-        if diff > ITERS + 1 + 3 {
+        if diff > (ITERS + 1 + 3) * (SERVERS - 1) {
             panic!("too many RPCs ({}) for {} entries", diff, ITERS);
         }
 

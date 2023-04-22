@@ -19,7 +19,9 @@ pub(crate) fn context() -> tarpc::context::Context {
 
 pub(crate) fn translate_rpc_error(e: RpcError) -> std::io::Error {
     match e {
-        RpcError::Disconnected => std::io::Error::new(ErrorKind::BrokenPipe, e),
+        RpcError::Shutdown | RpcError::Send(_) | RpcError::Receive(_) => {
+            std::io::Error::new(ErrorKind::BrokenPipe, e)
+        }
         RpcError::DeadlineExceeded => {
             std::io::Error::new(ErrorKind::TimedOut, e)
         }

@@ -1,3 +1,4 @@
+use std::pin::pin;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -78,9 +79,8 @@ impl<Command: ReplicableCommand> Raft<Command> {
         self.thread_pool.spawn(async move {
             let mut interval = tokio::time::interval(interval);
             while keep_running.load(Ordering::Relaxed) {
-                let tick = interval.tick();
-                let trigger = trigger.recv();
-                futures_util::pin_mut!(tick, trigger);
+                let tick = pin!(interval.tick());
+                let trigger = pin!(trigger.recv());
                 let _ = futures_util::future::select(tick, trigger).await;
                 if let Some(args) = Self::build_heartbeat(&rf) {
                     for peer in &peers {

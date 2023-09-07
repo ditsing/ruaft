@@ -12,10 +12,10 @@
 set -ex
 
 MACHINE=gcloud
-rsync -av /Users/ditsing/Code/ruaft $MACHINE:~/compile/ --exclude 'ruaft/target' --exclude 'ruaft/.git' --exclude '.idea'
-ssh $MACHINE 'cd ~/compile/ruaft/durio && cargo build --target=armv7-unknown-linux-musleabihf --release'
+rsync -av /Users/ditsing/Code/ruaft $MACHINE:~/compile/ --exclude 'ruaft/target' --exclude 'ruaft/durio/target' --exclude 'ruaft/.git' --exclude '.idea'
+ssh $MACHINE 'cd ~/compile/ruaft/durio && $HOME/.cargo/bin/cargo build --target=armv7-unknown-linux-musleabihf --release'
 mkdir -p /tmp/ruaft
-rsync -av $MACHINE:'~/compile/ruaft/target/armv7-unknown-linux-musleabihf/release/durio' '/tmp/ruaft/durio'
+rsync -av $MACHINE:'~/compile/ruaft/durio/target/armv7-unknown-linux-musleabihf/release/durio' '/tmp/ruaft/durio'
 
 ssh alice 'pkill -9 durio || echo nothing'
 rsync -av '/tmp/ruaft/durio' alice:/tmp/durio

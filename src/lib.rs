@@ -37,6 +37,7 @@ mod remote_peer;
 mod remote_raft;
 mod replicable_command;
 mod snapshot;
+pub mod storage;
 mod sync_log_entries;
 mod term_marker;
 pub mod utils;

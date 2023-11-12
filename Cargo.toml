@@ -50,4 +50,6 @@ default-members = [
     ".",
     "kvraft",
     "linearizability",
+    "test_configs",
+    "test_utils",
 ]

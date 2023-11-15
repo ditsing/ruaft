@@ -249,6 +249,12 @@ mod tests {
         }
     }
 
+    fn type_hint(
+        val: &InMemoryState,
+    ) -> &impl RaftStoragePersisterTrait<Transaction> {
+        val
+    }
+
     #[test]
     fn test_append() {
         let state = InMemoryState(Mutex::new(State::create()));
@@ -365,7 +371,7 @@ mod tests {
             assert_eq!(Term(0), state.current_term);
             assert!(state.voted_for.is_empty());
         }
-        <InMemoryState as RaftStoragePersisterTrait<Transaction>>::save_term_vote(&state, Term(9), "hi".to_owned());
+        type_hint(&state).save_term_vote(Term(9), "hi".to_owned());
 
         let state = state.0.lock();
         assert_eq!(Term(9), state.current_term);
@@ -381,7 +387,7 @@ mod tests {
             assert!(state.snapshot.is_empty());
         }
 
-        <InMemoryState as RaftStoragePersisterTrait<Transaction>>::update_snapshot(&state, 7, &[0x01, 0x02]);
+        type_hint(&state).update_snapshot(7, &[0x01, 0x02]);
 
         let state = state.0.lock();
         assert_eq!(7, state.snapshot_index);
@@ -416,8 +422,8 @@ mod tests {
             Transaction::populate(7),
             Transaction::populate(7),
         ]);
-        <InMemoryState as RaftStoragePersisterTrait<Transaction>>::save_term_vote(&state, Term(7), "voted_for".to_owned());
-        <InMemoryState as RaftStoragePersisterTrait<Transaction>>::update_snapshot(&state, 1, &[0x99]);
+        type_hint(&state).save_term_vote(Term(7), "voted_for".to_owned());
+        type_hint(&state).update_snapshot(1, &[0x99]);
 
         let raft_stored_state = storage
             .read_state()
@@ -556,7 +562,7 @@ mod tests {
             assert!(state.snapshot.is_empty());
         }
 
-        <InMemoryState as RaftStoragePersisterTrait<Transaction>>::update_snapshot(state.deref(), 7, &[0x01, 0x02]);
+        type_hint(state.deref()).update_snapshot(7, &[0x01, 0x02]);
         assert_eq!(2, storage.snapshot_size());
     }
 }

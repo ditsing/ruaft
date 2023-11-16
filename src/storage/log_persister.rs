@@ -64,6 +64,7 @@ where
         <T as RaftStoragePersisterTrait<LogEntry<Command>>>::update_snapshot(
             self,
             index_term.index,
+            index_term.term,
             snapshot,
         )
     }
@@ -102,7 +103,7 @@ impl RaftStoredState {
         self,
         log_array: &mut LogArray<Command>,
     ) {
-        log_array.reset(self.snapshot_index, Term(0), self.snapshot);
+        log_array.reset(self.snapshot_index, self.snapshot_term, self.snapshot);
         for entry in self.log.iter() {
             log_array.push(decode_log_entry(&entry.command));
         }
@@ -140,6 +141,7 @@ mod tests {
                 },
             ],
             snapshot_index: 0,
+            snapshot_term: Term(1),
             snapshot: vec![0x09, 0x90],
         };
 
@@ -150,7 +152,7 @@ mod tests {
         assert_eq!(log_array.end(), new_log_array.end());
         assert_eq!(log_array.at(1).command(), new_log_array.at(1).command());
         assert_eq!(log_array.at(2).command(), new_log_array.at(2).command());
-        assert_eq!(IndexTerm::pack(0, Term(0)), new_log_array.snapshot().0);
+        assert_eq!(IndexTerm::pack(0, Term(1)), new_log_array.snapshot().0);
         assert_eq!(&[0x09u8, 0x90u8], new_log_array.snapshot().1);
     }
 }

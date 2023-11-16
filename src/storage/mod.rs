@@ -49,7 +49,7 @@ pub trait RaftStoragePersisterTrait<LogEntry: RaftLogEntryRef>:
     /// Store the application snapshot. The snapshot is computed from all log
     /// entries at and before `index`. After the snapshot is saved, any log
     /// entry on or before index can be discarded.
-    fn update_snapshot(&self, index: Index, snapshot: &[u8]);
+    fn update_snapshot(&self, index: Index, term: Term, snapshot: &[u8]);
 }
 
 /// An object that watches the underlying storage system and help Raft decide
@@ -75,6 +75,7 @@ pub struct RaftStoredState {
     pub voted_for: String,
     pub log: Vec<RaftStoredLogEntry>,
     pub snapshot_index: Index,
+    pub snapshot_term: Term,
     pub snapshot: Vec<u8>,
 }
 

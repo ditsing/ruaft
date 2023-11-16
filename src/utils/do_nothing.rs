@@ -77,6 +77,7 @@ impl RaftStorageTrait for DoNothingRaftStorage {
             voted_for: "".to_string(),
             log: vec![],
             snapshot_index: 0,
+            snapshot_term: Term(0),
             snapshot: vec![],
         })
     }
@@ -114,5 +115,5 @@ impl<LogEntry: RaftLogEntryRef> RaftStoragePersisterTrait<LogEntry>
     {
     }
 
-    fn update_snapshot(&self, _index: Index, _snapshot: &[u8]) {}
+    fn update_snapshot(&self, _index: Index, _term: Term, _snapshot: &[u8]) {}
 }

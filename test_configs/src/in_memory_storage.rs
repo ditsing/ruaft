@@ -17,6 +17,7 @@ pub struct State {
     log: Vec<RaftStoredLogEntry>,
 
     snapshot_index: Index,
+    snapshot_term: Term,
     snapshot: Vec<u8>,
 
     log_size: usize,
@@ -30,6 +31,7 @@ impl State {
             voted_for: "".to_owned(),
             log: vec![],
             snapshot_index: 0,
+            snapshot_term: Term(0),
             snapshot: vec![],
             log_size: 0,
         }
@@ -101,6 +103,7 @@ impl RaftStorageTrait for InMemoryStorage {
             voted_for: stored.voted_for.clone(),
             log: organized_log,
             snapshot_index: stored.snapshot_index,
+            snapshot_term: stored.snapshot_term,
             snapshot: stored.snapshot.clone(),
         })
     }
@@ -161,9 +164,10 @@ impl<LogEntry: RaftLogEntryRef> RaftStoragePersisterTrait<LogEntry>
         }
     }
 
-    fn update_snapshot(&self, index: Index, snapshot: &[u8]) {
+    fn update_snapshot(&self, index: Index, term: Term, snapshot: &[u8]) {
         let mut stored = self.0.lock();
         stored.snapshot_index = index;
+        stored.snapshot_term = term;
         stored.snapshot = snapshot.to_vec();
     }
 }
@@ -387,10 +391,11 @@ mod tests {
             assert!(state.snapshot.is_empty());
         }
 
-        type_hint(&state).update_snapshot(7, &[0x01, 0x02]);
+        type_hint(&state).update_snapshot(7, Term(3), &[0x01, 0x02]);
 
         let state = state.0.lock();
         assert_eq!(7, state.snapshot_index);
+        assert_eq!(Term(3), state.snapshot_term);
         assert_eq!(&[0x01, 0x02], state.snapshot.as_slice());
     }
 
@@ -423,7 +428,7 @@ mod tests {
             Transaction::populate(7),
         ]);
         type_hint(&state).save_term_vote(Term(7), "voted_for".to_owned());
-        type_hint(&state).update_snapshot(1, &[0x99]);
+        type_hint(&state).update_snapshot(1, Term(0), &[0x99]);
 
         let raft_stored_state = storage
             .read_state()
@@ -433,6 +438,7 @@ mod tests {
         assert_eq!(3, raft_stored_state.log.len());
         assert_eq!(&[0x99], raft_stored_state.snapshot.as_slice());
         assert_eq!(1, raft_stored_state.snapshot_index);
+        assert_eq!(Term(0), raft_stored_state.snapshot_term);
 
         let entry = &raft_stored_state.log[0];
         assert_eq!(2, entry.index);
@@ -562,7 +568,7 @@ mod tests {
             assert!(state.snapshot.is_empty());
         }
 
-        type_hint(state.deref()).update_snapshot(7, &[0x01, 0x02]);
+        type_hint(state.deref()).update_snapshot(7, Term(3), &[0x01, 0x02]);
         assert_eq!(2, storage.snapshot_size());
     }
 }

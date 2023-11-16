@@ -1,6 +1,4 @@
-use crate::{
-    log_array::LogArray, persister::PersistedRaftState, Index, Peer, Term,
-};
+use crate::{log_array::LogArray, Index, Peer, Term};
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 pub(crate) enum State {
@@ -36,12 +34,6 @@ impl<Command> RaftState<Command> {
             state: State::Follower,
             leader_id: me,
         }
-    }
-}
-
-impl<Command: Clone> RaftState<Command> {
-    pub fn persisted_state(&self) -> PersistedRaftState<Command> {
-        self.into()
     }
 }
 

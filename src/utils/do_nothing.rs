@@ -1,7 +1,6 @@
 #![cfg(feature = "integration-test")]
 
 use async_trait::async_trait;
-use bytes::Bytes;
 
 use crate::storage::{
     RaftLogEntryRef, RaftStorageMonitorTrait, RaftStoragePersisterTrait,
@@ -9,25 +8,8 @@ use crate::storage::{
 };
 use crate::{
     AppendEntriesArgs, AppendEntriesReply, Index, InstallSnapshotArgs,
-    InstallSnapshotReply, Persister, RemoteRaft, RequestVoteArgs,
-    RequestVoteReply, Term,
+    InstallSnapshotReply, RemoteRaft, RequestVoteArgs, RequestVoteReply, Term,
 };
-
-#[derive(Clone)]
-pub struct DoNothingPersister;
-impl Persister for DoNothingPersister {
-    fn read_state(&self) -> Bytes {
-        Bytes::new()
-    }
-
-    fn save_state(&self, _bytes: Bytes) {}
-
-    fn state_size(&self) -> usize {
-        0
-    }
-
-    fn save_snapshot_and_state(&self, _: Bytes, _: &[u8]) {}
-}
 
 #[derive(Clone)]
 pub struct DoNothingRemoteRaft;

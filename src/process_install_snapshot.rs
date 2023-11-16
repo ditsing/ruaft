@@ -2,7 +2,7 @@ use crate::check_or_record;
 use crate::daemon_env::ErrorKind;
 use crate::{InstallSnapshotArgs, InstallSnapshotReply, Raft, State};
 
-impl<C: Clone + serde::Serialize> Raft<C> {
+impl<C> Raft<C> {
     pub fn process_install_snapshot(
         &self,
         args: InstallSnapshotArgs,
@@ -25,7 +25,7 @@ impl<C: Clone + serde::Serialize> Raft<C> {
         if rf.current_term < args.term {
             rf.current_term = args.term;
             rf.voted_for = None;
-            self.persister.save_state(rf.persisted_state().into());
+            self.persister.save_term_vote(&rf);
         }
 
         rf.state = State::Follower;
@@ -95,10 +95,8 @@ impl<C: Clone + serde::Serialize> Raft<C> {
             );
         }
 
-        self.persister.save_snapshot_and_state(
-            rf.persisted_state().into(),
-            rf.log.snapshot().1,
-        );
+        let (index_term, snapshot) = rf.log.snapshot();
+        self.persister.update_snapshot(index_term, snapshot);
 
         self.apply_command_signal.notify_one();
         InstallSnapshotReply {

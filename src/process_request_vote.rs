@@ -1,9 +1,6 @@
 use crate::{Raft, RequestVoteArgs, RequestVoteReply, State};
 
-// Command must be
-// 1. clone: they are copied to the persister.
-// 2. serialize: they are converted to bytes to persist.
-impl<Command: Clone + serde::Serialize> Raft<Command> {
+impl<Command> Raft<Command> {
     pub fn process_request_vote(
         &self,
         args: RequestVoteArgs,
@@ -38,7 +35,7 @@ impl<Command: Clone + serde::Serialize> Raft<Command> {
             rf.state = State::Follower;
 
             self.election.reset_election_timer();
-            self.persister.save_state(rf.persisted_state().into());
+            self.persister.save_term_vote(&rf);
         }
 
         let voted_for = rf.voted_for;
@@ -54,7 +51,7 @@ impl<Command: Clone + serde::Serialize> Raft<Command> {
             // current term. It does not hurt to update the timer again.
             // We do need to persist, though.
             self.election.reset_election_timer();
-            self.persister.save_state(rf.persisted_state().into());
+            self.persister.save_term_vote(&rf);
 
             RequestVoteReply {
                 term: args.term,

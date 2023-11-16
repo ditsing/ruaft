@@ -106,7 +106,9 @@ mod tests {
     use crate::election::ElectionState;
     use crate::remote_peer::RemotePeer;
     use crate::term_marker::TermMarker;
-    use crate::utils::do_nothing::{DoNothingPersister, DoNothingRemoteRaft};
+    use crate::utils::do_nothing::{
+        DoNothingRaftStoragePersister, DoNothingRemoteRaft,
+    };
     use crate::verify_authority::VerifyAuthorityDaemon;
     use crate::{Peer, RaftState};
 
@@ -117,8 +119,11 @@ mod tests {
         let rf = Arc::new(Mutex::new(RaftState::<i32>::create(1, Peer(0))));
         let election = Arc::new(ElectionState::create());
         let verify_authority_daemon = VerifyAuthorityDaemon::create(1);
-        let term_marker =
-            TermMarker::create(rf, election, Arc::new(DoNothingPersister));
+        let term_marker = TermMarker::create(
+            rf,
+            election,
+            Arc::new(DoNothingRaftStoragePersister {}),
+        );
         let remote_peer = RemotePeer::create(
             Peer(0),
             DoNothingRemoteRaft,

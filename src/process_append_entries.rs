@@ -5,9 +5,8 @@ use crate::{
 };
 
 // Command must be
-// 1. clone: they are copied to the persister.
-// 2. serialize: they are converted to bytes to persist.
-impl<Command: Clone + serde::Serialize> Raft<Command> {
+// 1. serialize: they are converted to bytes to persist.
+impl<Command: serde::Serialize> Raft<Command> {
     pub fn process_append_entries(
         &self,
         args: AppendEntriesArgs<Command>,
@@ -27,7 +26,7 @@ impl<Command: Clone + serde::Serialize> Raft<Command> {
         if rf.current_term < args.term {
             rf.current_term = args.term;
             rf.voted_for = None;
-            self.persister.save_state(rf.persisted_state().into());
+            self.persister.save_term_vote(&rf);
         }
 
         rf.state = State::Follower;
@@ -73,7 +72,8 @@ impl<Command: Clone + serde::Serialize> Raft<Command> {
 
         // COMMIT_INDEX_INVARIANT: Before this loop, we can safely assume that
         // commit_index < log.end().
-        for (i, entry) in args.entries.iter().enumerate() {
+        let mut first_mismatch = rf.log.end();
+        for (i, entry) in args.entries.into_iter().enumerate() {
             let index = i + args.prev_log_index + 1;
             if rf.log.end() > index {
                 if rf.log.at(index).term != entry.term {
@@ -87,20 +87,23 @@ impl<Command: Clone + serde::Serialize> Raft<Command> {
                     // checked that index is strictly larger than commit_index.
                     // The condition that commit_index < log.end() holds.
                     rf.log.truncate(index);
-                    rf.log.push(entry.clone());
+                    rf.log.push(entry);
+                    first_mismatch = std::cmp::min(first_mismatch, index);
                 }
                 // COMMIT_INDEX_INVARIANT: Otherwise log.end() does not move.
                 // The condition that commit_index < log.end() holds.
             } else {
                 // COMMIT_INDEX_INVARIANT: log.end() grows larger. The condition
                 // that commit_index < log.end() holds.
-                rf.log.push(entry.clone());
+                rf.log.push(entry);
+                first_mismatch = std::cmp::min(first_mismatch, index);
             }
         }
         // COMMIT_INDEX_INVARIANT: After the loop, commit_index < log.end()
         // must still hold.
-
-        self.persister.save_state(rf.persisted_state().into());
+        if first_mismatch <= rf.log.end() {
+            self.persister.append_entries(rf.log.after(first_mismatch));
+        }
 
         // SNAPSHOT_INDEX_INVARIANT: commit_index increases (or stays unchanged)
         // after this if-statement. log.start() <= commit_index still holds.

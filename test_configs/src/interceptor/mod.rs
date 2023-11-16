@@ -16,7 +16,7 @@ use ruaft::{
     RequestVoteReply,
 };
 
-use crate::Persister;
+use crate::InMemoryStorage;
 
 type RaftId = usize;
 
@@ -276,9 +276,8 @@ pub fn make_config(server_count: usize, max_state: Option<usize>) -> Config {
         })
         .collect();
     for (index, client_vec) in clients.iter().enumerate() {
-        let persister = Persister::new();
-        let kv_server =
-            KVServer::new(client_vec.to_vec(), index, persister, max_state);
+        let storage = InMemoryStorage::create(max_state.unwrap_or(usize::MAX));
+        let kv_server = KVServer::new(client_vec.to_vec(), index, storage);
         kv_servers.push(kv_server);
     }
 

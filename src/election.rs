@@ -6,12 +6,13 @@ use parking_lot::{Condvar, Mutex};
 use rand::{thread_rng, Rng};
 
 use crate::remote_context::RemoteContext;
+use crate::storage::SharedLogPersister;
 use crate::sync_log_entries::SyncLogEntriesComms;
 use crate::utils::{retry_rpc, RPC_DEADLINE};
 use crate::verify_authority::VerifyAuthorityDaemon;
 use crate::{
-    IndexTerm, Peer, Persister, Raft, RaftState, ReplicableCommand,
-    RequestVoteArgs, State, Term,
+    IndexTerm, Peer, Raft, RaftState, ReplicableCommand, RequestVoteArgs,
+    State, Term,
 };
 
 struct VersionedDeadline {
@@ -82,7 +83,7 @@ struct ElectionCandidate<Command> {
     election: Arc<ElectionState>,
     new_log_entry: SyncLogEntriesComms,
     verify_authority_daemon: VerifyAuthorityDaemon,
-    persister: Arc<dyn Persister>,
+    persister: SharedLogPersister<Command>,
     thread_pool: tokio::runtime::Handle,
 }
 
@@ -95,9 +96,8 @@ enum QuorumOrCancelled {
 
 // Command must be
 // 0. 'static: Raft<Command> must be 'static, it is moved to another thread.
-// 1. clone: they are copied to the persister.
-// 2. send: Arc<Mutex<Vec<LogEntry<Command>>>> must be send, it is moved to another thread.
-// 3. serialize: they are converted to bytes to persist.
+// 1. send: Arc<Mutex<Vec<LogEntry<Command>>>> must be send, it is moved to another thread.
+// 2. serialize: they are converted to bytes to persist.
 impl<Command: ReplicableCommand> Raft<Command> {
     /// Runs the election timer daemon that triggers elections.
     ///
@@ -317,7 +317,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             rf.voted_for = Some(me);
             rf.state = State::Candidate;
 
-            candidate.persister.save_state(rf.persisted_state().into());
+            candidate.persister.save_term_vote(&rf);
 
             (rf.current_term, rf.log.last_index_term().unpack())
         };
@@ -431,7 +431,8 @@ impl<Command: ReplicableCommand> Raft<Command> {
             if rf.commit_index != rf.log.last_index_term().index {
                 // Create a sentinel commit at the start of the term.
                 sentinel_commit_index = rf.log.add_term_change_entry(term);
-                this.persister.save_state(rf.persisted_state().into());
+                this.persister
+                    .append_one_entry(rf.log.at(sentinel_commit_index));
             } else {
                 sentinel_commit_index = rf.commit_index;
             }

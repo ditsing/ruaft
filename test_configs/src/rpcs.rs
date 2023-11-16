@@ -216,7 +216,7 @@ pub fn register_kv_server<
 
 #[cfg(test)]
 mod tests {
-    use ruaft::utils::do_nothing::DoNothingPersister;
+    use ruaft::utils::do_nothing::DoNothingRaftStorage;
     use ruaft::utils::integration_test::{
         make_append_entries_args, make_request_vote_args,
         unpack_append_entries_reply, unpack_request_vote_reply,
@@ -240,9 +240,8 @@ mod tests {
             let raft = Raft::new(
                 vec![RpcClient(client)],
                 0,
-                DoNothingPersister,
+                DoNothingRaftStorage,
                 |_: ApplyCommandMessage<i32>| {},
-                None,
                 crate::utils::NO_SNAPSHOT,
             );
             register_server(raft, name, network.as_ref())?;

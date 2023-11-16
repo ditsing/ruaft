@@ -1,10 +1,9 @@
 #![cfg(feature = "integration-test")]
 
 use crate::{
-    AppendEntriesArgs, AppendEntriesReply, IndexTerm, Peer, Persister, Raft,
-    RequestVoteArgs, RequestVoteReply, Term,
+    AppendEntriesArgs, AppendEntriesReply, IndexTerm, Peer, RequestVoteArgs,
+    RequestVoteReply, Term,
 };
-use std::sync::Arc;
 
 pub fn make_request_vote_args(
     term: Term,
@@ -50,10 +49,4 @@ pub fn unpack_append_entries_args<T>(
 
 pub fn unpack_append_entries_reply(reply: AppendEntriesReply) -> (Term, bool) {
     (reply.term, reply.success)
-}
-
-impl<Command> Raft<Command> {
-    pub fn persister(&self) -> Arc<dyn Persister> {
-        self.persister.clone()
-    }
 }

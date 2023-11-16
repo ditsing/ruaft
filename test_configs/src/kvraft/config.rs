@@ -8,7 +8,7 @@ use rand::thread_rng;
 use kvraft::Clerk;
 use kvraft::KVServer;
 
-use crate::{register_kv_server, register_server, Persister, RpcClient};
+use crate::{register_kv_server, register_server, InMemoryStorage, RpcClient};
 
 struct ConfigState {
     kv_servers: Vec<Option<Arc<KVServer>>>,
@@ -19,7 +19,7 @@ pub struct Config {
     network: Arc<Mutex<labrpc::Network>>,
     server_count: usize,
     state: Mutex<ConfigState>,
-    storage: Mutex<Vec<Option<Persister>>>,
+    storage: Mutex<Vec<InMemoryStorage>>,
     maxraftstate: usize,
 }
 
@@ -52,12 +52,9 @@ impl Config {
             }
         }
 
-        let persister = self.storage.lock()[index]
-            .take()
-            .expect("A persister must be present to create a raft server");
+        let storage = self.storage.lock()[index].clone();
 
-        let kv =
-            KVServer::new(clients, index, persister, Some(self.maxraftstate));
+        let kv = KVServer::new(clients, index, storage);
         self.state.lock().kv_servers[index].replace(kv.clone());
 
         let raft = kv.raft().clone();
@@ -153,13 +150,12 @@ impl Config {
         }
 
         if let Some(kv_server) = self.state.lock().kv_servers[index].take() {
-            let persister = kv_server.raft().persister();
-            let data = Persister::downcast_unsafe(persister.as_ref()).read();
+            let data = self.storage.lock()[index].save();
             kv_server.kill();
 
-            let persister = Persister::new();
-            persister.restore(data);
-            self.storage.lock()[index] = Some(persister);
+            let storage = InMemoryStorage::create(self.maxraftstate);
+            storage.restore(data);
+            self.storage.lock()[index] = storage;
         }
     }
 
@@ -253,16 +249,11 @@ impl Config {
     fn check_size(
         &self,
         upper: usize,
-        size_fn: impl Fn(&Persister) -> usize,
+        size_fn: impl Fn(&InMemoryStorage) -> usize,
     ) -> Result<(), String> {
         let mut over_limits = String::new();
-        for (index, p) in self.state.lock().kv_servers.iter().enumerate() {
-            let p = p
-                .as_ref()
-                .expect("KV server must be running to check size")
-                .raft()
-                .persister();
-            let size = size_fn(Persister::downcast_unsafe(p.as_ref()));
+        for (index, storage) in self.storage.lock().iter().enumerate() {
+            let size = size_fn(storage);
             if size > upper {
                 let str = format!(" (index {}, size {})", index, size);
                 over_limits.push_str(&str);
@@ -278,11 +269,11 @@ impl Config {
     }
 
     pub fn check_log_size(&self, upper: usize) -> Result<(), String> {
-        self.check_size(upper, ruaft::Persister::state_size)
+        self.check_size(upper, InMemoryStorage::state_size)
     }
 
     pub fn check_snapshot_size(&self, upper: usize) -> Result<(), String> {
-        self.check_size(upper, Persister::snapshot_size)
+        self.check_size(upper, InMemoryStorage::snapshot_size)
     }
 }
 
@@ -306,7 +297,7 @@ pub fn make_config(
     let storage = Mutex::new(vec![]);
     storage
         .lock()
-        .resize_with(server_count, || Some(Persister::new()));
+        .resize_with(server_count, || InMemoryStorage::create(maxraftstate));
 
     let cfg = Config {
         network,

@@ -11,14 +11,14 @@ use crate::daemon_env::{DaemonEnv, ThreadEnv};
 use crate::daemon_watch::{Daemon, DaemonWatch};
 use crate::election::ElectionState;
 use crate::heartbeats::{HeartbeatsDaemon, HEARTBEAT_INTERVAL};
-use crate::persister::PersistedRaftState;
 use crate::remote_context::RemoteContext;
 use crate::remote_peer::RemotePeer;
 use crate::snapshot::{RequestSnapshotFnMut, SnapshotDaemon};
+use crate::storage::{RaftStorageTrait, SharedLogPersister};
 use crate::sync_log_entries::SyncLogEntriesComms;
 use crate::term_marker::TermMarker;
 use crate::verify_authority::VerifyAuthorityDaemon;
-use crate::{IndexTerm, Persister, RaftState, RemoteRaft, ReplicableCommand};
+use crate::{IndexTerm, RaftState, RemoteRaft, ReplicableCommand};
 
 #[derive(
     Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Serialize, Deserialize,
@@ -35,7 +35,7 @@ pub struct Raft<Command> {
 
     pub(crate) me: Peer,
 
-    pub(crate) persister: Arc<dyn Persister>,
+    pub(crate) persister: SharedLogPersister<Command>,
 
     pub(crate) sync_log_entries_comms: SyncLogEntriesComms,
     pub(crate) apply_command_signal: Arc<Condvar>,
@@ -60,9 +60,8 @@ impl<Command: ReplicableCommand> Raft<Command> {
     pub fn new(
         peers: Vec<impl RemoteRaft<Command> + 'static>,
         me: usize,
-        persister: impl Persister + 'static,
+        storage: impl RaftStorageTrait,
         apply_command: impl ApplyCommandFnMut<Command>,
-        max_state_size_bytes: Option<usize>,
         request_snapshot: impl RequestSnapshotFnMut,
     ) -> Self {
         let peer_size = peers.len();
@@ -73,12 +72,11 @@ impl<Command: ReplicableCommand> Raft<Command> {
         // log.start() <= commit_index and commit_index < log.end() both hold.
         assert_eq!(state.commit_index + 1, state.log.end());
 
-        if let Ok(persisted_state) =
-            PersistedRaftState::try_from(persister.read_state())
-        {
-            state.current_term = persisted_state.current_term;
-            state.voted_for = persisted_state.voted_for;
-            state.log = persisted_state.log;
+        if let Ok(stored_state) = storage.read_state() {
+            state.current_term = stored_state.current_term();
+            state.voted_for = stored_state.voted_for();
+            stored_state.restore_log_array(&mut state.log);
+
             state.commit_index = state.log.start();
             // COMMIT_INDEX_INVARIANT, SNAPSHOT_INDEX_INVARIANT: the saved
             // snapshot must have a valid log.start() and log.end(). Thus
@@ -95,7 +93,9 @@ impl<Command: ReplicableCommand> Raft<Command> {
         let election = Arc::new(ElectionState::create());
         election.reset_election_timer();
 
-        let persister = Arc::new(persister);
+        let storage_monitor =
+            storage.log_compaction_required().then(|| storage.monitor());
+        let persister: SharedLogPersister<Command> = storage.persister();
         let term_marker = TermMarker::create(
             inner_state.clone(),
             election.clone(),
@@ -164,7 +164,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
             .create_daemon(Daemon::VerifyAuthority, verify_authority_daemon);
         // Running in a standalone thread.
         let snapshot_daemon =
-            this.run_snapshot_daemon(max_state_size_bytes, request_snapshot);
+            this.run_snapshot_daemon(storage_monitor, request_snapshot);
         daemon_watch.create_daemon(Daemon::Snapshot, snapshot_daemon);
         // Running in a standalone thread.
         let sync_log_entry_daemon =
@@ -216,7 +216,7 @@ impl<Command: ReplicableCommand> Raft<Command> {
         }
 
         let index = rf.log.add_command(term, command);
-        self.persister.save_state(rf.persisted_state().into());
+        self.persister.append_one_entry(rf.log.at(index));
 
         self.sync_log_entries_comms.update_followers(index);
 
@@ -284,7 +284,7 @@ impl RaftJoinHandle {
 
 #[cfg(test)]
 mod tests {
-    use crate::utils::do_nothing::{DoNothingPersister, DoNothingRemoteRaft};
+    use crate::utils::do_nothing::{DoNothingRaftStorage, DoNothingRemoteRaft};
     use crate::ApplyCommandMessage;
 
     use super::*;
@@ -309,9 +309,8 @@ mod tests {
         let raft = Raft::new(
             vec![DoNothingRemoteRaft {}; peer_size],
             me,
-            DoNothingPersister {},
+            DoNothingRaftStorage {},
             |_: ApplyCommandMessage<i32>| {},
-            None,
             |_| {},
         );
 

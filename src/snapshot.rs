@@ -6,6 +6,7 @@ use parking_lot::{Condvar, Mutex};
 
 use crate::check_or_record;
 use crate::daemon_env::ErrorKind;
+use crate::storage::RaftStorageMonitorTrait;
 use crate::{Index, Raft};
 
 #[derive(Clone, Debug, Default)]
@@ -123,16 +124,11 @@ impl<C: 'static + Clone + Send + serde::Serialize> Raft<C> {
     /// snapshot will be saved in a temporary space. This daemon will wake up,
     /// apply the snapshot into the log and discard log entries before the
     /// snapshot. There is no guarantee that the snapshot will be applied.
-    pub(crate) fn run_snapshot_daemon(
+    pub(crate) fn run_snapshot_daemon<T: RaftStorageMonitorTrait>(
         &mut self,
-        max_state_size: Option<usize>,
+        storage_monitor: Option<T>,
         mut request_snapshot: impl RequestSnapshotFnMut,
     ) -> impl FnOnce() {
-        let max_state_size = match max_state_size {
-            Some(max_state_size) => max_state_size,
-            None => usize::MAX,
-        };
-
         let parker = Parker::new();
         let unparker = parker.unparker().clone();
         self.snapshot_daemon.unparker.replace(unparker.clone());
@@ -144,7 +140,7 @@ impl<C: 'static + Clone + Send + serde::Serialize> Raft<C> {
         let snapshot_daemon = self.snapshot_daemon.clone();
 
         log::info!("{:?} snapshot daemon running ...", me);
-        let snapshot_daemon = move || loop {
+        let snapshot_daemon = move |storage_monitor: T| loop {
             parker.park();
             if !keep_running.load(Ordering::Acquire) {
                 log::info!("{:?} snapshot daemon done.", me);
@@ -152,11 +148,12 @@ impl<C: 'static + Clone + Send + serde::Serialize> Raft<C> {
                 // Explicitly drop every thing.
                 drop(keep_running);
                 drop(rf);
+                drop(storage_monitor);
                 drop(persister);
                 drop(snapshot_daemon);
                 break;
             }
-            if persister.state_size() >= max_state_size {
+            if storage_monitor.should_compact_log_now() {
                 let log_start = rf.lock().log.first_index_term();
                 let snapshot = {
                     let mut snapshot =
@@ -211,15 +208,13 @@ impl<C: 'static + Clone + Send + serde::Serialize> Raft<C> {
                 // smaller than commit_index. This is the only place where
                 // log.start() changes.
                 rf.log.shift(snapshot.last_included_index, snapshot.data);
-                persister.save_snapshot_and_state(
-                    rf.persisted_state().into(),
-                    rf.log.snapshot().1,
-                );
+                let (index_term, snapshot) = rf.log.snapshot();
+                persister.update_snapshot(index_term, snapshot);
             }
         };
         move || {
-            if max_state_size != usize::MAX {
-                snapshot_daemon()
+            if let Some(storage_monitor) = storage_monitor {
+                snapshot_daemon(storage_monitor)
             }
         }
     }

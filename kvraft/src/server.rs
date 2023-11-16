@@ -9,9 +9,9 @@ use futures::FutureExt;
 use parking_lot::Mutex;
 use serde_derive::{Deserialize, Serialize};
 
+use ruaft::storage::RaftStorageTrait;
 use ruaft::{
-    ApplyCommandMessage, Index, Persister, Raft, RemoteRaft, Term,
-    VerifyAuthorityResult,
+    ApplyCommandMessage, Index, Raft, RemoteRaft, Term, VerifyAuthorityResult,
 };
 #[cfg(all(not(test), feature = "integration-test"))]
 use test_utils::thread_local_logger::LocalLogger;
@@ -111,8 +111,7 @@ impl KVServer {
     pub fn new(
         servers: Vec<impl RemoteRaft<UniqueKVOp> + 'static>,
         me: usize,
-        persister: impl Persister + 'static,
-        max_state_size_bytes: Option<usize>,
+        storage: impl RaftStorageTrait,
     ) -> Arc<Self> {
         let (tx, rx) = channel();
         let apply_command = move |message| {
@@ -123,17 +122,10 @@ impl KVServer {
         let ret = Arc::new(Self {
             me,
             state: Mutex::new(KVServerState::default()),
-            rf: Raft::new(
-                servers,
-                me,
-                persister,
-                apply_command,
-                max_state_size_bytes,
-                {
-                    let snapshot_holder = snapshot_holder.clone();
-                    move |index| snapshot_holder.request_snapshot(index)
-                },
-            ),
+            rf: Raft::new(servers, me, storage, apply_command, {
+                let snapshot_holder = snapshot_holder.clone();
+                move |index| snapshot_holder.request_snapshot(index)
+            }),
             keep_running: AtomicBool::new(true),
         });
         ret.process_command(snapshot_holder, rx);

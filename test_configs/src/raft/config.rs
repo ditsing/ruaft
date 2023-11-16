@@ -8,10 +8,11 @@ use anyhow::{anyhow, bail};
 use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
 
-use ruaft::{ApplyCommandMessage, Persister, Raft, Term};
+use ruaft::{ApplyCommandMessage, Raft, Term};
 
 use crate::register_server;
 use crate::utils::{sleep_millis, NO_SNAPSHOT};
+use crate::InMemoryStorage;
 
 struct ConfigState {
     rafts: Vec<Option<Raft<i32>>>,
@@ -22,7 +23,7 @@ struct LogState {
     committed_logs: Vec<Vec<i32>>,
     results: Vec<Result<()>>,
     max_index: usize,
-    saved: Vec<Option<crate::Persister>>,
+    saved: Vec<InMemoryStorage>,
 }
 
 pub struct Config {
@@ -303,13 +304,13 @@ impl Config {
         // the apply command function.
         let Some(raft) = raft else { return };
 
-        let data = raft.persister().read_state();
+        let data = self.log.lock().saved[index].save();
         raft.kill().join();
 
         let mut log = self.log.lock();
-        let persister = crate::Persister::new();
-        persister.save_state(data);
-        log.saved[index] = Some(persister);
+        let storage = InMemoryStorage::create(usize::MAX);
+        storage.restore(data);
+        log.saved[index] = storage;
     }
 
     pub fn start1(&self, index: usize) -> Result<()> {
@@ -327,17 +328,14 @@ impl Config {
                 )))
             }
         }
-        let persister = self.log.lock().saved[index]
-            .take()
-            .expect("A persister must be present to create a raft server");
+        let storage = self.log.lock().saved[index].clone();
 
         let log = self.log.clone();
         let raft = Raft::new(
             clients,
             index,
-            persister,
+            storage,
             move |message| Self::apply_command(log.clone(), index, message),
-            None,
             NO_SNAPSHOT,
         );
         self.state.lock().rafts[index].replace(raft.clone());
@@ -493,7 +491,7 @@ pub fn make_config(
     });
 
     let mut saved = vec![];
-    saved.resize_with(server_count, || Some(crate::Persister::new()));
+    saved.resize_with(server_count, || InMemoryStorage::create(usize::MAX));
     let log = Arc::new(Mutex::new(LogState {
         committed_logs: vec![vec![]; server_count],
         results: vec![],

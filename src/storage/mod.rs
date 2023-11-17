@@ -1,9 +1,9 @@
-pub(crate) use log_persister::SharedLogPersister;
+pub(crate) use internal::SharedLogPersister;
 
 use crate::{Index, Term};
 
 mod decode_and_encode;
-mod log_persister;
+mod internal;
 
 /// A reference type that points to a Raft log entry. Used as input parameters
 /// in the storage interface `RaftStoragePersisterTrait`.

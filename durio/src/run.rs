@@ -4,8 +4,8 @@ use std::sync::Arc;
 use kvraft::KVServer;
 
 use crate::kv_service::start_kv_service_server;
-use crate::persister::DoNothingPersister;
 use crate::raft_service::{start_raft_service_server, LazyRaftServiceClient};
+use crate::storage::DoNothingRaftStorage;
 
 pub(crate) async fn run_kv_instance(
     addr: SocketAddr,
@@ -19,9 +19,9 @@ pub(crate) async fn run_kv_instance(
         remote_rafts.push(LazyRaftServiceClient::new(raft_peer));
     }
 
-    let persister = DoNothingPersister::default();
+    let storage = DoNothingRaftStorage::default();
 
-    let kv_server = KVServer::new(remote_rafts, me, persister, None);
+    let kv_server = KVServer::new(remote_rafts, me, storage);
     let raft = kv_server.raft().clone();
 
     start_raft_service_server(local_raft_peer, raft).await?;

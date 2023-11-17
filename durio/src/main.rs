@@ -13,9 +13,9 @@ use crate::kv_service::create_async_clerk;
 use crate::run::run_kv_instance;
 
 mod kv_service;
-mod persister;
 mod raft_service;
 mod run;
+mod storage;
 mod utils;
 
 #[derive(Deserialize, Serialize)]

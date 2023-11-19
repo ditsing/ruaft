@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 
 use parking_lot::Mutex;
 
-use crate::remote_context::RemoteContext;
+use crate::remote::RemoteContext;
 use crate::utils::{retry_rpc, RPC_DEADLINE};
 use crate::{AppendEntriesArgs, Peer, Raft, RaftState, ReplicableCommand};
 

@@ -6,7 +6,7 @@ use parking_lot::{Condvar, Mutex};
 use crate::daemon_env::ErrorKind;
 use crate::heartbeats::HEARTBEAT_INTERVAL;
 use crate::peer_progress::PeerProgress;
-use crate::remote_context::RemoteContext;
+use crate::remote::RemoteContext;
 use crate::utils::{retry_rpc, SharedSender, RPC_DEADLINE};
 use crate::{
     check_or_record, AppendEntriesArgs, Index, IndexTerm, InstallSnapshotArgs,

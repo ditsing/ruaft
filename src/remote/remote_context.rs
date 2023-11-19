@@ -1,8 +1,8 @@
 use std::any::Any;
 use std::cell::RefCell;
 
-use crate::remote_peer::RemotePeer;
-use crate::term_marker::TermMarker;
+use crate::remote::RemotePeer;
+use crate::remote::TermMarker;
 use crate::verify_authority::DaemonBeatTicker;
 use crate::{Peer, RemoteRaft};
 
@@ -104,8 +104,8 @@ mod tests {
     use parking_lot::Mutex;
 
     use crate::election::ElectionState;
-    use crate::remote_peer::RemotePeer;
-    use crate::term_marker::TermMarker;
+    use crate::remote::RemotePeer;
+    use crate::remote::TermMarker;
     use crate::utils::do_nothing::{
         DoNothingRaftStoragePersister, DoNothingRemoteRaft,
     };

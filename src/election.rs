@@ -5,7 +5,7 @@ use std::time::{Duration, Instant};
 use parking_lot::{Condvar, Mutex};
 use rand::{thread_rng, Rng};
 
-use crate::remote_context::RemoteContext;
+use crate::remote::RemoteContext;
 use crate::storage::SharedLogPersister;
 use crate::sync_log_entries::SyncLogEntriesComms;
 use crate::utils::{retry_rpc, RPC_DEADLINE};

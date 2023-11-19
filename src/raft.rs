@@ -11,12 +11,12 @@ use crate::daemon_env::{DaemonEnv, ThreadEnv};
 use crate::daemon_watch::{Daemon, DaemonWatch};
 use crate::election::ElectionState;
 use crate::heartbeats::{HeartbeatsDaemon, HEARTBEAT_INTERVAL};
-use crate::remote_context::RemoteContext;
-use crate::remote_peer::RemotePeer;
+use crate::remote::RemoteContext;
+use crate::remote::RemotePeer;
+use crate::remote::TermMarker;
 use crate::snapshot::{RequestSnapshotFnMut, SnapshotDaemon};
 use crate::storage::{RaftStorageTrait, SharedLogPersister};
 use crate::sync_log_entries::SyncLogEntriesComms;
-use crate::term_marker::TermMarker;
 use crate::verify_authority::VerifyAuthorityDaemon;
 use crate::{IndexTerm, RaftState, RemoteRaft, ReplicableCommand};
 

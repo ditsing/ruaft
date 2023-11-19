@@ -75,7 +75,7 @@ impl<Command: serde::Serialize> Raft<Command> {
         let mut first_mismatch = rf.log.end();
         for (i, entry) in args.entries.into_iter().enumerate() {
             let index = i + args.prev_log_index + 1;
-            if rf.log.end() > index {
+            if index < rf.log.end() {
                 if rf.log.at(index).term != entry.term {
                     check_or_record!(
                         index > rf.commit_index,

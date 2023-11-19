@@ -20,7 +20,7 @@ consistently across replicas.
 
 I have a 3-replica durio service running on Raspberry Pis. See the [README][durio] for more details.
 
-## Application Interafce
+## Application Interface
 
 Each application replica has a Raft instance that runs side by side with it. To add a log entry to the Raft log, the
 application calls `start()` with the data it wants to store (commonly referred to as a "command"). The log entry is not
@@ -119,6 +119,7 @@ assuming there is no thread starvation.
 - [x] Add public documentation
 - [x] Add a proper RPC interface to all public methods
 - [x] Allow storing arbitrary information
+- [x] Build a better storage interface
 - [x] Add more logging
 - [ ] Benchmarks
 - [x] Support the `Prevote` state

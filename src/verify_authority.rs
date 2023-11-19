@@ -220,6 +220,14 @@ impl VerifyAuthorityDaemon {
                 token.beats_moment[peer_index] <= ticked
             });
             let new_covered = first_not_ticked_index + state.start.0;
+            if new_covered < state.covered[peer_index].0 {
+                log::error!(
+                    "Ticked index moving backwards from {} to {} for peer {}",
+                    state.covered[peer_index].0,
+                    new_covered,
+                    peer_index,
+                );
+            }
             assert!(new_covered >= state.covered[peer_index].0);
             state.covered[peer_index].0 = new_covered;
 
@@ -248,6 +256,9 @@ impl VerifyAuthorityDaemon {
                     if self.beat_tickers[index].ticked() >= *beat {
                         cnt += 1;
                     }
+                }
+                if cnt + cnt + 1 < self.beat_tickers.len() {
+                    log::error!("Token {:?} is not covered", token);
                 }
                 assert!(cnt + cnt + 1 >= self.beat_tickers.len());
 

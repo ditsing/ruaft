@@ -178,6 +178,14 @@ impl<Command: ReplicableCommand> Raft<Command> {
             // order. We should cancel the election and just wait.
             if let Some(last_timer_count) = should_run {
                 let expected_timer_count = last_timer_count + 1;
+                if timer_count < expected_timer_count {
+                    log::error!(
+                        "Spurious wake up. \
+                        Expecting version at least {}+1, but got {}",
+                        last_timer_count,
+                        timer_count
+                    );
+                }
                 assert!(timer_count >= expected_timer_count);
                 // If the timer was changed more than once, we know the
                 // last scheduled election should have been cancelled.

@@ -69,6 +69,13 @@ impl<Command: ReplicableCommand> Raft<Command> {
                     // Note that between those two nested `if`s, log start is
                     // always smaller than or equal to commit index, as
                     // guaranteed by the SNAPSHOT_INDEX_INVARIANT.
+                    if rf.log.start() > rf.commit_index {
+                        log::error!(
+                            "Commit index {} is before log start {}",
+                            rf.commit_index,
+                            rf.log.start()
+                        );
+                    }
                     assert!(rf.log.start() <= rf.commit_index);
                     if last_applied < rf.log.start() {
                         let (index_term, data) = rf.log.snapshot();
@@ -84,6 +91,13 @@ impl<Command: ReplicableCommand> Raft<Command> {
                         let last_one = rf.commit_index + 1;
                         // This is safe because commit_index is always smaller
                         // than log.end(), see COMMIT_INDEX_INVARIANT.
+                        if last_one > rf.log.end() {
+                            log::error!(
+                                "Commit index {} is on or after log end {}",
+                                rf.commit_index,
+                                rf.log.end()
+                            );
+                        }
                         assert!(last_one <= rf.log.end());
                         let messages: Vec<ApplyCommandMessage<Command>> = rf
                             .log

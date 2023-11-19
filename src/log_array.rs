@@ -36,7 +36,7 @@ enum LogEntryEnum<Command> {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct LogEntry<Command> {
+pub(crate) struct LogEntry<Command> {
     pub index: Index,
     pub term: Term,
     command: LogEntryEnum<Command>,

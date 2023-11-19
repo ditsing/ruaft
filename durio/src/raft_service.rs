@@ -5,7 +5,7 @@ use async_trait::async_trait;
 use tarpc::context::Context;
 
 use kvraft::UniqueKVOp;
-use ruaft::{
+use raft::{
     AppendEntriesArgs, AppendEntriesReply, InstallSnapshotArgs,
     InstallSnapshotReply, Raft, RemoteRaft, RequestVoteArgs, RequestVoteReply,
 };

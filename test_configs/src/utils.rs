@@ -11,4 +11,4 @@ pub fn sleep_election_timeouts(count: u64) {
 
 /// Pass this function to [`Raft::new`] if the application will not accept
 /// any request for taking snapshots.
-pub const NO_SNAPSHOT: fn(ruaft::Index) = |_| {};
+pub const NO_SNAPSHOT: fn(raft::Index) = |_| {};

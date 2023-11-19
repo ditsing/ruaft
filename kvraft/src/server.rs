@@ -9,8 +9,8 @@ use futures::FutureExt;
 use parking_lot::Mutex;
 use serde_derive::{Deserialize, Serialize};
 
-use ruaft::storage::RaftStorageTrait;
-use ruaft::{
+use raft::storage::RaftStorageTrait;
+use raft::{
     ApplyCommandMessage, Index, Raft, RemoteRaft, Term, VerifyAuthorityResult,
 };
 #[cfg(all(not(test), feature = "integration-test"))]

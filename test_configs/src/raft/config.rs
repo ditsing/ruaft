@@ -8,7 +8,7 @@ use anyhow::{anyhow, bail};
 use parking_lot::Mutex;
 use rand::{thread_rng, Rng};
 
-use ruaft::{ApplyCommandMessage, Raft, Term};
+use raft::{ApplyCommandMessage, Raft, Term};
 
 use crate::register_server;
 use crate::utils::{sleep_millis, NO_SNAPSHOT};

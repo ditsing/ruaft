@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use ruaft::utils::integration_test::{
+use raft::utils::integration_test::{
     unpack_append_entries_args, unpack_append_entries_reply,
 };
 use test_configs::interceptor::{make_config, RaftRpcEvent};

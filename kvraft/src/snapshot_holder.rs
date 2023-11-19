@@ -4,7 +4,7 @@ use parking_lot::Mutex;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
-use ruaft::Snapshot;
+use raft::Snapshot;
 
 #[derive(Default)]
 pub(crate) struct SnapshotHolder<T> {

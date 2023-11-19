@@ -1,0 +1,40 @@
+[package]
+name = "raft"
+version = "0.1.0"
+description = "Raft implemented in Rust"
+authors = ["Jing Yang <ditsing@gmail.com>"]
+edition = "2021"
+license = "MIT"
+keywords = ["raft", "consensus-protocol"]
+readme = "README.md"
+repository = "https://github.com/ditsing/ruaft"
+homepage = "https://github.com/ditsing/ruaft"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+async-trait = "0.1"
+bincode = "1.3.3"
+bytes = "1.1"
+crossbeam-utils = "0.8"
+futures-channel = "0.3.21"
+futures-util = "0.3.21"
+lazy_static = "1.4.0"
+log = "0.4"
+parking_lot = "0.12"
+rand = "0.8"
+serde = "1.0"
+serde_derive = "1.0"
+serde_bytes = "0.11.9"
+tokio = { version = "1.7", features = ["net", "rt-multi-thread", "sync", "time", "parking_lot"] }
+test_utils = { path = "../test_utils", optional = true }
+
+[features]
+default = []
+integration-test = ["test_utils"]
+
+[dev-dependencies]
+scopeguard = "1.1.0"
+stdext = "0.3"
+test_configs = { path = "../test_configs" }
+test_utils = { path = "../test_utils" }

@@ -10,7 +10,7 @@ use once_cell::sync::OnceCell;
 use kvraft::{
     GetArgs, KVServer, PutAppendArgs, PutAppendEnum, UniqueId, UniqueKVOp,
 };
-use ruaft::{
+use raft::{
     AppendEntriesArgs, AppendEntriesReply, InstallSnapshotArgs,
     InstallSnapshotReply, Raft, RemoteRaft, ReplicableCommand, RequestVoteArgs,
     RequestVoteReply,

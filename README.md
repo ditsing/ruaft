@@ -127,11 +127,11 @@ assuming there is no thread starvation.
 
 [durio]: https://github.com/ditsing/ruaft/tree/master/durio
 [kvraft]: https://github.com/ditsing/ruaft/tree/master/kvraft
-[labrpc]: https://github.com/ditsing/librpc
+[labrpc]: https://github.com/ditsing/labrpc
 [tarpc]: https://github.com/google/tarpc
-[lib]: https://github.com/ditsing/ruaft/blob/master/src/lib.rs
-[apply_command]: https://github.com/ditsing/ruaft/blob/master/src/apply_command.rs
-[persister]: https://github.com/ditsing/ruaft/blob/master/src/persister.rs
-[remote_raft]: https://github.com/ditsing/ruaft/blob/master/src/remote_raft.rs
-[save_snapshot]: https://github.com/ditsing/ruaft/blob/master/src/snapshot.rs
-[snapshot_tests]: https://github.com/ditsing/ruaft/blob/master/tests/snapshot_tests.rs
+[lib]: https://github.com/ditsing/ruaft/blob/master/raft/src/lib.rs
+[apply_command]: https://github.com/ditsing/ruaft/blob/master/raft/src/apply_command.rs
+[persister]: https://github.com/ditsing/ruaft/blob/master/raft/src/persister.rs
+[remote_raft]: https://github.com/ditsing/ruaft/blob/master/raft/src/remote/remote_raft.rs
+[save_snapshot]: https://github.com/ditsing/ruaft/blob/master/raft/src/snapshot.rs
+[snapshot_tests]: https://github.com/ditsing/ruaft/blob/master/raft/tests/snapshot_tests.rs

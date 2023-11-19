@@ -5,11 +5,11 @@ use std::sync::Arc;
 
 use parking_lot::Mutex;
 
-use ruaft::storage::{
+use raft::storage::{
     RaftLogEntryRef, RaftStorageMonitorTrait, RaftStoragePersisterTrait,
     RaftStorageTrait, RaftStoredLogEntry, RaftStoredState,
 };
-use ruaft::{Index, Term};
+use raft::{Index, Term};
 
 #[derive(Clone)]
 pub struct State {
@@ -222,11 +222,11 @@ mod tests {
 
     use parking_lot::Mutex;
 
-    use ruaft::storage::{
+    use raft::storage::{
         RaftLogEntryRef, RaftStorageMonitorTrait, RaftStoragePersisterTrait,
         RaftStorageTrait,
     };
-    use ruaft::{Index, Term};
+    use raft::{Index, Term};
 
     use crate::in_memory_storage::{InMemoryState, State};
     use crate::InMemoryStorage;

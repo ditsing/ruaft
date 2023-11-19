@@ -1,8 +1,8 @@
-use ruaft::storage::{
+use raft::storage::{
     RaftLogEntryRef, RaftStorageMonitorTrait, RaftStoragePersisterTrait,
     RaftStorageTrait, RaftStoredState,
 };
-use ruaft::{Index, Term};
+use raft::{Index, Term};
 
 #[derive(Default)]
 pub struct DoNothingRaftStorage;

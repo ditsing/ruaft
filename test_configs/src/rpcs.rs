@@ -12,7 +12,7 @@ use kvraft::{
     CommitSentinelArgs, CommitSentinelReply, GetArgs, GetReply, KVServer,
     PutAppendArgs, PutAppendReply, RemoteKvraft,
 };
-use ruaft::{
+use raft::{
     AppendEntriesArgs, AppendEntriesReply, InstallSnapshotArgs,
     InstallSnapshotReply, Raft, ReplicableCommand, RequestVoteArgs,
     RequestVoteReply,
@@ -52,7 +52,7 @@ impl RpcClient {
 }
 
 #[async_trait]
-impl<Command: ReplicableCommand> ruaft::RemoteRaft<Command> for RpcClient {
+impl<Command: ReplicableCommand> raft::RemoteRaft<Command> for RpcClient {
     async fn request_vote(
         &self,
         args: RequestVoteArgs,
@@ -216,12 +216,12 @@ pub fn register_kv_server<
 
 #[cfg(test)]
 mod tests {
-    use ruaft::utils::do_nothing::DoNothingRaftStorage;
-    use ruaft::utils::integration_test::{
+    use raft::utils::do_nothing::DoNothingRaftStorage;
+    use raft::utils::integration_test::{
         make_append_entries_args, make_request_vote_args,
         unpack_append_entries_reply, unpack_request_vote_reply,
     };
-    use ruaft::{ApplyCommandMessage, RemoteRaft, Term};
+    use raft::{ApplyCommandMessage, RemoteRaft, Term};
 
     use super::*;
 

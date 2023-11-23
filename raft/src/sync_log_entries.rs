@@ -7,7 +7,7 @@ use crate::daemon_env::ErrorKind;
 use crate::heartbeats::HEARTBEAT_INTERVAL;
 use crate::peer_progress::PeerProgress;
 use crate::remote::RemoteContext;
-use crate::utils::{retry_rpc, SharedSender, RPC_DEADLINE};
+use crate::utils::{retry_rpc, RPC_DEADLINE};
 use crate::{
     check_or_record, AppendEntriesArgs, Index, IndexTerm, InstallSnapshotArgs,
     Peer, Raft, RaftState, ReplicableCommand, Term,
@@ -34,7 +34,7 @@ impl Event {
 
 #[derive(Clone)]
 pub(crate) struct SyncLogEntriesComms {
-    tx: SharedSender<Event>,
+    tx: std::sync::mpsc::Sender<Event>,
 }
 
 impl SyncLogEntriesComms {
@@ -68,7 +68,6 @@ pub(crate) fn create(
     peer_size: usize,
 ) -> (SyncLogEntriesComms, SyncLogEntriesDaemon) {
     let (tx, rx) = std::sync::mpsc::channel();
-    let tx = SharedSender::new(tx);
     let peer_progress = (0..peer_size).map(PeerProgress::create).collect();
     (
         SyncLogEntriesComms { tx },
